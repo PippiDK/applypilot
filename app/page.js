@@ -1,11 +1,8 @@
 'use client'
 import {useEffect,useMemo,useState} from 'react'
 
-const jobs=[
- {company:'Nordic Digital Bank',role:'Senior Delivery Manager',location:'Copenhagen · Hybrid',url:'https://www.google.com/search?q=Senior+Delivery+Manager+Copenhagen',salaryKnown:false,jd:`We are looking for a Senior Delivery Manager to own end-to-end delivery of enterprise software initiatives in a regulated financial environment. You will coordinate distributed engineering teams, manage cross-team dependencies and delivery risks, drive release readiness and go-live, and provide clear executive stakeholder reporting. Experience with Agile or hybrid delivery, delivery governance and complex platform programmes is highly valued.`},
- {company:'Cloud Platform Europe',role:'Technical Project Manager',location:'Remote · EMEA',url:'https://www.google.com/search?q=Technical+Project+Manager+Remote+EMEA',salaryKnown:false,jd:`We are hiring a Technical Project Manager to lead cloud and platform implementation across EMEA. The role works closely with engineering teams on Azure, integration dependencies, technical delivery planning, release readiness and risk management. Strong stakeholder management, Agile delivery and experience coordinating distributed technical teams are required.`},
- {company:'RegTech Systems',role:'Program Manager',location:'Copenhagen · Hybrid',url:'https://www.google.com/search?q=Program+Manager+RegTech+Copenhagen',salaryKnown:false,jd:`The Program Manager will lead multiple workstreams in a regulated environment, with responsibility for programme governance, roadmap execution, budget oversight, risk and dependency management, compliance delivery and senior stakeholder alignment. The role requires structured governance, cross-functional coordination and strategic delivery ownership across concurrent initiatives.`}
-]
+const EMPTY_JOBS=[]
+
 
 const requirementCatalog=[
  {id:'end_to_end',label:'End-to-end delivery',jd:[/end[- ]to[- ]end/i,/full lifecycle/i,/delivery lifecycle/i],evidence:[/end[- ]to[- ]end/i,/full lifecycle/i,/delivery lifecycle/i,/SIT/i,/SAT/i,/RFS/i,/go-live/i,/transition to operations/i]},
@@ -29,7 +26,9 @@ const defaultProfile={
  cvName:'',
  roles:'Senior Project Manager, Delivery Manager, Technical Project Manager, Program Manager',
  geography:['Denmark hybrid','Remote EU/EMEA'],
+ preferredLocations:'Nærum, Hørsholm, Lyngby, Kongens Lyngby, Virum, Holte, Gentofte, Hellerup, Ballerup, Greater Copenhagen, Copenhagen',
  salary:'75000',
+ freshnessDays:7,
  exclusions:'Construction; industrial hardware / manufacturing R&D; coordinator or assistant roles; mandatory Danish',
  savedAt:'',
  factBank:[],
@@ -57,7 +56,7 @@ function analyseJob(jd,facts=[]){
  const matched=reqs.filter(r=>requirementSupported(r,facts))
  const gaps=reqs.filter(r=>!requirementSupported(r,facts))
  const ratio=reqs.length?matched.length/reqs.length:0
- const score=Math.max(55,Math.min(98,Math.round(62+ratio*34)))
+ const score=reqs.length?Math.max(35,Math.min(98,Math.round(35+ratio*63))):50
  return {reqs,matched,gaps,score}
 }
 function relevance(fact,reqs){
@@ -139,7 +138,9 @@ function buildChanges(facts,jd){
 
 
 export default function Home(){
- const [selected,setSelected]=useState(jobs[0])
+ const [jobs,setJobs]=useState(EMPTY_JOBS)
+ const [selected,setSelected]=useState(null)
+ const [searchState,setSearchState]=useState({loading:false,error:'',meta:null})
  const [profile,setProfile]=useState(defaultProfile)
  const [draft,setDraft]=useState(defaultProfile)
  const [open,setOpen]=useState(false)
@@ -160,18 +161,40 @@ export default function Home(){
   }catch(e){}
  },[])
 
+ useEffect(()=>{
+  if(profile.savedAt) searchJobs(profile)
+ },[profile.savedAt])
+
  const profileReady=Boolean(profile.savedAt)
  const cvReady=Boolean(profile.factBank?.length)
  const completion=useMemo(()=>{
   const fields=[draft.cvName,draft.roles,draft.geography?.length,draft.salary,draft.exclusions]
   return Math.round(fields.filter(Boolean).length/fields.length*100)
  },[draft])
- const jobKey=`${selected.company}|${selected.role}`
- const activeJd=jobJds[jobKey]||selected.jd
+ const jobKey=selected?`${selected.source||'job'}|${selected.id||selected.company}|${selected.role}`:''
+ const activeJd=selected?(jobJds[jobKey]||selected.jd||''):''
  const jobAnalysis=useMemo(()=>analyseJob(activeJd,profile.factBank||[]),[activeJd,profile.factBank])
  const evidence=useMemo(()=>topEvidence(profile.factBank||[],jobAnalysis.reqs),[profile.factBank,jobAnalysis.reqs])
  const proposedChanges=tailor.jobKey===jobKey?tailor.changes:[]
  const reviewedCount=proposedChanges.filter(c=>decisions[`${jobKey}|${c.id}`]).length
+ const combinedScore=selected?Math.round((selected.searchScore||0)*(cvReady?0.68:1)+(cvReady?jobAnalysis.score*0.32:0)):0
+ const fitLabel=combinedScore>=82?'STRONG FIT':combinedScore>=68?'GOOD FIT':'POSSIBLE FIT'
+ const whyReasons=selected?[...(selected.reasons||[]),...jobAnalysis.matched.map(x=>x.label)].filter((x,i,a)=>x&&a.indexOf(x)===i).slice(0,7):[]
+
+ async function searchJobs(activeProfile=profile){
+  if(!activeProfile?.savedAt) return
+  setSearchState({loading:true,error:'',meta:null})
+  try{
+   const res=await fetch('/api/search-jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roles:activeProfile.roles,geography:activeProfile.geography,preferredLocations:activeProfile.preferredLocations,salary:activeProfile.salary,exclusions:activeProfile.exclusions,freshnessDays:activeProfile.freshnessDays||7})})
+   const data=await res.json()
+   if(!res.ok) throw new Error(data.error||'Live job search failed.')
+   const list=Array.isArray(data.jobs)?data.jobs:[]
+   setJobs(list)
+   setSelected(prev=>list.find(j=>prev&&j.source===prev.source&&j.id===prev.id)||list[0]||null)
+   setTailor({jobKey:'',loading:false,error:'',changes:[],priorities:[]})
+   setSearchState({loading:false,error:'',meta:data.meta||null})
+  }catch(e){setJobs([]);setSelected(null);setSearchState({loading:false,error:e.message||'Live job search failed.',meta:null})}
+ }
 
  function setDecision(id,value){setDecisions(p=>({...p,[`${jobKey}|${id}`]:value}))}
  function acceptAll(){
@@ -180,7 +203,7 @@ export default function Home(){
   setDecisions(next)
  }
  async function runTailoring(force=false){
-  if(!cvReady) return
+  if(!cvReady||!selected) return
   if(!force && tailor.jobKey===jobKey && !tailor.error && (tailor.changes.length || tailor.priorities.length)) return
   setTailor({jobKey,loading:true,error:'',changes:[],priorities:[]})
   try{
@@ -191,9 +214,9 @@ export default function Home(){
    setTailor({jobKey,loading:false,error:'',changes:data.changes||[],priorities:data.priorities||[]})
   }catch(e){setTailor({jobKey,loading:false,error:e.message||'AI tailoring failed.',changes:[],priorities:[]})}
  }
- function openReview(){setReviewOpen(true);runTailoring(false)}
- function openJd(){setJdDraft(activeJd);setJdOpen(true)}
- function saveJd(){const next={...jobJds,[jobKey]:jdDraft};setJobJds(next);localStorage.setItem('applypilot-job-jds',JSON.stringify(next));setDecisions({});setTailor({jobKey:'',loading:false,error:'',changes:[],priorities:[]});setJdOpen(false)}
+ function openReview(){if(!selected)return;setReviewOpen(true);runTailoring(false)}
+ function openJd(){if(!selected)return;setJdDraft(activeJd);setJdOpen(true)}
+ function saveJd(){if(!selected)return;const next={...jobJds,[jobKey]:jdDraft};setJobJds(next);localStorage.setItem('applypilot-job-jds',JSON.stringify(next));setDecisions({});setTailor({jobKey:'',loading:false,error:'',changes:[],priorities:[]});setJdOpen(false)}
  function startProfile(){setDraft(profileReady?profile:defaultProfile);setStep(1);setOpen(true);setParseState({loading:false,error:''})}
  function close(){setOpen(false)}
  function toggleGeo(value){setDraft(p=>({...p,geography:p.geography.includes(value)?p.geography.filter(x=>x!==value):[...p.geography,value]}))}
@@ -219,18 +242,21 @@ export default function Home(){
  return <main>
   <header><div><div className="brand">ApplyPilot</div><div className="tag">Search less. Apply better.</div></div><button className="ghost profileBtn" onClick={startProfile}>{profileReady?'✓ Profile ready':'Search profile'}</button></header>
 
-  <section className="hero"><div><p className="eyebrow">YOUR JOB SEARCH AUTOPILOT</p><h1>3 new opportunities are ready for review.</h1><p>We found, filtered and prepared today’s strongest matches. You decide what gets submitted.</p></div><div className="metric"><b>3</b><span>new today</span></div></section>
+  <section className="hero"><div><p className="eyebrow">YOUR JOB SEARCH AUTOPILOT</p><h1>{profileReady?(searchState.loading?'Searching live vacancies…':`${jobs.length} matching ${jobs.length===1?'opportunity is':'opportunities are'} ready for review.`):'Build your search profile to start live job search.'}</h1><p>{profileReady?`Hard filters are active: target roles, geography, salary floor, exclusions and ${profile.freshnessDays||7}-day freshness.`:'ApplyPilot will search live sources and filter before showing a vacancy.'}</p></div><div className="metric"><b>{searchState.loading?'…':jobs.length}</b><span>live matches</span></div></section>
 
-  {profileReady&&<div className="profileStrip"><span>✓ Search profile active</span><span>{profile.roles.split(',').slice(0,2).join(' · ')}</span><span>{profile.geography.join(' · ')}</span><button onClick={startProfile}>Edit</button></div>}
+  {profileReady&&<div className="profileStrip"><span>✓ Search profile active</span><span>{profile.roles.split(',').slice(0,2).join(' · ')}</span><span>{profile.geography.join(' · ')}</span><span>≤ {profile.freshnessDays||7} days old</span><button onClick={startProfile}>Edit</button><button onClick={()=>searchJobs(profile)} disabled={searchState.loading}>{searchState.loading?'Searching…':'Search now'}</button></div>}
 
-  <section className="grid"><div className="list"><h2>Today</h2>{jobs.map((j,i)=><button key={i} onClick={()=>setSelected(j)} className={'job '+(selected===j?'active':'')}><span className="score">{profileReady?analyseJob(jobJds[`${j.company}|${j.role}`]||j.jd,profile.factBank||[]).score:'—'}{profileReady?'%':''}</span><span><b>{j.role}</b><small>{j.company} · {j.location}</small></span><span>→</span></button>)}</div>
-  <div className="panel"><div className="panelTop"><div><span className="pill">STRONG FIT</span><h2>{selected.role}</h2><p>{selected.company} · {selected.location}</p></div><div className="bigScore">{profileReady?jobAnalysis.score:'—'}{profileReady?'%':''}</div></div>
-  <div className="section"><h3>Why this fits</h3>{profileReady&&jobAnalysis.matched.length?jobAnalysis.matched.slice(0,6).map((x,i)=><p key={i}>✓ {x.label}</p>):<p>Analyse CV to compare it with the full job description.</p>}</div>
-  <div className="section"><h3>Gap</h3>{profileReady&&jobAnalysis.gaps.length?jobAnalysis.gaps.slice(0,3).map((x,i)=><p key={i}>⚠ {x.label} not confirmed</p>):<p>✓ No major JD gaps detected in this prototype</p>}{!selected.salaryKnown&&<p>⚠ Salary not stated</p>}<button className="ghost jdButton" onClick={openJd}>View / edit job description</button></div>
-  <div className="section"><h3>Application pack</h3><div className="docs"><div>{cvReady?'✓':'○'} Tailored CV <span className={cvReady?'ready':'pending'}>{cvReady?'Ready for review':'Needs CV analysis'}</span></div><div>○ Cover letter <span className="pending">Not generated yet</span></div></div></div>
-  <div className="actions"><button className="primary" onClick={()=>cvReady?openReview():startProfile()}>{cvReady?'Review CV changes':'Analyse CV first'}</button><a className="secondary openJob" href={selected.url} target="_blank" rel="noreferrer">Open job</a></div></div></section>
+  {searchState.error&&<div className="errorBox searchNotice"><b>Live search failed</b><span>{searchState.error}</span></div>}
+  {profileReady&&searchState.meta&&<div className="searchMeta"><span><b>{searchState.meta.matchedCount}</b> matched after hard filters</span><span>{searchState.meta.rawCount} fetched</span><span>Sources: {(searchState.meta.sources||[]).join(' · ')||'none'}</span>{searchState.meta.warnings?.length>0&&<span className="pending">{searchState.meta.warnings.join(' · ')}</span>}</div>}
 
-  {profileReady&&<section className="cvReviewSummary"><div><p className="eyebrow">CV UPDATE REVIEW</p><h2>{cvReady?'Tailored CV ready for review':'Analyse your CV to prepare updates'}</h2><p>{cvReady?'See exactly what ApplyPilot proposes to change before anything is used in an application.':'Upload a master CV to create a reviewable tailored version.'}</p></div>{cvReady&&<div className="reviewStats"><div><b>{tailor.jobKey===jobKey&&!tailor.loading?proposedChanges.length:'AI'}</b><span>wording changes</span></div><div><b>{jobAnalysis.matched.length}</b><span>JD requirements matched</span></div><div><b>0</b><span>unsupported claims</span></div><button className="ghost" onClick={openReview}>Review CV changes</button></div>}</section>}
+  <section className="grid"><div className="list"><div className="listHead"><h2>Live matches</h2>{profileReady&&<small>Newest {profile.freshnessDays||7} days</small>}</div>{searchState.loading&&<div className="emptyJobs">Searching Jobnet and remote sources…</div>}{!searchState.loading&&profileReady&&!jobs.length&&<div className="emptyJobs">No vacancies passed the current hard filters. Nothing is padded with demo jobs.</div>}{jobs.map(j=>{const a=analyseJob(jobJds[`${j.source||'job'}|${j.id||j.company}|${j.role}`]||j.jd||'',profile.factBank||[]);const score=Math.round((j.searchScore||0)*(cvReady?0.68:1)+(cvReady?a.score*0.32:0));return <button key={`${j.source}-${j.id}`} onClick={()=>{setSelected(j);setTailor({jobKey:'',loading:false,error:'',changes:[],priorities:[]})}} className={'job '+(selected&&selected.source===j.source&&selected.id===j.id?'active':'')}><span className="score">{score}%</span><span><b>{j.role}</b><small>{j.company} · {j.location}</small><small className="sourceLine">{j.sourceLabel} · {new Date(j.postedAt).toLocaleDateString('en-DK')}</small></span><span>→</span></button>})}</div>
+  <div className="panel">{selected?<><div className="panelTop"><div><span className="pill">{fitLabel}</span><h2>{selected.role}</h2><p>{selected.company} · {selected.location}</p><small className="sourceLine">Source: {selected.sourceLabel} · posted {new Date(selected.postedAt).toLocaleDateString('en-DK')}</small></div><div className="bigScore">{combinedScore}%</div></div>
+  <div className="section"><h3>Why this fits</h3>{whyReasons.length?whyReasons.map((x,i)=><p key={i}>✓ {x}</p>):<p>Search-profile filters passed. Analyse CV to add experience-based reasons.</p>}</div>
+  <div className="section"><h3>Gap / unknown</h3>{cvReady&&jobAnalysis.gaps.length?jobAnalysis.gaps.slice(0,3).map((x,i)=><p key={i}>⚠ {x.label} not confirmed in CV</p>):null}{selected.salaryStatus==='unknown'&&<p>⚠ Salary not stated in comparable DKK/month</p>}{selected.salaryStatus==='possible'&&<p>⚠ Salary range only partly confirms your floor</p>}{!selected.jd&&<p>⚠ Full job description was not returned by the source</p>}<button className="ghost jdButton" onClick={openJd}>View / edit job description</button></div>
+  <div className="section"><h3>Application pack</h3><div className="docs"><div>{cvReady?'✓':'○'} Tailored CV <span className={cvReady?'ready':'pending'}>{cvReady?'Evidence available':'Needs CV analysis'}</span></div><div>○ Cover letter <span className="pending">Not generated yet</span></div></div></div>
+  <div className="actions"><button className="primary" onClick={()=>cvReady?openReview():startProfile()}>{cvReady?'Review CV changes':'Analyse CV first'}</button><a className="secondary openJob" href={selected.url} target="_blank" rel="noreferrer">Open job</a></div></>:<div className="emptyPanel"><h2>No selected vacancy</h2><p>{profileReady?'Run live search or broaden the Search Profile.':'Create a Search Profile first.'}</p></div>}</div></section>
+
+  {profileReady&&selected&&<section className="cvReviewSummary"><div><p className="eyebrow">CV UPDATE REVIEW</p><h2>{cvReady?'Tailored CV ready for review':'Analyse your CV to prepare updates'}</h2><p>{cvReady?'See exactly what ApplyPilot proposes to change before anything is used in an application.':'Upload a master CV to create a reviewable tailored version.'}</p></div>{cvReady&&<div className="reviewStats"><div><b>{tailor.jobKey===jobKey&&!tailor.loading?proposedChanges.length:'AI'}</b><span>wording changes</span></div><div><b>{jobAnalysis.matched.length}</b><span>JD requirements matched</span></div><div><b>0</b><span>unsupported claims</span></div><button className="ghost" onClick={openReview}>Review CV changes</button></div>}</section>}
 
   <footer>Human-in-the-loop by design · ApplyPilot never submits an application without you.</footer>
 
@@ -238,18 +264,18 @@ export default function Home(){
     <div className="modalHead"><div><p className="eyebrow">BUILD YOUR SEARCH AGENT</p><h2>Search profile</h2></div><button className="close" onClick={close}>×</button></div>
     <div className="progress"><span style={{width:`${step/6*100}%`}}></span></div><div className="stepMeta"><span>Step {step} of 6</span><span>{completion}% profile data</span></div>
     {step===1&&<div className="wizard"><h3>Upload your master CV</h3><p>ApplyPilot reads your CV and creates a private evidence layer used to verify every proposed CV update. The evidence layer stays behind the scenes.</p><label className="upload"><input type="file" accept=".pdf,.docx" onChange={e=>parseCv(e.target.files?.[0])}/><b>{parseState.loading?'Analysing CV…':draft.cvName?'✓ '+draft.cvName:'Choose CV file'}</b><span>PDF or DOCX · max 8 MB</span></label>{parseState.error&&<div className="errorBox">{parseState.error}</div>}{draft.factBank?.length>0&&<div className="successBox"><b>✓ CV analysed successfully</b><span>{draft.skills?.length?`Detected signals: ${draft.skills.slice(0,8).join(' · ')}`:'Verified CV evidence is ready.'}</span></div>}</div>}
-    {step===2&&<div className="wizard"><h3>Which roles should we search for?</h3><p>Use job titles you want, separated by commas. Matching will later also understand semantically similar titles.</p><textarea value={draft.roles} onChange={e=>setDraft(p=>({...p,roles:e.target.value}))} rows="5"/></div>}
-    {step===3&&<div className="wizard"><h3>Where can you work?</h3><p>Select every geography that should count as a valid match.</p><div className="choiceGrid">{['Denmark hybrid','Denmark onsite','Remote EU/EMEA','Remote worldwide'].map(x=><button key={x} onClick={()=>toggleGeo(x)} className={draft.geography.includes(x)?'choice selected':'choice'}>{draft.geography.includes(x)?'✓ ':''}{x}</button>)}</div></div>}
-    {step===4&&<div className="wizard"><h3>Minimum acceptable monthly salary</h3><p>For permanent roles. Leave blank if you do not want salary to influence matching yet.</p><div className="salary"><input type="number" min="0" step="1000" value={draft.salary} onChange={e=>setDraft(p=>({...p,salary:e.target.value}))}/><span>DKK / month</span></div></div>}
+    {step===2&&<div className="wizard"><h3>Which roles should we search for?</h3><p>Use job titles you want, separated by commas. The live search expands common project/delivery title variants and then applies hard profile filters.</p><textarea value={draft.roles} onChange={e=>setDraft(p=>({...p,roles:e.target.value}))} rows="5"/></div>}
+    {step===3&&<div className="wizard"><h3>Where can you work?</h3><p>Select valid work models. Denmark results inside your preferred locations are ranked higher, but other Capital Region matches can still survive.</p><div className="choiceGrid">{['Denmark hybrid','Denmark onsite','Remote EU/EMEA','Remote worldwide'].map(x=><button key={x} onClick={()=>toggleGeo(x)} className={draft.geography.includes(x)?'choice selected':'choice'}>{draft.geography.includes(x)?'✓ ':''}{x}</button>)}</div><label className="fieldLabel">Preferred Denmark locations</label><textarea value={draft.preferredLocations||''} onChange={e=>setDraft(p=>({...p,preferredLocations:e.target.value}))} rows="3"/></div>}
+    {step===4&&<div className="wizard"><h3>Freshness & salary floor</h3><p>Search only recent vacancies. Salary is a hard filter only when a comparable DKK salary is actually stated; unknown salary is kept and flagged.</p><div className="freshness"><label>Maximum vacancy age</label><select value={draft.freshnessDays||7} onChange={e=>setDraft(p=>({...p,freshnessDays:Number(e.target.value)}))}><option value="1">1 day</option><option value="3">3 days</option><option value="7">7 days</option><option value="14">14 days</option></select></div><div className="salary"><input type="number" min="0" step="1000" value={draft.salary} onChange={e=>setDraft(p=>({...p,salary:e.target.value}))}/><span>DKK / month minimum</span></div></div>}
     {step===5&&<div className="wizard"><h3>What should ApplyPilot exclude?</h3><p>Describe hard no-go roles, industries, languages or working conditions.</p><textarea value={draft.exclusions} onChange={e=>setDraft(p=>({...p,exclusions:e.target.value}))} rows="6"/></div>}
-    {step===6&&<div className="wizard review"><h3>Confirm your search profile</h3><p>This is what the matching engine will use.</p><div className="reviewRow"><span>CV</span><b>{draft.cvName||'Not uploaded yet'}</b></div><div className="reviewRow"><span>CV analysis</span><b>{draft.factBank?.length?'Ready — evidence verified':'CV not analysed'}</b></div><div className="reviewRow"><span>Target roles</span><b>{draft.roles||'Not set'}</b></div><div className="reviewRow"><span>Geography</span><b>{draft.geography.length?draft.geography.join(' · '):'Not set'}</b></div><div className="reviewRow"><span>Salary floor</span><b>{draft.salary?Number(draft.salary).toLocaleString('en-DK')+' DKK/month':'Not set'}</b></div><div className="reviewRow"><span>Exclude</span><b>{draft.exclusions||'None'}</b></div><div className="truth"><b>Truth rule</b><span>ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.</span></div></div>}
+    {step===6&&<div className="wizard review"><h3>Confirm your search profile</h3><p>This is what the matching engine will use.</p><div className="reviewRow"><span>CV</span><b>{draft.cvName||'Not uploaded yet'}</b></div><div className="reviewRow"><span>CV analysis</span><b>{draft.factBank?.length?'Ready — evidence verified':'CV not analysed'}</b></div><div className="reviewRow"><span>Target roles</span><b>{draft.roles||'Not set'}</b></div><div className="reviewRow"><span>Geography</span><b>{draft.geography.length?draft.geography.join(' · '):'Not set'}</b></div><div className="reviewRow"><span>Preferred locations</span><b>{draft.preferredLocations||'Not set'}</b></div><div className="reviewRow"><span>Freshness</span><b>Last {draft.freshnessDays||7} days only</b></div><div className="reviewRow"><span>Salary floor</span><b>{draft.salary?Number(draft.salary).toLocaleString('en-DK')+' DKK/month':'Not set'}</b></div><div className="reviewRow"><span>Exclude</span><b>{draft.exclusions||'None'}</b></div><div className="truth"><b>Truth rule</b><span>ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.</span></div></div>}
     <div className="modalActions"><button className="secondary" onClick={()=>step===1?close():setStep(s=>s-1)}>{step===1?'Cancel':'Back'}</button>{step<6?<button className="primary" disabled={step===1&&parseState.loading} onClick={()=>setStep(s=>s+1)}>Continue</button>:<button className="primary" onClick={saveProfile}>Save & activate profile</button>}</div>
   </div></div>}
 
 
-  {jdOpen&&<div className="overlay" onMouseDown={e=>{if(e.target===e.currentTarget)setJdOpen(false)}}><div className="modal jdModal"><div className="modalHead"><div><p className="eyebrow">JOB DESCRIPTION</p><h2>{selected.role}</h2><p className="muted">{selected.company} · {selected.location}</p></div><button className="close" onClick={()=>setJdOpen(false)}>×</button></div><div className="wizard"><h3>Full job description</h3><p>Paste the complete vacancy text here. ApplyPilot extracts known delivery requirements from this JD and uses them to drive matching and CV wording proposals.</p><textarea value={jdDraft} onChange={e=>setJdDraft(e.target.value)} rows="14"/><div className="successBox"><b>{extractJobRequirements(jdDraft).length} JD requirements detected</b><span>{extractJobRequirements(jdDraft).map(r=>r.label).join(' · ')||'Add more detailed vacancy text to detect requirements.'}</span></div></div><div className="modalActions"><button className="secondary" onClick={()=>setJdOpen(false)}>Cancel</button><button className="primary" onClick={saveJd}>Save & analyse JD</button></div></div></div>}
+  {jdOpen&&selected&&<div className="overlay" onMouseDown={e=>{if(e.target===e.currentTarget)setJdOpen(false)}}><div className="modal jdModal"><div className="modalHead"><div><p className="eyebrow">JOB DESCRIPTION</p><h2>{selected.role}</h2><p className="muted">{selected.company} · {selected.location}</p></div><button className="close" onClick={()=>setJdOpen(false)}>×</button></div><div className="wizard"><h3>Full job description</h3><p>Paste the complete vacancy text here. ApplyPilot uses this source JD for experience matching and, later, CV wording proposals. Search-profile hard filters are applied before the vacancy reaches this screen.</p><textarea value={jdDraft} onChange={e=>setJdDraft(e.target.value)} rows="14"/><div className="successBox"><b>{extractJobRequirements(jdDraft).length} JD requirements detected</b><span>{extractJobRequirements(jdDraft).map(r=>r.label).join(' · ')||'Add more detailed vacancy text to detect requirements.'}</span></div></div><div className="modalActions"><button className="secondary" onClick={()=>setJdOpen(false)}>Cancel</button><button className="primary" onClick={saveJd}>Save & analyse JD</button></div></div></div>}
 
-  {reviewOpen&&<div className="overlay" onMouseDown={e=>{if(e.target===e.currentTarget)setReviewOpen(false)}}><div className="modal reviewModal"><div className="modalHead"><div><p className="eyebrow">CV UPDATE REVIEW</p><h2>{selected.role}</h2><p className="muted">{selected.company} · {selected.location}</p></div><button className="close" onClick={()=>setReviewOpen(false)}>×</button></div>
+  {reviewOpen&&selected&&<div className="overlay" onMouseDown={e=>{if(e.target===e.currentTarget)setReviewOpen(false)}}><div className="modal reviewModal"><div className="modalHead"><div><p className="eyebrow">CV UPDATE REVIEW</p><h2>{selected.role}</h2><p className="muted">{selected.company} · {selected.location}</p></div><button className="close" onClick={()=>setReviewOpen(false)}>×</button></div>
    <div className="reviewDashboard"><div><b>{tailor.loading?'…':proposedChanges.length}</b><span>wording changes proposed</span></div><div><b>0</b><span>bullets reordered in this prototype</span></div><div><b>{jobAnalysis.matched.length}</b><span>JD requirements matched</span></div><div className="zeroClaims"><b>0</b><span>unsupported claims added</span></div></div>
    <div className="truth compact"><b>Truth Guard active</b><span>Updated wording may only restate evidence already present in your Master CV. Internal evidence IDs are hidden from the user interface.</span></div>
    <div className="jdFocus"><div><small>JOB DESCRIPTION FOCUS</small><p>{tailor.priorities?.length?tailor.priorities.join(' · '):(jobAnalysis.reqs.length?jobAnalysis.reqs.map(r=>r.label).join(' · '):'No known requirements detected — edit the JD to add more detail.')}</p></div><button className="secondary" onClick={openJd}>View JD</button></div>

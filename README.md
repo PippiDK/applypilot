@@ -1,34 +1,32 @@
-# ApplyPilot Web MVP v0.5.2 — AI Evidence-Driven Tailoring
+# ApplyPilot Web v0.6 — Live Search Engine Foundation
 
-This release replaces deterministic phrase replacement with vacancy-specific AI tailoring.
+This release replaces the three hard-coded demo vacancies with live job-source ingestion and real Search Profile hard filters.
 
-## What changed
-- Full Job Description + verified Master CV evidence are sent to a server-side AI tailoring route.
-- AI selects the strongest existing CV evidence for the specific vacancy.
-- AI may rephrase emphasis/order/terminology, but may not invent claims.
-- Server-side Truth Guard validates source IDs and rejects unsupported numbers/acronyms.
-- Tiny grammar/cosmetic edits are filtered out; only meaningful diffs are shown.
-- Different JDs should produce different proposed CV updates from the same Master CV.
-- Review UI remains Original → Updated → Why changed → Source → Accept/Keep.
-- Re-run AI tailoring is available after editing a JD.
+## Live sources
+- Jobnet (Denmark, Capital Region searches via Jobnet's public website BFF)
+- Jobicy (remote jobs)
+- Remotive (remote jobs; source attribution and original link preserved)
 
-## AI runtime
-Uses Vercel AI SDK + AI Gateway model `openai/gpt-5.5` by default.
-On Vercel, AI Gateway can authenticate automatically through OIDC. If OIDC is unavailable, add `AI_GATEWAY_API_KEY` in Vercel Environment Variables.
-Optional model override: `AI_MODEL`.
+## Search Profile fields that now affect results
+- Target roles and common project/delivery title variants
+- Geography (Denmark / Remote EU-EMEA / worldwide)
+- Preferred Denmark locations (used for ranking inside the Capital Region)
+- Freshness (1, 3, 7, or 14 days; default 7)
+- Salary floor when a comparable DKK salary is actually stated
+- Hard exclusions, including mandatory Danish, coordinator/assistant, construction, and industrial hardware/manufacturing R&D patterns
 
-## Truth Guard
-The LLM never receives permission to invent experience. Each returned rewrite must reference a supplied CV evidence ID. The server discards proposals that:
-- cannot be anchored to a verified source,
-- introduce unsupported numeric/acronym claims,
-- are merely cosmetic/minor wording edits.
+## Search pipeline
+1. Query live sources
+2. Normalize vacancy data and full JD when available
+3. Remove stale vacancies
+4. Deduplicate
+5. Reject hard no-go matches
+6. Score remaining jobs against the Search Profile
+7. Blend Search Profile fit with CV/JD evidence match when a CV is available
+8. Show only surviving live vacancies — no fake/demo fallback
 
-## Current scope
-- Jobs are still demo jobs unless their JD is replaced in the UI.
-- Cover-letter generation comes later.
-- Accepted changes are reviewed in-browser; final document export is a later step.
-
-
-## v0.5.2
-- Fixed production build syntax error in CV relevance scoring.
-- Fixed the Vercel production build syntax error in CV relevance scoring.
+## Honest limitations
+- LinkedIn, Jobindex, The Hub, Glassdoor and company-career-page adapters are not connected yet.
+- Salary is only a hard filter when the source provides a comparable DKK amount; otherwise it is shown as unknown.
+- AI CV tailoring remains behind the existing Vercel AI Gateway route and currently requires Gateway billing verification. This release does not change that subsystem.
+- Search matching is deterministic, not LLM-based. The purpose of v0.6 is to make the Search Profile actually control retrieval and filtering before further AI work.
