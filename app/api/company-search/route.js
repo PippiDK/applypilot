@@ -16,7 +16,7 @@ const TARGET_INDUSTRY = [
   /telekommunikation|telecom|satellit|kommunikationsteknolog/i,
   /elektricitet|energi|gasforsyning|fjernvarme|forsyning|utility/i,
   /logistik|transport|lufttransport|luftfart|maritim|søtransport|skibsfart|spedition/i,
-  /medicinsk udstyr|medicoteknik|medtech|healthtech|sundhedsteknolog/i,
+  /medicinsk|dentale instrumenter|medicoteknik|medtech|healthtech|sundhedsteknolog/i,
   /farmaceut|lægemiddel|pharma/i,
   /rådgivning.*informationsteknolog|informationsteknolog.*rådgivning|technology consulting|it consulting/i,
 ]
@@ -27,6 +27,29 @@ const EXCLUDED_INDUSTRY = [
   /byggeri|bygge-? og anlæg|anlægsvirksomhed|civil engineering|construction|ejendomsudvikling|property development/i,
   /rekruttering|vikarbureau|recruitment|staffing/i,
   /reklamebureau|marketingbureau|creative agency|advertising agency/i,
+]
+
+// Verified DB07 industry codes from Danmarks Statistik.
+// We intentionally keep these in code instead of resolving the CVR branch catalogue at runtime.
+// This removes a fragile dependency and makes company discovery deterministic.
+const TARGET_BRANCH_CODES = [
+  // Software / SaaS / IT / data
+  '582100','582900','620100','620200','620300','620900','631100','631200',
+  // DB25 equivalents now used by newly classified companies
+  '621000','622000','629000','631000','639100','639200',
+  // Telecom / satellite
+  '611000','612000','613000','619000',
+  // Banking / finance / insurance / pension
+  '641100','641900','649100','649210','649220','649230','649900',
+  '651100','651200','652000','653010','653020','661100','661200','661900','662100','662200','662900',
+  // Energy / utilities
+  '351100','351200','351300','351400','352100','352200','352300','353000',
+  // Logistics / transport / aviation / maritime
+  '491000','492000','493100','493200','494100','494200','495000',
+  '501000','502000','503000','504000','511000','512100','512200',
+  '521000','522100','522200','522300','522400','522900','531000','532000',
+  // Pharma / medtech
+  '211000','212000','325000'
 ]
 
 // CVR employee bands. Target industries are accepted from 20+ employees;
@@ -56,14 +79,11 @@ function findObjectArray(value,predicate,depth=0){
 function companyRows(v){
   return findObjectArray(v,x=>x&&typeof x==='object'&&('Cvrnr' in x||'cvrnr' in x||'CVR' in x))
 }
-function branchRows(v){
-  return findObjectArray(v,x=>x&&typeof x==='object'&&('Kode' in x||'kode' in x)&&('Navn' in x||'navn' in x))
-}
 function chunk(items,size){const out=[];for(let i=0;i<items.length;i+=size)out.push(items.slice(i,i+size));return out}
 function uniq(items,key){const seen=new Set();return items.filter(x=>{const k=key(x);if(!k||seen.has(k))return false;seen.add(k);return true})}
 
 async function fetchJson(url,timeout=12000){
-  const res=await fetch(url,{headers:{'user-agent':'ApplyPilot/0.8.1 company-discovery','accept':'application/json'},signal:AbortSignal.timeout(timeout),cache:'no-store'})
+  const res=await fetch(url,{headers:{'user-agent':'ApplyPilot/0.8.2 company-discovery','accept':'application/json'},signal:AbortSignal.timeout(timeout),cache:'no-store'})
   if(!res.ok) throw new Error(`${new URL(url).hostname}: ${res.status}`)
   return res.json()
 }
@@ -91,21 +111,21 @@ function location(company){return company?.Beliggenhed||company?.beliggenhed||{}
 function companyCvr(company){return String(company?.Cvrnr||company?.cvrnr||company?.CVR||'')}
 function companyName(company){return clean(company?.Navn||company?.navn||'')}
 function closed(company){return !!(company?.OphoersDato||company?.ophoersDato)}
-function accessPointId(company){
+function addressId(company){
   const l=location(company)
-  return clean(l?.Adgangspunkt||l?.adgangspunkt||l?.AdgangspunktId||l?.adgangspunktid||'')
+  return clean(l?.AdresseId||l?.adresseId||l?.adresseid||'')
 }
 function addressText(company){
   const l=location(company)
   const street=clean(l?.Vejstykke?.Navn||l?.vejstykke?.navn||'')
   const no=clean(l?.HusnrFra||l?.husnrFra||l?.husnr||'')
-  const post=clean(l?.Postdistrikt?.Kode||l?.Postdistrikt?.kode||l?.Postdistrikt?.Nr||l?.postdistrikt?.kode||'')
-  const city=clean(l?.Postdistrikt?.Navn||l?.postdistrikt?.navn||l?.Kommune?.Navn||l?.kommune?.navn||'')
+  const post=clean(l?.Postdistrikt?.PostNr||l?.postdistrikt?.postNr||l?.postdistrikt?.postnr||'')
+  const city=clean(l?.Postdistrikt?.PostDistrikt||l?.postdistrikt?.postDistrikt||l?.postdistrikt?.postdistrikt||l?.Kommune?.Navn||l?.kommune?.navn||'')
   return [street&&`${street}${no?' '+no:''}`,post,city].filter(Boolean).join(', ')
 }
 function cityName(company){
   const l=location(company)
-  return clean(l?.Postdistrikt?.Navn||l?.postdistrikt?.navn||l?.Kommune?.Navn||l?.kommune?.navn||'')
+  return clean(l?.Postdistrikt?.PostDistrikt||l?.postdistrikt?.postDistrikt||l?.postdistrikt?.postdistrikt||l?.Kommune?.Navn||l?.kommune?.navn||'')
 }
 
 async function municipalitiesForRadius(radiusKm){
@@ -113,15 +133,6 @@ async function municipalitiesForRadius(radiusKm){
   const url=`${DAWA}/kommuner?cirkel=${encodeURIComponent(circle)}&struktur=mini&per_side=100`
   const rows=await fetchJson(url,8000)
   return (Array.isArray(rows)?rows:[]).map(x=>({code:String(x?.kode||''),name:clean(x?.navn||'')})).filter(x=>x.code)
-}
-
-async function targetBranchCodes(){
-  const data=await fetchJson(`${CVR}/branchekoder?format=json`,12000)
-  const rows=branchRows(data)
-  return rows
-    .filter(x=>TARGET_INDUSTRY.some(rx=>rx.test(clean(x?.Navn||x?.navn||''))))
-    .map(x=>String(x?.Kode||x?.kode||''))
-    .filter(Boolean)
 }
 
 async function cvrCompanies(params){
@@ -156,16 +167,19 @@ async function loadCandidateCompanies(municipalities,branchCodes){
   return uniq(rows,x=>companyCvr(x))
 }
 
-async function geocodeAccessPoints(companies){
-  const ids=uniq(companies.map(accessPointId).filter(Boolean),x=>x)
+async function geocodeAddresses(companies){
+  // CVR Beliggenhed.AdresseId is a DAR/DAWA address id.
+  // DAWA's /adresser endpoint supports multi-value id lookup and returns
+  // adgangsadresse.adgangspunkt.koordinater in WGS84 by default.
+  const ids=uniq(companies.map(addressId).filter(Boolean),x=>x)
   const map=new Map()
   for(const group of chunk(ids,75)){
     try{
-      const url=`${DAWA}/adgangsadresser?id=${encodeURIComponent(group.join('|'))}&struktur=nestet&per_side=1000`
+      const url=`${DAWA}/adresser?id=${encodeURIComponent(group.join('|'))}&struktur=nestet&per_side=1000`
       const rows=await fetchJson(url,9000)
       for(const x of Array.isArray(rows)?rows:[]){
-        const coords=x?.adgangspunkt?.koordinater
-        const id=clean(x?.id||x?.adgangspunkt?.id||'')
+        const coords=x?.adgangsadresse?.adgangspunkt?.koordinater
+        const id=clean(x?.id||'')
         if(id&&Array.isArray(coords)&&coords.length>=2){
           const lon=Number(coords[0]),lat=Number(coords[1])
           if(Number.isFinite(lat)&&Number.isFinite(lon)) map.set(id.toLowerCase(),{lat,lon})
@@ -189,20 +203,16 @@ export async function POST(request){
     const radiusKm=Number(body?.radiusKm)
     if(!ALLOWED_RADIUS.has(radiusKm)) return NextResponse.json({error:'Radius must be 10, 20, 30, 40 or 50 km.'},{status:400})
 
-    const [municipalities,branchCodes]=await Promise.all([
-      municipalitiesForRadius(radiusKm),
-      targetBranchCodes(),
-    ])
+    const municipalities=await municipalitiesForRadius(radiusKm)
     if(!municipalities.length) throw new Error('Could not resolve municipalities around Nærum.')
-    if(!branchCodes.length) throw new Error('Could not resolve target CVR industries.')
 
-    const candidates=await loadCandidateCompanies(municipalities,branchCodes)
+    const candidates=await loadCandidateCompanies(municipalities,TARGET_BRANCH_CODES)
     const active=candidates.filter(x=>!closed(x)&&employerPass(x))
-    const geo=await geocodeAccessPoints(active)
+    const geo=await geocodeAddresses(active)
 
     const companies=[]
     for(const company of active){
-      const point=geo.get(accessPointId(company).toLowerCase())
+      const point=geo.get(addressId(company).toLowerCase())
       if(!point) continue // strict radius: no coordinates, no result
       const distanceKm=haversineKm(NAERUM,point)
       if(distanceKm>radiusKm) continue
