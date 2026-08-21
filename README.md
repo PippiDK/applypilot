@@ -1,6 +1,11 @@
-# ApplyPilot Web v0.6 — Live Search Engine Foundation
+# ApplyPilot Web v0.6.1 — Vacancy Link UX Fix
 
-This release replaces the three hard-coded demo vacancies with live job-source ingestion and real Search Profile hard filters.
+This release keeps the v0.6 live search engine unchanged and makes one focused UX correction: the job-detail panel links directly to the original vacancy instead of offering JD editing there.
+
+## v0.6.1 change
+- Replaced `View / edit job description` in the job-detail panel with `View vacancy ↗`, linking to the original source URL in a new tab.
+- JD editing remains available only inside the CV-tailoring review flow when needed.
+- No search, scoring, filtering, CV parsing, or AI-tailoring logic was changed.
 
 ## Live sources
 - Jobnet (Denmark, Capital Region searches via Jobnet's public website BFF)
