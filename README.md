@@ -1,37 +1,27 @@
-# ApplyPilot Web v0.6.1 — Vacancy Link UX Fix
+# ApplyPilot Web v0.7.1 — Danish Company Search
 
-This release keeps the v0.6 live search engine unchanged and makes one focused UX correction: the job-detail panel links directly to the original vacancy instead of offering JD editing there.
+This version changes only the search layer to the company-first search agreed for ApplyPilot.
 
-## v0.6.1 change
-- Replaced `View / edit job description` in the job-detail panel with `View vacancy ↗`, linking to the original source URL in a new tab.
-- JD editing remains available only inside the CV-tailoring review flow when needed.
-- No search, scoring, filtering, CV parsing, or AI-tailoring logic was changed.
+## Search criteria
+1. **Radius from Nærum** — the only user-selectable search criterion: 10 / 20 / 30 / 40 / 50 km.
+2. **Company profile** — internal hardcoded employer criteria. Companies outside the agreed employer profile are not considered.
+3. **Profession family** — internal hardcoded IT/project/delivery role family.
+4. **Mandatory final gate** — a vacancy is shown only after ApplyPilot has retrieved a full job description and compared the full JD with the full Master CV. Title match alone is not enough.
 
-## Live sources
-- Jobnet (Denmark, Capital Region searches via Jobnet's public website BFF)
-- Jobicy (remote jobs)
-- Remotive (remote jobs; source attribution and original link preserved)
+If a company or vacancy fails any gate, it is not shown.
 
-## Search Profile fields that now affect results
-- Target roles and common project/delivery title variants
-- Geography (Denmark / Remote EU-EMEA / worldwide)
-- Preferred Denmark locations (used for ranking inside the Capital Region)
-- Freshness (1, 3, 7, or 14 days; default 7)
-- Salary floor when a comparable DKK salary is actually stated
-- Hard exclusions, including mandatory Danish, coordinator/assistant, construction, and industrial hardware/manufacturing R&D patterns
+## Company source
+- Official Danish CVR data through Datafordeler.
+- Exact radius is calculated from the registered company address to Nærum.
+- ApplyPilot then follows the company's public web presence to its career/jobs pages and only evaluates matching role candidates with a full JD.
 
-## Search pipeline
-1. Query live sources
-2. Normalize vacancy data and full JD when available
-3. Remove stale vacancies
-4. Deduplicate
-5. Reject hard no-go matches
-6. Score remaining jobs against the Search Profile
-7. Blend Search Profile fit with CV/JD evidence match when a CV is available
-8. Show only surviving live vacancies — no fake/demo fallback
+## Server configuration
+ApplyPilot uses one Datafordeler credential on the server for the application itself. End users never create, enter, receive, or see a Datafordeler credential.
 
-## Honest limitations
-- LinkedIn, Jobindex, The Hub, Glassdoor and company-career-page adapters are not connected yet.
-- Salary is only a hard filter when the source provides a comparable DKK amount; otherwise it is shown as unknown.
-- AI CV tailoring remains behind the existing Vercel AI Gateway route and currently requires Gateway billing verification. This release does not change that subsystem.
-- Search matching is deterministic, not LLM-based. The purpose of v0.6 is to make the Search Profile actually control retrieval and filtering before further AI work.
+Vercel server environment variable:
+
+`DATAFORDELER_API_KEY`
+
+The value is read only inside the server-side `/api/company-search` route. The browser sends only the selected radius and Master CV content required for the agreed search flow. The API key is never accepted in request data and is never returned in responses.
+
+The final full-JD-vs-CV decision uses the existing Vercel AI Gateway. If that gate is unavailable, the search fails closed rather than showing unverified matches.

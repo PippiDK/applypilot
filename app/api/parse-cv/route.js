@@ -98,6 +98,7 @@ export async function POST(request){
     return NextResponse.json({
       fileName:file.name,
       chars:text.length,
+      cvText:text,
       facts,
       skills:inferSkills(text),
       preview:text.slice(0,1800)

@@ -164,12 +164,12 @@ async function getJobnet(profile){
     if(seen.has(x.jobAdId)) continue; seen.add(x.jobAdId)
     if(!freshEnough(x.publicationDate,Number(profile.freshnessDays||7))) continue
     const rf=roleFit(x.title,targetRoles); if(rf.score<45) continue
-    base.push({id:String(x.jobAdId),source:'jobnet',sourceLabel:'Jobnet',company:clean(x.hiringOrgName||'Employer'),title:clean(x.title),location:clean(x.postalDistrictName||x.municipality||'Denmark'),country:x.country||'Danmark',postedAt:x.publicationDate,deadline:x.applicationDeadline||null,remote:false,url:`/api/open-job?source=jobnet&id=${encodeURIComponent(x.jobAdId)}`,jd:'',salaryCurrency:null,salaryMinMonthly:null,salaryMaxMonthly:null})
+    base.push({id:String(x.jobAdId),source:'jobnet',sourceLabel:'Jobnet',company:clean(x.hiringOrgName||'Employer'),title:clean(x.title),location:clean(x.postalDistrictName||x.municipality||'Denmark'),country:x.country||'Danmark',postedAt:x.publicationDate,deadline:x.applicationDeadline||null,remote:false,url:clean(x.jobAdUrl)||`/api/open-job?source=jobnet&id=${encodeURIComponent(x.jobAdId)}`,jd:'',salaryCurrency:null,salaryMinMonthly:null,salaryMaxMonthly:null,isExternal:!!x.isExternal})
   }
   base.sort((a,b)=>roleFit(b.title,targetRoles).score-roleFit(a.title,targetRoles).score || new Date(b.postedAt)-new Date(a.postedAt))
   const top=base.slice(0,18)
-  const details=await Promise.allSettled(top.map(j=>jobnetDetail(j.id)))
-  return top.map((j,i)=>details[i]?.status==='fulfilled'?{...j,jd:details[i].value.body||j.jd,url:details[i].value.url||j.url,location:details[i].value.address||j.location,country:details[i].value.country||j.country,deadline:details[i].value.deadline||j.deadline}:j)
+  const details=await Promise.allSettled(top.map(j=>j.isExternal&&j.url&&!j.url.startsWith('/api/')?Promise.resolve(null):jobnetDetail(j.id)))
+  return top.map((j,i)=>details[i]?.status==='fulfilled'&&details[i].value?{...j,jd:details[i].value.body||j.jd,url:details[i].value.url||j.url,location:details[i].value.address||j.location,country:details[i].value.country||j.country,deadline:details[i].value.deadline||j.deadline}:j)
 }
 
 function jobicyGeo(profile){

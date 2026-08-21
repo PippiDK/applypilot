@@ -12,3 +12,6 @@ button{cursor:pointer}.profileBtn{font-weight:700}.profileStrip{display:flex;ali
 .fieldLabel{display:block;margin:18px 0 8px;color:#9da8b5;font-size:12px;font-weight:700}
 
 .jdButton{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+
+/* v0.7 — company search radius */
+.radiusHeading{margin-top:28px!important}.radiusChoices{display:flex;gap:10px;flex-wrap:wrap}.radiusChoices .choice{min-width:92px;text-align:center}.radiusChoices .choice.selected{font-weight:800}
