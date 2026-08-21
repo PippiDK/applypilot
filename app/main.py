@@ -12,14 +12,14 @@ PROFILE = load_profile(BASE / "config" / "yulia_profile.yaml")
 SOURCE = LinkedInPublicSource(PROFILE["discovery_queries"])
 PIPELINE = SearchPipeline(PROFILE, SOURCE, BASE / "data" / "search_history.json")
 
-app = FastAPI(title="ApplyPilot LinkedIn E2E", version="0.3.0")
+app = FastAPI(title="ApplyPilot LinkedIn E2E", version="0.3.1")
 
 
 @app.get("/health")
 def health():
     return {
         "status": "ok",
-        "version": "0.3.0",
+        "version": "0.3.1",
         "milestone": "LinkedIn public search -> full JD -> evaluator",
         "active_connector": SOURCE.name,
     }

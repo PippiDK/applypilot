@@ -160,13 +160,49 @@ class LinkedInPublicSource(JobSource):
         return clean_html(node.get("content") if node else "")
 
     @staticmethod
-    def _remote_type(text: str) -> str:
-        value = (text or "").lower()
-        if any(x in value for x in ["hybrid", "hybrid work", "work from home", "home office", "hjemmearbejde"]):
+    def _remote_type(location: str, description: str = "") -> str:
+        loc = clean_html(location).lower()
+        value = clean_html(description).lower()
+
+        # Location labels such as "Copenhagen (Hybrid)" are strong evidence.
+        if re.search(r"\bhybrid\b", loc):
             return "hybrid"
-        if any(x in value for x in ["fully remote", "100% remote", "remote position", "remote role", "work remotely"]):
+        if re.search(r"\bremote\b", loc):
             return "remote"
-        if any(x in value for x in ["on-site", "onsite", "office-based", "work from office"]):
+
+        # Work-arrangement language only.  Do not confuse delivery methodology
+        # ("hybrid delivery approaches") or global delivery topology
+        # ("offshore/onsite delivery model") with office attendance.
+        hybrid_patterns = [
+            r"\bhybrid (work|working|role|position|setup|arrangement|workplace|schedule)\b",
+            r"\b(work|working) from home\b",
+            r"\bhome office\b",
+            r"\bremote.{0,35}days? per week\b",
+            r"\boffice.{0,45}(days? per week|days? a week|per quarter)\b",
+            r"\bwork remotely the other days\b",
+            r"\bfrom the office.{0,80}remotely the other days\b",
+            r"\bat least half \(50%\) of our time.{0,60}in the office\b",
+        ]
+        if any(re.search(p, value, re.I | re.S) for p in hybrid_patterns):
+            return "hybrid"
+
+        remote_patterns = [
+            r"\bfully remote\b",
+            r"\b100% remote\b",
+            r"\bremote (position|role|job|work arrangement)\b",
+            r"\bwork remotely\b",
+        ]
+        if any(re.search(p, value, re.I | re.S) for p in remote_patterns):
+            return "remote"
+
+        onsite_patterns = [
+            r"\b(on-site|onsite) (position|role|job)\b",
+            r"\boffice[- ]based\b",
+            r"\bwork from (the )?office\b",
+            r"\bphysical presence (will be )?required\b",
+            r"\brequired.{0,35}(physical presence|in the office|on-site|onsite)\b",
+        ]
+        if any(re.search(p, value, re.I | re.S) for p in onsite_patterns):
             return "onsite"
         return "unknown"
 
@@ -203,6 +239,62 @@ class LinkedInPublicSource(JobSource):
                         return str(candidate)
             return None
         return str(href)
+
+    @staticmethod
+    def _salary_monthly_dkk(text_value: str) -> tuple[int | None, int | None]:
+        text = clean_html(text_value)
+
+        def amount(raw: str) -> int | None:
+            # Danish salary formatting can be 50.000,00; English can be 50,000.
+            raw = raw.strip()
+            if re.search(r"[.,]00$", raw):
+                raw = raw[:-3]
+            digits = re.sub(r"[^0-9]", "", raw)
+            if not digits:
+                return None
+            value = int(digits)
+            return value if 10_000 <= value <= 250_000 else None
+
+        # Require an explicit monthly unit. Never infer a monthly figure from an annual range.
+        patterns = [
+            r"(?:DKK|kr\.?)?\s*([0-9]{2,3}(?:[.,][0-9]{3})?(?:,[0-9]{2})?)\s*(?:DKK|kr\.?)?\s*(?:/md|/md\.|pr\.? måned|per month|/month|monthly)\s*[-–—]\s*(?:DKK|kr\.?)?\s*([0-9]{2,3}(?:[.,][0-9]{3})?(?:,[0-9]{2})?)\s*(?:DKK|kr\.?)?\s*(?:/md|/md\.|pr\.? måned|per month|/month|monthly)",
+            r"(?:DKK|kr\.?)\s*([0-9]{2,3}(?:[.,][0-9]{3})?(?:,[0-9]{2})?)\s*[-–—]\s*(?:DKK|kr\.?)?\s*([0-9]{2,3}(?:[.,][0-9]{3})?(?:,[0-9]{2})?)\s*(?:per month|/month|monthly|pr\.? måned)",
+            r"([0-9]{2,3}(?:[.,][0-9]{3})?(?:,[0-9]{2})?)\s*[-–—]\s*([0-9]{2,3}(?:[.,][0-9]{3})?(?:,[0-9]{2})?)\s*(?:DKK|kr\.?)\s*(?:per month|/month|monthly|pr\.? måned)",
+        ]
+        for pattern in patterns:
+            m = re.search(pattern, text, re.I)
+            if not m:
+                continue
+            low, high = amount(m.group(1)), amount(m.group(2))
+            if low is not None and high is not None:
+                return min(low, high), max(low, high)
+        return None, None
+
+    @staticmethod
+    def _deadline(description: str, reference_year: int) -> datetime | None:
+        text = clean_html(description)
+        month_map = {
+            'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
+            'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12,
+            'januar': 1, 'februar': 2, 'marts': 3, 'april': 4, 'maj': 5, 'juni': 6,
+            'juli': 7, 'august': 8, 'september': 9, 'oktober': 10, 'november': 11, 'december': 12,
+        }
+        m = re.search(
+            r"(?:deadline for application|application deadline|apply by|ansøgningsfrist)\s*[:\-]?\s*"
+            r"([0-3]?[0-9])(?:st|nd|rd|th)?\s+([A-Za-zæøåÆØÅ]+)(?:\s+(20[0-9]{2}))?",
+            text, re.I,
+        )
+        if not m:
+            return None
+        day = int(m.group(1))
+        month = month_map.get(m.group(2).lower())
+        if not month:
+            return None
+        year = int(m.group(3) or reference_year)
+        try:
+            return datetime(year, month, day, 23, 59, 59, tzinfo=timezone.utc)
+        except ValueError:
+            return None
 
     @staticmethod
     def _employment_type(soup: BeautifulSoup, text: str) -> str:
@@ -256,9 +348,13 @@ class LinkedInPublicSource(JobSource):
             return "incomplete", None
 
         published = parse_datetime(time_node.get("datetime") if time_node else row.get("published_at"))
-        remote_type = self._remote_type(f"{location} {description}")
+        remote_type = self._remote_type(location, description)
         remote_eligibility = self._remote_eligibility(description, location, remote_type)
         official_url = self._external_apply_url(apply_node.get("href") if apply_node else None)
+        salary_min, salary_max = self._salary_monthly_dkk(closed_text)
+        deadline = self._deadline(description, self.now_fn().year)
+        if deadline is not None and deadline < self.now_fn():
+            return "closed", None
 
         return "ok", Job(
             source="LinkedIn Jobs",
@@ -270,11 +366,14 @@ class LinkedInPublicSource(JobSource):
             remote_type=remote_type,
             remote_eligibility=remote_eligibility,
             employment_type=self._employment_type(soup, description),
+            salary_min_dkk_month=salary_min,
+            salary_max_dkk_month=salary_max,
             description=description,
             full_jd_verified=True,
             original_url=url,
             official_url=official_url,
             published_at=published,
+            deadline=deadline,
             vacancy_status="ACTIVE VIA THIRD PARTY",
         )
 
