@@ -150,6 +150,7 @@ export default function Home(){
  const [jdOpen,setJdOpen]=useState(false)
  const [jobJds,setJobJds]=useState({})
  const [jdDraft,setJdDraft]=useState('')
+ const [tailor,setTailor]=useState({jobKey:'',loading:false,error:'',changes:[],priorities:[]})
 
  useEffect(()=>{
   try{
@@ -169,7 +170,7 @@ export default function Home(){
  const activeJd=jobJds[jobKey]||selected.jd
  const jobAnalysis=useMemo(()=>analyseJob(activeJd,profile.factBank||[]),[activeJd,profile.factBank])
  const evidence=useMemo(()=>topEvidence(profile.factBank||[],jobAnalysis.reqs),[profile.factBank,jobAnalysis.reqs])
- const proposedChanges=useMemo(()=>buildChanges(profile.factBank||[],activeJd),[profile.factBank,activeJd])
+ const proposedChanges=tailor.jobKey===jobKey?tailor.changes:[]
  const reviewedCount=proposedChanges.filter(c=>decisions[`${jobKey}|${c.id}`]).length
 
  function setDecision(id,value){setDecisions(p=>({...p,[`${jobKey}|${id}`]:value}))}
@@ -178,15 +179,28 @@ export default function Home(){
   proposedChanges.forEach(c=>{next[`${jobKey}|${c.id}`]='accepted'})
   setDecisions(next)
  }
+ async function runTailoring(force=false){
+  if(!cvReady) return
+  if(!force && tailor.jobKey===jobKey && !tailor.error && (tailor.changes.length || tailor.priorities.length)) return
+  setTailor({jobKey,loading:true,error:'',changes:[],priorities:[]})
+  try{
+   const res=await fetch('/api/tailor-cv',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jd:activeJd,role:selected.role,company:selected.company,facts:profile.factBank||[]})})
+   const data=await res.json()
+   if(!res.ok) throw new Error(data.error||'AI tailoring failed.')
+   setDecisions(p=>Object.fromEntries(Object.entries(p).filter(([k])=>!k.startsWith(jobKey+'|'))))
+   setTailor({jobKey,loading:false,error:'',changes:data.changes||[],priorities:data.priorities||[]})
+  }catch(e){setTailor({jobKey,loading:false,error:e.message||'AI tailoring failed.',changes:[],priorities:[]})}
+ }
+ function openReview(){setReviewOpen(true);runTailoring(false)}
  function openJd(){setJdDraft(activeJd);setJdOpen(true)}
- function saveJd(){const next={...jobJds,[jobKey]:jdDraft};setJobJds(next);localStorage.setItem('applypilot-job-jds',JSON.stringify(next));setDecisions({});setJdOpen(false)}
+ function saveJd(){const next={...jobJds,[jobKey]:jdDraft};setJobJds(next);localStorage.setItem('applypilot-job-jds',JSON.stringify(next));setDecisions({});setTailor({jobKey:'',loading:false,error:'',changes:[],priorities:[]});setJdOpen(false)}
  function startProfile(){setDraft(profileReady?profile:defaultProfile);setStep(1);setOpen(true);setParseState({loading:false,error:''})}
  function close(){setOpen(false)}
  function toggleGeo(value){setDraft(p=>({...p,geography:p.geography.includes(value)?p.geography.filter(x=>x!==value):[...p.geography,value]}))}
  function saveProfile(){
   const saved={...draft,savedAt:new Date().toISOString()}
   localStorage.setItem('applypilot-profile',JSON.stringify(saved))
-  setProfile(saved);setDraft(saved);setOpen(false);setStep(1)
+  setProfile(saved);setDraft(saved);setTailor({jobKey:'',loading:false,error:'',changes:[],priorities:[]});setOpen(false);setStep(1)
  }
  async function parseCv(file){
   if(!file) return
@@ -214,9 +228,9 @@ export default function Home(){
   <div className="section"><h3>Why this fits</h3>{profileReady&&jobAnalysis.matched.length?jobAnalysis.matched.slice(0,6).map((x,i)=><p key={i}>✓ {x.label}</p>):<p>Analyse CV to compare it with the full job description.</p>}</div>
   <div className="section"><h3>Gap</h3>{profileReady&&jobAnalysis.gaps.length?jobAnalysis.gaps.slice(0,3).map((x,i)=><p key={i}>⚠ {x.label} not confirmed</p>):<p>✓ No major JD gaps detected in this prototype</p>}{!selected.salaryKnown&&<p>⚠ Salary not stated</p>}<button className="ghost jdButton" onClick={openJd}>View / edit job description</button></div>
   <div className="section"><h3>Application pack</h3><div className="docs"><div>{cvReady?'✓':'○'} Tailored CV <span className={cvReady?'ready':'pending'}>{cvReady?'Ready for review':'Needs CV analysis'}</span></div><div>○ Cover letter <span className="pending">Not generated yet</span></div></div></div>
-  <div className="actions"><button className="primary" onClick={()=>cvReady?setReviewOpen(true):startProfile()}>{cvReady?'Review CV changes':'Analyse CV first'}</button><a className="secondary openJob" href={selected.url} target="_blank" rel="noreferrer">Open job</a></div></div></section>
+  <div className="actions"><button className="primary" onClick={()=>cvReady?openReview():startProfile()}>{cvReady?'Review CV changes':'Analyse CV first'}</button><a className="secondary openJob" href={selected.url} target="_blank" rel="noreferrer">Open job</a></div></div></section>
 
-  {profileReady&&<section className="cvReviewSummary"><div><p className="eyebrow">CV UPDATE REVIEW</p><h2>{cvReady?'Tailored CV ready for review':'Analyse your CV to prepare updates'}</h2><p>{cvReady?'See exactly what ApplyPilot proposes to change before anything is used in an application.':'Upload a master CV to create a reviewable tailored version.'}</p></div>{cvReady&&<div className="reviewStats"><div><b>{proposedChanges.length}</b><span>wording changes</span></div><div><b>{jobAnalysis.matched.length}</b><span>JD requirements matched</span></div><div><b>0</b><span>unsupported claims</span></div><button className="ghost" onClick={()=>setReviewOpen(true)}>Review CV changes</button></div>}</section>}
+  {profileReady&&<section className="cvReviewSummary"><div><p className="eyebrow">CV UPDATE REVIEW</p><h2>{cvReady?'Tailored CV ready for review':'Analyse your CV to prepare updates'}</h2><p>{cvReady?'See exactly what ApplyPilot proposes to change before anything is used in an application.':'Upload a master CV to create a reviewable tailored version.'}</p></div>{cvReady&&<div className="reviewStats"><div><b>{tailor.jobKey===jobKey&&!tailor.loading?proposedChanges.length:'AI'}</b><span>wording changes</span></div><div><b>{jobAnalysis.matched.length}</b><span>JD requirements matched</span></div><div><b>0</b><span>unsupported claims</span></div><button className="ghost" onClick={openReview}>Review CV changes</button></div>}</section>}
 
   <footer>Human-in-the-loop by design · ApplyPilot never submits an application without you.</footer>
 
@@ -236,18 +250,20 @@ export default function Home(){
   {jdOpen&&<div className="overlay" onMouseDown={e=>{if(e.target===e.currentTarget)setJdOpen(false)}}><div className="modal jdModal"><div className="modalHead"><div><p className="eyebrow">JOB DESCRIPTION</p><h2>{selected.role}</h2><p className="muted">{selected.company} · {selected.location}</p></div><button className="close" onClick={()=>setJdOpen(false)}>×</button></div><div className="wizard"><h3>Full job description</h3><p>Paste the complete vacancy text here. ApplyPilot extracts known delivery requirements from this JD and uses them to drive matching and CV wording proposals.</p><textarea value={jdDraft} onChange={e=>setJdDraft(e.target.value)} rows="14"/><div className="successBox"><b>{extractJobRequirements(jdDraft).length} JD requirements detected</b><span>{extractJobRequirements(jdDraft).map(r=>r.label).join(' · ')||'Add more detailed vacancy text to detect requirements.'}</span></div></div><div className="modalActions"><button className="secondary" onClick={()=>setJdOpen(false)}>Cancel</button><button className="primary" onClick={saveJd}>Save & analyse JD</button></div></div></div>}
 
   {reviewOpen&&<div className="overlay" onMouseDown={e=>{if(e.target===e.currentTarget)setReviewOpen(false)}}><div className="modal reviewModal"><div className="modalHead"><div><p className="eyebrow">CV UPDATE REVIEW</p><h2>{selected.role}</h2><p className="muted">{selected.company} · {selected.location}</p></div><button className="close" onClick={()=>setReviewOpen(false)}>×</button></div>
-   <div className="reviewDashboard"><div><b>{proposedChanges.length}</b><span>wording changes proposed</span></div><div><b>0</b><span>bullets reordered in this prototype</span></div><div><b>{jobAnalysis.matched.length}</b><span>JD requirements matched</span></div><div className="zeroClaims"><b>0</b><span>unsupported claims added</span></div></div>
+   <div className="reviewDashboard"><div><b>{tailor.loading?'…':proposedChanges.length}</b><span>wording changes proposed</span></div><div><b>0</b><span>bullets reordered in this prototype</span></div><div><b>{jobAnalysis.matched.length}</b><span>JD requirements matched</span></div><div className="zeroClaims"><b>0</b><span>unsupported claims added</span></div></div>
    <div className="truth compact"><b>Truth Guard active</b><span>Updated wording may only restate evidence already present in your Master CV. Internal evidence IDs are hidden from the user interface.</span></div>
-   <div className="jdFocus"><div><small>JOB DESCRIPTION FOCUS</small><p>{jobAnalysis.reqs.length?jobAnalysis.reqs.map(r=>r.label).join(' · '):'No known requirements detected — edit the JD to add more detail.'}</p></div><button className="secondary" onClick={openJd}>View JD</button></div>
-   <div className="reviewToolbar"><div><h3>Proposed CV updates</h3><p>{reviewedCount} of {proposedChanges.length} reviewed</p></div>{proposedChanges.length>0&&<button className="secondary" onClick={acceptAll}>Accept all safe changes</button>}</div>
-   {proposedChanges.map((c,i)=>{const decision=decisions[`${jobKey}|${c.id}`];return <div className={'changeCard '+(decision?'decided':'')} key={c.id}>
+   <div className="jdFocus"><div><small>JOB DESCRIPTION FOCUS</small><p>{tailor.priorities?.length?tailor.priorities.join(' · '):(jobAnalysis.reqs.length?jobAnalysis.reqs.map(r=>r.label).join(' · '):'No known requirements detected — edit the JD to add more detail.')}</p></div><button className="secondary" onClick={openJd}>View JD</button></div>
+   <div className="reviewToolbar"><div><h3>Proposed CV updates</h3><p>{tailor.loading?'AI is comparing the full JD with verified CV evidence…':`${reviewedCount} of ${proposedChanges.length} reviewed`}</p></div><div style={{display:'flex',gap:'10px'}}>{!tailor.loading&&<button className="secondary" onClick={()=>runTailoring(true)}>Re-run AI tailoring</button>}{proposedChanges.length>0&&<button className="secondary" onClick={acceptAll}>Accept all safe changes</button>}</div></div>
+   {tailor.loading&&<div className="successBox noChangesBox"><b>AI tailoring in progress…</b><span>Reading the full job description, selecting supported CV evidence and generating only meaningful vacancy-specific rewrites.</span></div>}
+   {tailor.error&&<div className="errorBox">{tailor.error}</div>}
+   {!tailor.loading&&!tailor.error&&proposedChanges.map((c,i)=>{const decision=decisions[`${jobKey}|${c.id}`];return <div className={'changeCard '+(decision?'decided':'')} key={c.id}>
     <div className="changeHead"><span>CV change {i+1}</span><b>{decision==='accepted'?'Accepted':decision==='original'?'Original kept':'Review needed'}</b></div>
     <div className="compareGrid"><div className="compareBox"><small>ORIGINAL</small><p>{c.original}</p></div><div className="compareArrow">→</div><div className="compareBox updatedBox"><small>UPDATED</small><p>{c.updated}</p></div></div>
     <div className="changeWhy"><div><small>WHY CHANGED</small><p>{c.why}</p></div><div><small>SOURCE</small><p>Existing Master CV experience only · no new claim added</p></div></div>
     <div className="evidenceActions"><button className={'secondary '+(decision==='original'?'chosen':'')} onClick={()=>setDecision(c.id,'original')}>Keep original</button><button className={'primary smallPrimary '+(decision==='accepted'?'chosenPrimary':'')} onClick={()=>setDecision(c.id,'accepted')}>Accept change</button></div>
    </div>})}
    {!evidence.length&&<div className="errorBox">No usable CV evidence was found for this review. Re-analyse the Master CV.</div>}
-   {evidence.length>0&&proposedChanges.length===0&&<div className="successBox noChangesBox"><b>✓ No CV wording changes needed</b><span>The strongest verified CV evidence is already aligned with the detected requirements in this job description. Aligned bullets are intentionally hidden; only actual changes appear in this review.</span></div>}
+   {!tailor.loading&&!tailor.error&&evidence.length>0&&proposedChanges.length===0&&<div className="successBox noChangesBox"><b>✓ No meaningful safe CV wording changes found</b><span>The AI compared this full job description with verified CV evidence and did not find a rewrite strong enough to show. Trivial edits are intentionally suppressed.</span></div>}
    <div className="reviewFooter"><span>Cover letter generation comes next, after CV updates are reviewed.</span><button className="secondary" onClick={()=>setReviewOpen(false)}>Close review</button></div>
   </div></div>}
  </main>
