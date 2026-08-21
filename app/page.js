@@ -12,7 +12,6 @@ export default function Home(){
   const [jobs,setJobs]=useState([])
   const [selected,setSelected]=useState(null)
   const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null})
-  const [cvOpen,setCvOpen]=useState(false)
   const [cvData,setCvData]=useState(null)
   const [cvState,setCvState]=useState({loading:false,error:''})
   const [profile,setProfile]=useState(DEFAULT_PROFILE)
@@ -126,7 +125,7 @@ export default function Home(){
       <button className="primary" onClick={search} disabled={state.loading}>{state.loading?'Reading LinkedIn JDs…':'Search LinkedIn'}</button>
     </section>
 
-    <div className="profileStrip"><b>{profileReady?'✓ Search profile saved':'Profile loaded'}</b><span>{profileReady?profile.roles.split(',').slice(0,2).join(' · '):'Senior IT Project / Delivery · Denmark'}</span><span>JD responsibilities 40% · experience/domain 25% · geography 20% · career/comp 15%</span><button className="profileEditButton" onClick={startProfile}>{profileReady?'Edit profile':'Search profile'}</button><button className="cvButton" onClick={()=>setCvOpen(true)}>{cvData?.fileName?`✓ ${cvData.fileName}`:'Upload Master CV'}</button></div>
+    <div className="profileStrip"><b>{profileReady?'✓ Search profile saved':'Profile loaded'}</b><span>{profileReady?profile.roles.split(',').slice(0,2).join(' · '):'Senior IT Project / Delivery · Denmark'}</span><span>JD responsibilities 40% · experience/domain 25% · geography 20% · career/comp 15%</span><button className="profileEditButton" onClick={startProfile}>{profileReady?'Edit profile':'Search profile'}</button><button className="cvButton" onClick={startProfile}>{cvData?.fileName?`✓ ${cvData.fileName}`:'Upload Master CV'}</button></div>
 
     {state.error&&<div className="errorBox"><b>LinkedIn search failed</b><span>{state.error}</span></div>}
     {state.stats&&<div className="searchMeta"><span><b>{state.stats.discovered}</b> jobs discovered</span><span><b>{state.stats.fullJdVerified}</b> full JDs read</span><span><b>{state.stats.evaluated}</b> worthwhile after evaluation</span><span>Coverage: <b>{state.coverage?.status}</b></span></div>}
@@ -153,20 +152,12 @@ export default function Home(){
           <div className="section"><h3>Gap / unknown</h3>{evaluation.gaps.length?evaluation.gaps.map((x,n)=><p key={n}>⚠ {x}</p>):<p>✓ No material gap detected</p>}</div>
           <div className="section"><h3>Score breakdown</h3><div className="breakdown"><span>Delivery <b>{evaluation.breakdown.responsibilitiesDelivery}</b></span><span>Experience/domain <b>{evaluation.breakdown.experienceDomain}</b></span><span>Geography <b>{evaluation.breakdown.geographyWorkModel}</b></span><span>Career/comp <b>{evaluation.breakdown.careerCompensation}</b></span></div></div>
           <div className="section"><h3>Application pack</h3><div className="docs"><div>{pack.cvReady?'✓':'○'} Tailored CV <span className={pack.cvReady?'ready':'pending'}>{pack.tailoredCvLabel}</span></div><div>○ Cover letter <span className="pending">{pack.coverLetterLabel}</span></div></div></div>
-          <div className="actions reviewActions">{pack.cvReady?<button className="primary" onClick={()=>setReviewOpen(true)}>Review CV changes</button>:<button className="primary" onClick={()=>setCvOpen(true)}>Upload / analyse CV</button>}<a className="secondary openLink" href={job.originalUrl} target="_blank" rel="noreferrer">Open LinkedIn vacancy</a>{job.officialUrl&&<a className="secondary openLink" href={job.officialUrl} target="_blank" rel="noreferrer">Employer link</a>}</div>
+          <div className="actions reviewActions">{pack.cvReady?<button className="primary" onClick={()=>setReviewOpen(true)}>Review CV changes</button>:<button className="primary" onClick={startProfile}>Upload / analyse CV</button>}<a className="secondary openLink" href={job.originalUrl} target="_blank" rel="noreferrer">Open LinkedIn vacancy</a>{job.officialUrl&&<a className="secondary openLink" href={job.officialUrl} target="_blank" rel="noreferrer">Employer link</a>}</div>
         </>})():<div className="emptyPanel"><h2>No selected vacancy</h2><p>{state.loading?'Searching LinkedIn public pages…':'Run the LinkedIn search to see matching vacancies.'}</p></div>}
       </div>
     </section>
 
     <footer>Milestone: LinkedIn public search only · no CVR · no Jobnet · no additional sources</footer>
-
-    {cvOpen&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget)setCvOpen(false)}}><div className="modal cvModal">
-      <div className="modalHead"><div><p className="eyebrow">MASTER CV</p><h2>Upload resume</h2></div><button className="close" onClick={()=>setCvOpen(false)}>×</button></div>
-      <p className="muted">PDF or DOCX · max 8 MB</p>
-      <label className="upload"><input type="file" accept=".pdf,.docx" onChange={event=>parseCv(event.target.files?.[0])} disabled={cvState.loading}/><b>{cvState.loading?'Analysing CV…':cvData?.fileName?`Replace ${cvData.fileName}`:'Choose CV file'}</b><span>PDF or DOCX · max 8 MB</span></label>
-      {cvState.error&&<div className="errorBox"><b>CV parsing failed</b><span>{cvState.error}</span></div>}
-      {cvData&&<div className="successBox"><b>✓ {cvData.fileName}</b><span>{cvData.facts.length} verified facts extracted{cvData.skills.length?` · ${cvData.skills.length} skills/signals detected`:''}</span></div>}
-    </div></div>}
 
     {profileOpen&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget)closeProfile()}}><div className="modal profileModal">
       <div className="modalHead"><div><p className="eyebrow">BUILD YOUR SEARCH AGENT</p><h2>Search profile</h2></div><button className="close" onClick={closeProfile}>×</button></div>

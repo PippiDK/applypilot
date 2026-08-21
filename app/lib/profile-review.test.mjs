@@ -111,3 +111,14 @@ test('CV review shows a neutral empty state when there are no actual wording cha
   assert.match(source,/No CV changes proposed\./)
   assert.doesNotMatch(source,/No usable CV evidence was found for this review/)
 })
+
+test('all Master CV entry points use the full six-step Search Profile flow',()=>{
+  const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+  assert.doesNotMatch(source,/setCvOpen/)
+  assert.doesNotMatch(source,/cvOpen&&/)
+  assert.match(source,/className="cvButton" onClick=\{startProfile\}/)
+  assert.match(source,/Upload \/ analyse CV<\/button>/)
+  assert.doesNotMatch(source,/onClick=\{\(\)=>setCvOpen\(true\)\}[^>]*>Upload \/ analyse CV/)
+  assert.match(source,/Detected signals:/)
+  assert.match(source,/Step \{profileStep\} of 6/)
+})
