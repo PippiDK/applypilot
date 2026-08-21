@@ -55,16 +55,19 @@ function matchedTerms(text,job){
  return job.keywords.filter(k=>lower.includes(k.toLowerCase()))
 }
 function buildChanges(facts,job){
+ // Review contains ONLY genuine wording changes. Already-aligned evidence is never returned here.
  return topEvidence(facts,job).map((f,index)=>{
   const original=cleanSource(f.text)
   const updated=conservativeRewrite(original)
+  const normalizedOriginal=`${original}${/[.!?]$/.test(original)?'':'.'}`.replace(/\s+/g,' ').trim()
+  const normalizedUpdated=updated.replace(/\s+/g,' ').trim()
+  if(normalizedUpdated===normalizedOriginal) return null
   const terms=matchedTerms(original,job)
-  const changed=updated!==`${original}${/[.!?]$/.test(original)?'':'.'}`
-  let why='Keeps verified experience intact while making the wording cleaner for this role.'
-  if(terms.length) why=`Keeps the verified experience intact and brings ${terms.slice(0,3).join(', ')} wording into clearer focus for this role.`
-  if(!changed) why=terms.length?`Already strongly aligned with this role through ${terms.slice(0,3).join(', ')}; no factual expansion is needed.`:'Already clear and evidence-based; no factual expansion is needed.'
-  return {id:f.id,original,updated,why,terms,changed,rank:index}
- })
+  const why=terms.length
+   ?`Keeps the verified experience intact and brings ${terms.slice(0,3).join(', ')} wording into clearer focus for this role.`
+   :'Keeps verified experience intact while making the wording cleaner for this role.'
+  return {id:f.id,original,updated,why,terms,rank:index}
+ }).filter(Boolean)
 }
 
 export default function Home(){
@@ -90,9 +93,11 @@ export default function Home(){
   const fields=[draft.cvName,draft.roles,draft.geography?.length,draft.salary,draft.exclusions]
   return Math.round(fields.filter(Boolean).length/fields.length*100)
  },[draft])
+ const evidence=useMemo(()=>topEvidence(profile.factBank||[],selected),[profile.factBank,selected])
  const changes=useMemo(()=>buildChanges(profile.factBank||[],selected),[profile.factBank,selected])
- const proposedChanges=changes.filter(x=>x.changed)
- const alignedTerms=useMemo(()=>[...new Set(changes.flatMap(x=>x.terms))],[changes])
+ // `changes` is already guaranteed to contain only real diffs.
+ const proposedChanges=changes
+ const alignedTerms=useMemo(()=>[...new Set(evidence.flatMap(f=>matchedTerms(cleanSource(f.text),selected)))],[evidence,selected])
  const jobKey=`${selected.company}|${selected.role}`
  const reviewedCount=proposedChanges.filter(c=>decisions[`${jobKey}|${c.id}`]).length
 
@@ -164,8 +169,8 @@ export default function Home(){
     <div className="changeWhy"><div><small>WHY CHANGED</small><p>{c.why}</p></div><div><small>SOURCE</small><p>Existing Master CV experience only · no new claim added</p></div></div>
     <div className="evidenceActions"><button className={'secondary '+(decision==='original'?'chosen':'')} onClick={()=>setDecision(c.id,'original')}>Keep original</button><button className={'primary smallPrimary '+(decision==='accepted'?'chosenPrimary':'')} onClick={()=>setDecision(c.id,'accepted')}>Accept change</button></div>
    </div>})}
-   {!changes.length&&<div className="errorBox">No usable CV evidence was found for this review. Re-analyse the Master CV.</div>}
-   {changes.length>0&&proposedChanges.length===0&&<div className="successBox noChangesBox"><b>✓ No CV wording changes needed</b><span>The strongest verified CV evidence is already aligned with this role. Nothing is shown as a proposed update unless the wording actually changes.</span></div>}
+   {!evidence.length&&<div className="errorBox">No usable CV evidence was found for this review. Re-analyse the Master CV.</div>}
+   {evidence.length>0&&proposedChanges.length===0&&<div className="successBox noChangesBox"><b>✓ No CV wording changes needed</b><span>The strongest verified CV evidence is already aligned with this role. Aligned bullets are intentionally hidden; only actual changes appear in this review.</span></div>}
    <div className="reviewFooter"><span>Cover letter generation comes next, after CV updates are reviewed.</span><button className="secondary" onClick={()=>setReviewOpen(false)}>Close review</button></div>
   </div></div>}
  </main>

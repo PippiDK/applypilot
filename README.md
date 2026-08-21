@@ -1,8 +1,8 @@
-# ApplyPilot Web MVP v0.4.1
+# ApplyPilot Web MVP v0.4.2
 
 Human-in-the-loop job-search autopilot for senior IT / project / delivery professionals.
 
-## v0.4.1 — Review Quality Fix
+## v0.4.2 — Strict Diff Review Fix
 
 - Removes the Career Fact Bank from the user-facing interface
 
@@ -25,7 +25,7 @@ Human-in-the-loop job-search autopilot for senior IT / project / delivery profes
 
 ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.
 
-The current v0.4.1 rewriting layer is deliberately conservative and deterministic. It does not yet use an LLM and does not add unsupported claims.
+The current v0.4.2 rewriting layer is deliberately conservative and deterministic. It does not yet use an LLM and does not add unsupported claims.
 
 ## Current limitations
 
@@ -37,3 +37,10 @@ The current v0.4.1 rewriting layer is deliberately conservative and deterministi
 ## Deploy
 
 Push all files to the connected GitHub repository. Vercel will redeploy automatically.
+
+
+## v0.4.2 strict diff rule
+- Proposed CV updates contains only genuine Original → Updated differences.
+- Already-aligned bullets are never returned by the change builder and cannot render as review cards.
+- Review counts and Accept all operate only on actual changes.
+- If nothing needs changing, the review shows a single No CV wording changes needed state.
