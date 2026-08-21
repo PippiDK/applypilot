@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 const WINDOWS=[1,3,7,14]
 
@@ -11,7 +11,35 @@ export default function Home(){
   const [jobs,setJobs]=useState([])
   const [selected,setSelected]=useState(null)
   const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null})
+  const [cvOpen,setCvOpen]=useState(false)
+  const [cvData,setCvData]=useState(null)
+  const [cvState,setCvState]=useState({loading:false,error:''})
   const active=jobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||jobs[0]||null
+
+  useEffect(()=>{
+    try{
+      const saved=localStorage.getItem('applypilot-master-cv')
+      if(saved) setCvData(JSON.parse(saved))
+    }catch{}
+  },[])
+
+  async function parseCv(file){
+    if(!file) return
+    setCvState({loading:true,error:''})
+    try{
+      const form=new FormData()
+      form.append('file',file)
+      const res=await fetch('/api/parse-cv',{method:'POST',body:form})
+      const data=await res.json()
+      if(!res.ok) throw new Error(data.error||'CV parsing failed.')
+      const saved={fileName:data.fileName,chars:data.chars,facts:data.facts||[],skills:data.skills||[],preview:data.preview||'',parsedAt:new Date().toISOString()}
+      localStorage.setItem('applypilot-master-cv',JSON.stringify(saved))
+      setCvData(saved)
+      setCvState({loading:false,error:''})
+    }catch(error){
+      setCvState({loading:false,error:error.message||'CV parsing failed. Please try another PDF or DOCX.'})
+    }
+  }
 
   async function search(){
     setJobs([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null})
@@ -37,7 +65,7 @@ export default function Home(){
       <button className="primary" onClick={search} disabled={state.loading}>{state.loading?'Reading LinkedIn JDs…':'Search LinkedIn'}</button>
     </section>
 
-    <div className="profileStrip"><b>Profile loaded</b><span>Senior IT Project / Delivery · Master CV · Denmark</span><span>JD responsibilities 40% · experience/domain 25% · geography 20% · career/comp 15%</span></div>
+    <div className="profileStrip"><b>Profile loaded</b><span>Senior IT Project / Delivery · Denmark</span><span>JD responsibilities 40% · experience/domain 25% · geography 20% · career/comp 15%</span><button className="cvButton" onClick={()=>setCvOpen(true)}>{cvData?.fileName?`✓ ${cvData.fileName}`:'Upload Master CV'}</button></div>
 
     {state.error&&<div className="errorBox"><b>LinkedIn search failed</b><span>{state.error}</span></div>}
     {state.stats&&<div className="searchMeta"><span><b>{state.stats.discovered}</b> jobs discovered</span><span><b>{state.stats.fullJdVerified}</b> full JDs read</span><span><b>{state.stats.evaluated}</b> worthwhile after evaluation</span><span>Coverage: <b>{state.coverage?.status}</b></span></div>}
@@ -68,5 +96,13 @@ export default function Home(){
       </div>
     </section>
     <footer>Milestone: LinkedIn public search only · no CVR · no Jobnet · no additional sources</footer>
+
+    {cvOpen&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget)setCvOpen(false)}}><div className="modal cvModal">
+      <div className="modalHead"><div><p className="eyebrow">MASTER CV</p><h2>Upload resume</h2></div><button className="close" onClick={()=>setCvOpen(false)}>×</button></div>
+      <p className="muted">PDF or DOCX · max 8 MB</p>
+      <label className="upload"><input type="file" accept=".pdf,.docx" onChange={event=>parseCv(event.target.files?.[0])} disabled={cvState.loading}/><b>{cvState.loading?'Analysing CV…':cvData?.fileName?`Replace ${cvData.fileName}`:'Choose CV file'}</b><span>PDF or DOCX · max 8 MB</span></label>
+      {cvState.error&&<div className="errorBox"><b>CV parsing failed</b><span>{cvState.error}</span></div>}
+      {cvData&&<div className="successBox"><b>✓ {cvData.fileName}</b><span>{cvData.facts.length} verified facts extracted{cvData.skills.length?` · ${cvData.skills.length} skills/signals detected`:''}</span></div>}
+    </div></div>}
   </main>
 }
