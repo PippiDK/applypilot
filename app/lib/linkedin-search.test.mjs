@@ -67,9 +67,12 @@ test('expired explicit validThrough closes vacancy',()=>{
  assert.equal(job.vacancyStatus,'CLOSED'); assert.equal(evaluateJob(job).hardExclusion,true)
 })
 
-test('one-source E2E: search -> detail -> evaluator returns VELUX fixture',async()=>{
- const fetcher=async url=>url.includes('/jobs/search/')?SEARCH_HTML:detailHtml()
+test('one-source E2E: LinkedIn guest search -> guest detail -> evaluator returns VELUX fixture',async()=>{
+ const urls=[]
+ const fetcher=async url=>{ urls.push(url); return url.includes('/seeMoreJobPostings/search')?SEARCH_HTML:detailHtml() }
  const result=await searchLinkedIn({freshnessDays:7,fetcher,now:new Date('2026-08-21T12:00:00Z')})
+ assert.match(urls[0],/\/jobs-guest\/jobs\/api\/seeMoreJobPostings\/search/)
+ assert.ok(urls.some(url=>/\/jobs-guest\/jobs\/api\/jobPosting\/4440077540/.test(url)))
  assert.equal(result.stats.discovered,1); assert.equal(result.stats.fullJdVerified,1); assert.equal(result.jobs.length,1); assert.equal(result.jobs[0].job.company,'VELUX'); assert.ok(result.jobs[0].evaluation.score>=6)
 })
 

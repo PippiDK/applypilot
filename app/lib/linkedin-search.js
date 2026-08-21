@@ -1,4 +1,5 @@
-const LINKEDIN_SEARCH = 'https://www.linkedin.com/jobs/search/'
+const LINKEDIN_SEARCH = 'https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search'
+const LINKEDIN_JOB_DETAIL = 'https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/'
 const LINKEDIN_JOB = 'https://www.linkedin.com/jobs/view/'
 
 export const DISCOVERY_QUERIES = [
@@ -402,7 +403,7 @@ export async function searchLinkedIn({freshnessDays=7,maxDetails=24,fetcher=fetc
   const diagnostics={searchRequests:0,searchFailures:0,searchRows:0,detailRequests:0,detailFailures:0,incompleteDetails:0}
   const searchResults=await mapLimit(DISCOVERY_QUERIES,5,async query=>{
     diagnostics.searchRequests++
-    const qs=new URLSearchParams({keywords:query,location:'Denmark',f_TPR:`r${seconds}`,position:'1',pageNum:'0'})
+    const qs=new URLSearchParams({keywords:query,location:'Denmark',f_TPR:`r${seconds}`,sortBy:'DD',start:'0'})
     const html=await fetcher(`${LINKEDIN_SEARCH}?${qs}`)
     return parseSearchHtml(html)
   })
@@ -413,7 +414,7 @@ export async function searchLinkedIn({freshnessDays=7,maxDetails=24,fetcher=fetc
   const unique=[...byId.values()].sort((a,b)=>(safeDate(b.publishedAt)?.getTime()||0)-(safeDate(a.publishedAt)?.getTime()||0)).slice(0,maxDetails)
   const details=await mapLimit(unique,8,async row=>{
     diagnostics.detailRequests++
-    const html=await fetcher(`${LINKEDIN_JOB}${row.jobId}/`)
+    const html=await fetcher(`${LINKEDIN_JOB_DETAIL}${row.jobId}`)
     return parseDetailHtml(row,html,now)
   })
   const jobs=[]
