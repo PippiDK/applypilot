@@ -1,17 +1,24 @@
-# ApplyPilot Web MVP v0.2
+# ApplyPilot Web MVP v0.3
 
-Live-product prototype for a human-in-the-loop job-search autopilot for senior IT / project / delivery professionals.
+Functional CV evidence layer for a human-in-the-loop job-search autopilot.
 
-## v0.2
-- Working Search Profile onboarding
-- CV file selection
-- Target role setup
-- Geography setup
-- Salary floor
-- Hard exclusions
-- Review & truth rule
-- Browser persistence with localStorage
-- Editable saved profile
+## v0.3
+- Real server-side CV parsing for PDF and DOCX
+- Career Fact Bank extracted from the uploaded Master CV
+- Skills/signals detected from CV text
+- Honest application-pack statuses (no fake “Ready”)
+- Career Fact Bank viewer
+- Review Application flow grounded in verified CV facts
+- Truth Guard messaging and evidence IDs
+- Safe tailoring preview anchored to the original fact
+- External job link action
+- Search profile remains stored locally in the browser
 
-## Important
-The dashboard job data is still demo data. CV contents are not uploaded to a server or parsed yet; v0.2 stores only the selected filename in the browser. The next backend milestone is secure CV upload + parsing into a verified Career Fact Bank.
+## Current limitations
+- The job cards are still demo jobs; live job-source ingestion is not connected yet.
+- Tailoring is deterministic and conservative in v0.3; an LLM-backed rewriter comes later.
+- Cover letter generation is intentionally not yet enabled.
+- Legacy .doc parsing is not supported; use PDF or DOCX.
+
+## Deploy
+Push all files to the connected GitHub repository. Vercel will redeploy automatically.
