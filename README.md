@@ -1,46 +1,39 @@
-# ApplyPilot Web MVP v0.4.2
+# ApplyPilot Web MVP v0.5
 
 Human-in-the-loop job-search autopilot for senior IT / project / delivery professionals.
 
-## v0.4.2 — Strict Diff Review Fix
+## v0.5 — Job Description Driven Tailoring
 
-- Removes the Career Fact Bank from the user-facing interface
+- Each job now carries a full Job Description (JD), not only a title and a few demo signals.
+- Users can **View / edit job description** and paste a complete vacancy text.
+- ApplyPilot deterministically extracts known delivery requirements from the JD.
+- Match reasons and gaps are derived from **JD requirements ↔ verified CV evidence**.
+- The fit score is recalculated from the detected JD requirements supported by the CV.
+- CV Update Review is now vacancy-specific: different JDs produce different proposed wording changes.
+- Proposed CV updates still show only genuine Original → Updated diffs.
+- Truth Guard remains strict: wording can only restate evidence already present in the Master CV.
+- Internal evidence IDs remain hidden from the user interface.
+- CV parser remains the working PDF/DOCX implementation from v0.3.2.
+- Cover-letter generation remains intentionally pending.
 
-- Shows only **real wording changes** in Proposed CV updates
-- Hides bullets that are already aligned and unchanged
-- Review counters now count only actual proposed changes
-- **Accept all safe changes** applies only to actual diffs
-- When no wording change is needed, shows a clear **No CV wording changes needed** state
-- Keeps CV evidence internally as the Truth Guard / source-of-truth layer
-- Adds a user-facing **CV Update Review** summary on the dashboard
-- Shows **Original → Updated** wording for every proposed CV change
-- Explains **Why changed** and confirms the **Source** for each change
-- Supports **Accept change** and **Keep original** decisions
-- Shows a review summary with wording changes, supported role terms and unsupported-claim count
-- Keeps `Why this fits` and `Gap` separate from CV-edit review
-- Keeps cover-letter generation explicitly pending
-- Preserves working server-side PDF/DOCX parsing from v0.3.2
+## v0.5 deterministic requirement catalogue
+
+The prototype detects common senior IT delivery requirements such as end-to-end delivery, distributed teams, release/go-live, risk and dependencies, executive stakeholders, Azure/cloud, technical delivery, integrations, governance, regulatory/compliance, budget ownership, multi-workstream programme scope, Agile/Hybrid and data/BI.
+
+This is intentionally deterministic for MVP validation. A semantic/LLM requirement extractor can replace the catalogue later without changing the UI flow.
 
 ## Truth rule
 
 ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.
 
-The current v0.4.2 rewriting layer is deliberately conservative and deterministic. It does not yet use an LLM and does not add unsupported claims.
-
 ## Current limitations
 
 - Job cards are still demo jobs; live job-source ingestion is not connected yet.
-- CV wording changes are conservative deterministic rewrites in this prototype.
+- JD extraction uses a deterministic requirement catalogue rather than an LLM.
+- Tailoring is conservative and rule-driven.
 - Cover letter generation is not yet enabled.
-- Accepted/kept wording decisions are session UI state and are not yet persisted to a database.
+- User data and decisions are still browser-local rather than database-backed.
 
 ## Deploy
 
 Push all files to the connected GitHub repository. Vercel will redeploy automatically.
-
-
-## v0.4.2 strict diff rule
-- Proposed CV updates contains only genuine Original → Updated differences.
-- Already-aligned bullets are never returned by the change builder and cannot render as review cards.
-- Review counts and Accept all operate only on actual changes.
-- If nothing needs changing, the review shows a single No CV wording changes needed state.
