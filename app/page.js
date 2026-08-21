@@ -62,7 +62,7 @@ function analyseJob(jd,facts=[]){
 }
 function relevance(fact,reqs){
  const t=cleanSource(fact.text)
- return reqs.reduce((n,r)=>n+(matchesAny(t,r.evidence)?3:0),0)+(\b(led|managed|delivered|owned|drove|implemented)\b/i.test(t)?1:0)
+ return reqs.reduce((n,r)=>n+(matchesAny(t,r.evidence)?3:0),0)+(/\b(led|managed|delivered|owned|drove|implemented)\b/i.test(t)?1:0)
 }
 function topEvidence(facts,reqs){
  const complete=facts.filter(f=>isCompleteEvidence(f.text))

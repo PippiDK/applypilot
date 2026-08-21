@@ -1,4 +1,4 @@
-# ApplyPilot Web MVP v0.5.1 — AI Evidence-Driven Tailoring
+# ApplyPilot Web MVP v0.5.2 — AI Evidence-Driven Tailoring
 
 This release replaces deterministic phrase replacement with vacancy-specific AI tailoring.
 
@@ -27,3 +27,8 @@ The LLM never receives permission to invent experience. Each returned rewrite mu
 - Jobs are still demo jobs unless their JD is replaced in the UI.
 - Cover-letter generation comes later.
 - Accepted changes are reviewed in-browser; final document export is a later step.
+
+
+## v0.5.2
+- Fixed production build syntax error in CV relevance scoring.
+- Fixed the Vercel production build syntax error in CV relevance scoring.
