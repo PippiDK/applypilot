@@ -73,8 +73,9 @@ export async function POST(request){
     let text=''
 
     if(name.endsWith('.pdf')){
+      const { CanvasFactory } = await import('pdf-parse/worker')
       const { PDFParse } = await import('pdf-parse')
-      const parser = new PDFParse({ data: new Uint8Array(buffer) })
+      const parser = new PDFParse({ data: new Uint8Array(buffer), CanvasFactory })
       try {
         const result = await parser.getText()
         text = result.text || ''
