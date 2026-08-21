@@ -232,35 +232,3 @@ weights:
   experience_domain: 0.25
   geography_work_model: 0.20
   career_compensation: 0.15
-
-# Every required source from the Master Prompt. Unsupported sources are explicitly reported ACCESS LIMITED.
-required_source_registry:
-  - [Jobnet, Public job boards]
-  - [Jobindex, Public job boards]
-  - [LinkedIn Jobs, Public job boards]
-  - [Workindenmark, Public job boards]
-  - [The Hub, Public job boards]
-  - [StepStone Denmark, Public job boards]
-  - [Ofir, Public job boards]
-  - [Jobs in Copenhagen, Public job boards]
-  - [Jobfinder / Ingeniøren, Public job boards]
-  - [Glassdoor Jobs, Public job boards]
-  - [emagine, Recruitment / consulting]
-  - [Ework Verama, Recruitment / consulting]
-  - [Hays Denmark, Recruitment / consulting]
-  - [Randstad Denmark, Recruitment / consulting]
-  - [Capax Recruitment, Recruitment / consulting]
-  - [GlobeSearch, Recruitment / consulting]
-  - [RDT Engineers, Recruitment / consulting]
-  - [EPICO, Recruitment / consulting]
-  - [7N, Recruitment / consulting]
-  - [Jobgether, Remote EU / Europe]
-  - [Europe Remotely, Remote EU / Europe]
-  - [We Work Remotely, Remote EU / Europe]
-  - [Remote OK, Remote EU / Europe]
-  - [Himalayas, Remote EU / Europe]
-  - [Welcome to the Jungle, Remote EU / Europe]
-  - [Landing.jobs, Remote EU / Europe]
-
-  - [Email job alerts / talent communities, Email job alerts / talent communities]
-  - [Official target company career pages, Official career pages of target companies]

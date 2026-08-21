@@ -1,87 +1,82 @@
-# ApplyPilot MVP — Search + Matching Engine v0.2
+# ApplyPilot MVP v0.3 — LinkedIn Public Search E2E
 
-Built by extending the original v0.1 evaluator, not replacing it.
+This build intentionally has **one active source only: LinkedIn Jobs public pages**.
 
-## What v0.2 adds
+## End-to-end contract
 
-1. **Live source layer**
-   - Jobnet public BFF search + full JobAdDetails
-   - The Hub public board feed
-   - Remote OK public JSON feed
-   - We Work Remotely RSS
-   - All other mandatory Master-Prompt sources are reported honestly as `ACCESS LIMITED` until a stable connector exists.
+`LinkedIn public search → public job detail page → verified full JD → normalize → dedupe → Master Prompt hard filters → JD/CV evidence scoring → ranked worthwhile jobs`
 
-2. **Search pipeline**
-   - ingest
-   - normalize
-   - require a real/full JD before detailed evaluation
-   - freshness filter
-   - title/JD discovery gate (title is only a signal)
-   - deduplicate
-   - hard filters
-   - full-JD + supplied Master-CV evaluation
-   - NEW / UPDATED / SEEN history
-   - max 10 worthwhile results
+No Jobnet, CVR, company discovery, The Hub, Remote OK, We Work Remotely, or other connectors are active in this milestone.
+Do not add a second source until this path is stable in production.
 
-3. **Master Prompt v2 scoring**
-   - 40% actual responsibilities / delivery ownership
-   - 25% experience & domain match against the supplied Master CV text
-   - 20% geography / work model
-   - 15% career / compensation value
-   - hard exclusions override score
+## Public LinkedIn flow
 
-4. **Hard rules implemented**
-   - mandatory professional/fluent Danish → reject
-   - R&D / scientific / hardware product-development roles → reject
-   - BAU/support/service operations → reject when delivery ownership is absent
-   - coordination-only roles → reject
-   - assistant/coordinator level → reject
-   - no meaningful technology/digital delivery ownership → reject
-   - Program Manager only when execution/delivery is strong
-   - Product roles only when delivery execution ownership is present
+For every configured discovery query the connector requests LinkedIn's zero-login public search page for:
 
-## Important truth rule
+- `location=Denmark`
+- freshness window via `f_TPR`
 
-The evaluator never invents candidate experience. Candidate-specific evidence is counted only when a term exists in **both** the full JD and the `resume_text` supplied to the API.
+It extracts public `/jobs/view/...` links and their LinkedIn job IDs, deduplicates IDs, then opens each public job detail page.
 
-## Run
+A job is allowed into the evaluator **only** when the actual public detail page contains LinkedIn's full job-description container (`show-more-less-html__markup`) and the extracted JD passes a minimum body sanity check. Search-card snippets and meta descriptions are never treated as full JDs.
 
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
-pip install -r requirements.txt
-pytest -q
-uvicorn app.main:app --reload
-```
+If LinkedIn returns an auth wall/challenge, if all search requests fail, or if search results exist but full JDs cannot be verified, coverage becomes `ACCESS LIMITED`. The engine never converts source failure into a fake successful zero-result search.
 
-Open `http://127.0.0.1:8000/docs`.
+## Evaluator rules carried forward
 
-### `POST /search`
+The evaluator uses the Master Prompt weights:
 
-Requires the Master CV text:
+- 40% actual responsibilities / delivery ownership
+- 25% experience & domain evidence against supplied Master CV
+- 20% geography / work model
+- 15% career / compensation
+
+Critical hard-filter regressions are covered by tests:
+
+- Danish preferred but not required → not rejected
+- mandatory professional/fluent Danish → rejected
+- corporate IT inside an R&D-heavy company → not rejected merely because the JD mentions research/drug discovery
+- primary construction/building/civil-engineering delivery → rejected
+- coordination-only / no delivery ownership → rejected
+- unverified full JD → rejected
+- remote Europe without explicit Denmark support → `REMOTE ELIGIBILITY — UNVERIFIED`
+- remote employment explicitly excluding Denmark → rejected
+
+Salary ranges are assessed conservatively from the lower bound when a range is supplied; the upper bound is not treated as guaranteed compensation.
+
+## API
+
+### Health
+
+`GET /health`
+
+### Search
+
+`POST /search`
+
+Example body:
 
 ```json
 {
-  "resume_text": "<full parsed Master CV text>",
+  "resume_text": "<full Master CV text>",
   "freshness_days": 7,
   "max_results": 10,
-  "include_remote_eu": true,
-  "only_new_or_updated": true
+  "only_new_or_updated": false
 }
 ```
 
-The response includes:
-- worthwhile vacancies only;
-- score/verdict/action;
-- MATCH and GAPS;
-- original/official URL when available;
-- source coverage statuses;
-- pipeline counters.
+### Evaluate one already-normalized vacancy
 
-## Source honesty
+`POST /evaluate`
 
-The Master Prompt says not to claim a source was searched when access failed. v0.2 therefore exposes `SEARCHED`, `ACCESS LIMITED`, `NOT ACCESSIBLE`, or `NO RELEVANT RESULTS` per source. Unsupported job boards are not silently replaced by another source.
+## Tests
 
-## Next technical slice
+Run:
 
-Add stable connectors for the remaining Denmark/recruitment sources and official target-company ATS pages, while keeping the evaluator unchanged.
+```bash
+python -m pytest -q
+```
+
+The test suite includes a mocked **LinkedIn public search → public detail page → full JD → evaluator** integration test, parser tests, access-wall handling, hard-filter regressions, dedupe, and history updates.
+
+The build environment used to assemble this package has no external DNS, so the exact HTTP path cannot be smoke-tested from this container against LinkedIn itself. Public LinkedIn search and job-detail pages were independently confirmed to be publicly readable on the web on 2026-08-21. The next production validation should therefore be exactly one thing: deploy this build and inspect the first real LinkedIn `/search` run. No second source should be added before that succeeds.

@@ -5,6 +5,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field, HttpUrl
 
 RemoteType = Literal["remote", "hybrid", "onsite", "unknown"]
+RemoteEligibility = Literal["DENMARK CONFIRMED", "DENMARK EXCLUDED", "UNVERIFIED", "NOT APPLICABLE"]
 EmploymentType = Literal["permanent", "fixed-term", "contract", "unknown"]
 VacancyStatus = Literal["VERIFIED ACTIVE", "ACTIVE VIA THIRD PARTY", "UNVERIFIED", "CLOSED"]
 HistoryStatus = Literal["NEW", "UPDATED", "SEEN"]
@@ -21,10 +22,12 @@ class Job(BaseModel):
     location: str
     country: Optional[str] = None
     remote_type: RemoteType = "unknown"
+    remote_eligibility: RemoteEligibility = "NOT APPLICABLE"
     employment_type: EmploymentType = "unknown"
     salary_min_dkk_month: Optional[int] = None
     salary_max_dkk_month: Optional[int] = None
     description: str = ""
+    full_jd_verified: bool = False
     original_url: HttpUrl
     official_url: Optional[HttpUrl] = None
     published_at: Optional[datetime] = None
@@ -66,7 +69,6 @@ class SearchRequest(BaseModel):
     resume_text: str = Field(min_length=50)
     freshness_days: int = Field(default=7, ge=1, le=30)
     max_results: int = Field(default=10, ge=1, le=10)
-    include_remote_eu: bool = True
     only_new_or_updated: bool = True
 
 
@@ -76,11 +78,17 @@ class SourceCoverage(BaseModel):
     status: CoverageStatus
     detail: Optional[str] = None
     fetched: int = 0
+    search_requests: int = 0
+    search_failures: int = 0
+    search_rows: int = 0
+    detail_requests: int = 0
+    detail_failures: int = 0
+    incomplete_details: int = 0
 
 
 class SearchStats(BaseModel):
     fetched: int = 0
-    normalized: int = 0
+    full_jd_verified: int = 0
     deduplicated: int = 0
     cheap_filter_passed: int = 0
     full_jd_evaluated: int = 0
