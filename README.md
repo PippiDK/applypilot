@@ -1,37 +1,33 @@
-# ApplyPilot Web MVP v0.3.2
+# ApplyPilot Web MVP v0.4
 
-Functional CV evidence layer for a human-in-the-loop job-search autopilot.
+Human-in-the-loop job-search autopilot for senior IT / project / delivery professionals.
 
-## v0.3.2
-- Real server-side CV parsing for PDF and DOCX
-- Career Fact Bank extracted from the uploaded Master CV
-- Skills/signals detected from CV text
-- Honest application-pack statuses (no fake “Ready”)
-- Career Fact Bank viewer
-- Review Application flow grounded in verified CV facts
-- Truth Guard messaging and evidence IDs
-- Safe tailoring preview anchored to the original fact
-- External job link action
-- Search profile remains stored locally in the browser
+## v0.4 — CV Update Review
+
+- Removes the Career Fact Bank from the user-facing interface
+- Keeps CV evidence internally as the Truth Guard / source-of-truth layer
+- Adds a user-facing **CV Update Review** summary on the dashboard
+- Shows **Original → Updated** wording for every proposed CV change
+- Explains **Why changed** and confirms the **Source** for each change
+- Supports **Accept change** and **Keep original** decisions
+- Shows a review summary with wording changes, supported role terms and unsupported-claim count
+- Keeps `Why this fits` and `Gap` separate from CV-edit review
+- Keeps cover-letter generation explicitly pending
+- Preserves working server-side PDF/DOCX parsing from v0.3.2
+
+## Truth rule
+
+ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.
+
+The current v0.4 rewriting layer is deliberately conservative and deterministic. It does not yet use an LLM and does not add unsupported claims.
 
 ## Current limitations
-- The job cards are still demo jobs; live job-source ingestion is not connected yet.
-- Tailoring is deterministic and conservative in v0.3; an LLM-backed rewriter comes later.
-- Cover letter generation is intentionally not yet enabled.
-- Legacy .doc parsing is not supported; use PDF or DOCX.
+
+- Job cards are still demo jobs; live job-source ingestion is not connected yet.
+- CV wording changes are conservative deterministic rewrites in this prototype.
+- Cover letter generation is not yet enabled.
+- Accepted/kept wording decisions are session UI state and are not yet persisted to a database.
 
 ## Deploy
+
 Push all files to the connected GitHub repository. Vercel will redeploy automatically.
-
-
-### v0.3.2 hotfix
-- Upgraded pdf-parse from legacy 1.1.1 to 2.4.5.
-- Uses the v2 PDFParse API and always destroys the parser after extraction.
-- Fixes the Vercel build failure caused by the legacy package trying to open ./test/data/05-versions-space.pdf.
-
-
-## v0.3.2 hotfix
-- Fix Vercel runtime DOMMatrix error for PDF parsing
-- Use pdf-parse CanvasFactory from pdf-parse/worker
-- Add @napi-rs/canvas for Node serverless DOM/canvas polyfills
-- Externalize PDF native packages in Next.js server build
