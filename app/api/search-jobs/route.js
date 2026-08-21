@@ -148,7 +148,7 @@ async function jobnetDetail(id){
   const data=await fetchJson(`${JOBNET}/FindJob/JobAdDetails/${encodeURIComponent(id)}?incrementViews=false`,{headers:{'x-csrf':'1'}},1800)
   const body=clean(data.body||'')
   const addr=data.job?.address||{}
-  const url=data.application?.url || `https://jobnet.dk/job/${id}`
+  const url=data.application?.url || `https://jobnet.dk/find-job/${id}`
   return {body,url,address:clean([addr.city,addr.postalCode].filter(Boolean).join(' ')),country:addr.countryName||'Danmark',deadline:data.application?.deadlineDate||data.unpublicationDateTime||null}
 }
 
@@ -164,7 +164,7 @@ async function getJobnet(profile){
     if(seen.has(x.jobAdId)) continue; seen.add(x.jobAdId)
     if(!freshEnough(x.publicationDate,Number(profile.freshnessDays||7))) continue
     const rf=roleFit(x.title,targetRoles); if(rf.score<45) continue
-    base.push({id:String(x.jobAdId),source:'jobnet',sourceLabel:'Jobnet',company:clean(x.hiringOrgName||'Employer'),title:clean(x.title),location:clean(x.postalDistrictName||x.municipality||'Denmark'),country:x.country||'Danmark',postedAt:x.publicationDate,deadline:x.applicationDeadline||null,remote:false,url:`https://jobnet.dk/job/${x.jobAdId}`,jd:'',salaryCurrency:null,salaryMinMonthly:null,salaryMaxMonthly:null})
+    base.push({id:String(x.jobAdId),source:'jobnet',sourceLabel:'Jobnet',company:clean(x.hiringOrgName||'Employer'),title:clean(x.title),location:clean(x.postalDistrictName||x.municipality||'Denmark'),country:x.country||'Danmark',postedAt:x.publicationDate,deadline:x.applicationDeadline||null,remote:false,url:`https://jobnet.dk/find-job/${x.jobAdId}`,jd:'',salaryCurrency:null,salaryMinMonthly:null,salaryMaxMonthly:null})
   }
   base.sort((a,b)=>roleFit(b.title,targetRoles).score-roleFit(a.title,targetRoles).score || new Date(b.postedAt)-new Date(a.postedAt))
   const top=base.slice(0,18)
