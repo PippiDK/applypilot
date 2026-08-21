@@ -1,16 +1,13 @@
-# ApplyPilot v0.7.2 — no-key company search
+# ApplyPilot v0.8 — Step 1: Company Discovery
 
-This build removes the runtime dependency on a Datafordeler credential.
+This build intentionally does one thing only:
 
-Search path:
-1. User selects only radius from Nærum and supplies the Master CV already stored in ApplyPilot.
-2. Public Jobnet index discovers active vacancies in the hard-coded target profession family.
-3. Public DAWA postal geography enforces the selected radius from Nærum.
-4. Full JD is mandatory. External Jobnet listings are read from the employer/ATS page; internal listings use Jobnet detail text.
-5. Public APICVR enriches the employer with CVR industry/size/website data; the hard-coded employer profile is applied.
-6. The full JD is compared with the full Master CV using a conservative local evidence gate. A matching title alone never passes.
-7. Only passing vacancies are returned.
+1. User chooses 10 / 20 / 30 / 40 / 50 km from Nærum.
+2. Server discovers Danish companies from public CVR data.
+3. Internal Employer Profile filters company types and minimum size.
+4. Exact address coordinates are used to enforce the selected radius.
+5. The UI outputs the company list.
 
-No Datafordeler key, MitID, user API key or card is required for this search path.
+Not part of this build: vacancy discovery, profession filtering, career pages, full JD retrieval, CV/JD matching, AI tailoring, cover letters.
 
-Unchanged: CV parser, profile UI, radius choices, CV review/tailoring UI, styling and other API routes.
+No API key, MitID or user credential is required for company discovery.
