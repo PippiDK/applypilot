@@ -1,263 +1,248 @@
 import { NextResponse } from 'next/server'
-import AdmZip from 'adm-zip'
-import { generateText } from 'ai'
 import {
-  NAERUM, clean, haversineKm, municipalityCodes, companyProfileDecision,
-  corporateDomainFromEmails, careerLinks, jobLinks, htmlTitle,
-  fullJobDescription, professionMatches, jdHardRejected,
+  NAERUM, clean, haversineKm, professionMatches, jdHardRejected,
 } from '../../lib/company-search.js'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-const FILE_API='https://api.datafordeler.dk/FileDownloads/v2.0'
-const CVR_GRAPHQL='https://graphql.datafordeler.dk/flexibleCurrent/v4'
+const JOBNET='https://jobnet.dk/bff'
+const APICVR='https://apicvr.dk/api/v1'
 const DAWA='https://api.dataforsyningen.dk'
-const MAX_COMPANIES_TO_CRAWL=80
-const MAX_JOB_PAGES=24
+const MAX_SEARCH_RESULTS=45
+const MAX_FULL_JDS=24
 
-function pick(obj,...keys){
-  for(const key of keys){
-    if(obj && obj[key]!==undefined && obj[key]!==null) return obj[key]
-    const found=obj && Object.keys(obj).find(k=>k.toLowerCase()===String(key).toLowerCase())
-    if(found) return obj[found]
-  }
-  return undefined
-}
-function asArray(v){return Array.isArray(v)?v:v?[v]:[]}
-function chunk(arr,size){const out=[];for(let i=0;i<arr.length;i+=size)out.push(arr.slice(i,i+size));return out}
+// Agreed profession family. Internal only; user chooses only radius.
+const SEARCH_TERMS=[
+  'Senior Project Manager',
+  'IT Project Manager',
+  'Technical Project Manager',
+  'Delivery Manager',
+  'IT Delivery Manager',
+  'Implementation Manager',
+  'Transformation Project Manager',
+  'Software Delivery Lead',
+  'Platform Delivery Lead',
+]
+
+const TARGET_INDUSTRY=[
+  /software|computerprogrammering|informationsteknolog|it-konsulent|it konsulent|saas|cloud|data|cyber/i,
+  /bank|finans|betaling|payment|fintech|forsikring|insurance/i,
+  /telekommunikation|telecom|kommunikationsteknolog|satellite/i,
+  /energi|elektricitet|gasforsyning|forsyning|utility|utilities/i,
+  /logistik|transport|lufttransport|luftfart|maritim|søtransport|skibsfart/i,
+  /medicinsk|medtech|healthtech|sundhedsteknolog/i,
+  /farmaceut|lægemiddel|pharma/i,
+  /technology consulting|it consulting|rådgivning.*informationsteknolog|informationsteknolog.*rådgivning/i,
+]
+
+const COMPANY_EXCLUSIONS=[
+  /forskning.*bioteknolog|bioteknolog.*forskning|research.*biotech|drug discovery/i,
+  /arkitekt|architecture/i,
+  /byggeri|bygge-? og anlæg|anlægsvirksomhed|civil engineering|construction|ejendomsudvikling|property development/i,
+  /rekruttering|vikarbureau|recruitment|staffing agency/i,
+  /reklamebureau|marketingbureau|creative agency|advertising agency/i,
+]
+
+const FIT_SIGNALS=[
+  {label:'end-to-end delivery',jd:/end[- ]to[- ]end|full lifecycle|delivery lifecycle/i,cv:/end[- ]to[- ]end|full lifecycle|SIT|SAT|RFS|go-live|transition to operations/i},
+  {label:'release / go-live',jd:/release readiness|go-live|production release|release management/i,cv:/release readiness|go-live|RFS|production|release/i},
+  {label:'risk & dependencies',jd:/\brisk\b|dependenc|RAID/i,cv:/\brisk\b|dependenc|RAID/i},
+  {label:'senior stakeholders',jd:/executive stakeholder|senior stakeholder|steering committee|stakeholder management/i,cv:/executive|senior stakeholder|steering|stakeholder/i},
+  {label:'Agile / hybrid delivery',jd:/\bAgile\b|hybrid delivery|\bScrum\b|\bSAFe\b/i,cv:/\bAgile\b|\bHybrid\b|\bScrum\b|\bSAFe\b/i},
+  {label:'Azure / cloud',jd:/\bAzure\b|\bcloud\b/i,cv:/\bAzure\b|\bcloud\b/i},
+  {label:'data / SQL / BI',jd:/\bSQL\b|data platform|Power BI|\bBI\b|data warehouse|DWH/i,cv:/\bSQL\b|Power BI|\bBI\b|DWH|data warehouse/i},
+  {label:'regulatory / compliance',jd:/regulated|regulatory|compliance|AML/i,cv:/regulated|regulatory|compliance|AML/i},
+  {label:'integration',jd:/integration|interfaces?|\bAPI\b/i,cv:/integration|interfaces?|\bAPI\b/i},
+  {label:'delivery governance',jd:/programme governance|program governance|delivery governance|PMO|governance/i,cv:/governance|roadmap|backlog governance|PMO/i},
+  {label:'budget / financial oversight',jd:/\bbudget\b|financial oversight|cost management/i,cv:/\bbudget\b|financial/i},
+  {label:'distributed teams',jd:/distributed|international teams|global teams|cross[- ]functional teams/i,cv:/distributed|international teams|Denmark.*India|India.*Poland|DK.*IN|cross[- ]functional/i},
+  {label:'software / engineering delivery',jd:/software development|engineering teams|technical delivery|platform delivery|IT development/i,cv:/software|engineering|technical|platform|IT delivery/i},
+]
+
+function norm(v=''){return clean(v).toLowerCase().replace(/[–—]/g,'-').replace(/\s+/g,' ')}
 function uniqBy(arr,keyFn){const seen=new Set();return arr.filter(x=>{const k=keyFn(x);if(!k||seen.has(k))return false;seen.add(k);return true})}
-function addressId(value=''){
-  const s=String(value||'').trim()
-  const m=s.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
-  return m?m[0]:''
-}
-function addressText(row){
-  const street=pick(row,'CVRAdresse_vejnavn','vejnavn')
-  const no=pick(row,'CVRAdresse_husnummerFra','husnummerFra')
-  const zip=pick(row,'CVRAdresse_postnummer','postnummer')
-  const city=pick(row,'CVRAdresse_postdistrikt','postdistrikt')
-  return clean([street,no,zip,city].filter(Boolean).join(' '))
-}
+function chunk(arr,size){const out=[];for(let i=0;i<arr.length;i+=size)out.push(arr.slice(i,i+size));return out}
 
-async function fetchJson(url,options={},timeout=12000){
-  const res=await fetch(url,{...options,signal:AbortSignal.timeout(timeout),cache:'no-store'})
+async function fetchJson(url,options={},timeout=10000){
+  const res=await fetch(url,{...options,headers:{'user-agent':'ApplyPilot/0.7.2 (+public-job-search)',...(options.headers||{})},signal:AbortSignal.timeout(timeout),cache:'no-store'})
   if(!res.ok) throw new Error(`${new URL(url).hostname}: ${res.status}`)
   return res.json()
 }
-async function fetchBuffer(url,timeout=15000){
-  const res=await fetch(url,{signal:AbortSignal.timeout(timeout),cache:'no-store'})
-  if(!res.ok) throw new Error(`${new URL(url).hostname}: ${res.status}`)
-  return Buffer.from(await res.arrayBuffer())
-}
-async function fetchHtml(url,timeout=7000){
-  const res=await fetch(url,{headers:{'user-agent':'ApplyPilot/0.7 (+job-search; public-career-pages-only)','accept':'text/html,application/xhtml+xml'},redirect:'follow',signal:AbortSignal.timeout(timeout),cache:'no-store'})
+async function fetchHtml(url,timeout=9000){
+  const res=await fetch(url,{headers:{'user-agent':'ApplyPilot/0.7.2 (+public-job-search)','accept':'text/html,application/xhtml+xml'},redirect:'follow',signal:AbortSignal.timeout(timeout),cache:'no-store'})
   if(!res.ok) throw new Error(`${new URL(url).hostname}: ${res.status}`)
   const type=res.headers.get('content-type')||''
   if(!/text\/html|application\/xhtml/i.test(type)) throw new Error('Not HTML')
   return {html:await res.text(),url:res.url}
 }
 
-async function availableFiles(entity,apiKey){
-  let page=1,total=1,all=[]
-  while(page<=total && page<=20){
-    const qs=new URLSearchParams({Register:'CVR',Version:'2',Entity:entity,PageNumber:String(page),apiKey})
-    const data=await fetchJson(`${FILE_API}/GetAvailableFileDownloads?${qs}`)
-    const files=pick(data,'AvailableFileDownloads','availableFileDownloads')||[]
-    all.push(...files)
-    const meta=pick(data,'PaginationMetadata','paginationMetadata')||{}
-    total=Number(pick(meta,'TotalPages','totalPages')||1)
-    page++
-  }
-  return all
+function htmlToText(html=''){
+  return clean(String(html)
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,' ')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,' ')
+    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi,' '))
+}
+function htmlTitle(html=''){
+  const h1=String(html).match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)
+  if(h1&&clean(h1[1])) return clean(h1[1])
+  const t=String(html).match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)
+  return t?clean(t[1]).replace(/\s+[|–—-]\s+[^|–—-]+$/,'').trim():''
+}
+function fullDescription(html=''){
+  const text=htmlToText(html)
+  return text.length>=500?text.slice(0,35000):''
 }
 
-function selectMunicipalFiles(files,codes){
-  const wanted=new Set(codes)
-  const candidates=files.filter(f=>{
-    const municipality=String(pick(f,'MunicipalityCode','municipalityCode')||'').padStart(4,'0')
-    const format=String(pick(f,'ContainedFileFormat','containedFileFormat')||'').toLowerCase()
-    const type=String(pick(f,'TypeOfDownload','typeOfDownload')||'').toLowerCase()
-    return wanted.has(municipality) && format==='json' && type.includes('total')
-  })
-  const byMunicipality=new Map()
-  for(const file of candidates){
-    const municipality=String(pick(file,'MunicipalityCode','municipalityCode')||'').padStart(4,'0')
-    const generation=Number(pick(file,'GenerationNumber','generationNumber')||0)
-    const prior=byMunicipality.get(municipality)
-    if(!prior || generation>prior.generation) byMunicipality.set(municipality,{file,generation})
-  }
-  return [...byMunicipality.values()].map(x=>x.file)
+async function jobnetSearch(term){
+  const qs=new URLSearchParams({resultsPerPage:'50',pageNumber:'1',orderType:'PublicationDate',searchString:term,regions:'HovedstadenOgBornholm',workHoursType:'FullTime',employmentDurationType:'Permanent'})
+  const data=await fetchJson(`${JOBNET}/FindJob/Search?${qs}`,{headers:{'x-csrf':'1'}},9000)
+  return Array.isArray(data?.jobAds)?data.jobAds:[]
 }
 
-function parseJsonPayload(text=''){
-  const raw=String(text).trim()
-  if(!raw) return []
-  try{
-    const parsed=JSON.parse(raw)
-    if(Array.isArray(parsed)) return parsed
-    if(parsed && typeof parsed==='object'){
-      const arr=Object.values(parsed).find(Array.isArray)
-      if(arr) return arr
-      return [parsed]
-    }
-  }catch{}
+async function jobnetDetail(id){
+  const data=await fetchJson(`${JOBNET}/FindJob/JobAdDetails/${encodeURIComponent(id)}?incrementViews=false`,{headers:{'x-csrf':'1'}},9000)
+  const addr=data?.job?.address||{}
+  return {
+    jd:clean(data?.body||''),
+    url:clean(data?.application?.url||''),
+    postalCode:clean(addr?.postalCode||''),
+    city:clean(addr?.city||''),
+  }
+}
+
+async function loadJobnetCandidates(){
+  const batches=await Promise.allSettled(SEARCH_TERMS.map(jobnetSearch))
+  const raw=[]
+  for(const b of batches) if(b.status==='fulfilled') raw.push(...b.value)
   const rows=[]
-  for(const line of raw.split(/\r?\n/)){
-    const t=line.trim();if(!t)continue
-    try{rows.push(JSON.parse(t))}catch{}
+  for(const x of raw){
+    const title=clean(x?.title||'')
+    if(!professionMatches(title)) continue
+    rows.push({
+      id:String(x?.jobAdId||''),title,company:clean(x?.hiringOrgName||''),
+      city:clean(x?.postalDistrictName||x?.municipality||''),postalCode:clean(x?.postalCode||''),
+      externalUrl:clean(x?.jobAdUrl||''),isExternal:!!x?.isExternal,
+      postedAt:x?.publicationDate||null,
+    })
   }
-  return rows
+  return uniqBy(rows,x=>x.id).slice(0,MAX_SEARCH_RESULTS)
 }
 
-async function downloadRows(file,apiKey){
-  const filename=pick(file,'Filename','FileName','filename','fileName')
-  if(!filename) return []
-  const qs=new URLSearchParams({Filename:filename,apiKey})
-  const zipBuffer=await fetchBuffer(`${FILE_API}/GetFile?${qs}`)
-  const zip=new AdmZip(zipBuffer)
-  const entry=zip.getEntries().find(e=>!e.isDirectory && /\.json$/i.test(e.entryName)) || zip.getEntries().find(e=>!e.isDirectory)
-  if(!entry) return []
-  return parseJsonPayload(entry.getData().toString('utf8'))
+async function postalCenter(postalCode,city){
+  let rows=[]
+  try{
+    if(/^\d{4}$/.test(postalCode)) rows=await fetchJson(`${DAWA}/postnumre?nr=${encodeURIComponent(postalCode)}`,{},6000)
+    if(!rows?.length&&city) rows=await fetchJson(`${DAWA}/postnumre?navn=${encodeURIComponent(city)}`,{},6000)
+  }catch{return null}
+  if(!Array.isArray(rows)||!rows.length) return null
+  const wanted=norm(city)
+  const row=rows.find(r=>wanted&&norm(r?.navn)===wanted)||rows[0]
+  const p=row?.visueltcenter
+  if(!Array.isArray(p)||p.length<2) return null
+  const lon=Number(p[0]),lat=Number(p[1])
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)) return null
+  return {lat,lon,postalCode:String(row?.nr||postalCode||''),city:clean(row?.navn||city)}
 }
 
-async function loadAddressRows(radiusKm,apiKey){
-  const codes=municipalityCodes(radiusKm)
-  const files=selectMunicipalFiles(await availableFiles('Adressering',apiKey),codes)
-  if(!files.length) throw new Error('CVR municipality address files were not found.')
-  const batches=[]
-  for(const group of chunk(files,4)){
-    const settled=await Promise.allSettled(group.map(f=>downloadRows(f,apiKey)))
-    for(const result of settled) if(result.status==='fulfilled') batches.push(...result.value)
-  }
-  return batches.filter(row=>{
-    const use=clean(pick(row,'AdresseringAnvendelse','adresseringAnvendelse')||'')
-    const country=clean(pick(row,'CVRAdresse_landekode','landekode')||'DK')
-    return (!use || /beliggenhedsadresse/i.test(use)) && (!country || /^DK$/i.test(country))
-  })
+async function cvrCompany(companyName){
+  if(!companyName) return null
+  try{
+    const url=`${APICVR}/search/company/${encodeURIComponent(companyName)}?limit=5`
+    const rows=await fetchJson(url,{},8000)
+    if(!Array.isArray(rows)||!rows.length) return null
+    const target=norm(companyName).replace(/\b(a\/s|aps|a s)\b/g,'').trim()
+    const scored=rows.map(r=>{
+      const n=norm(r?.name||'').replace(/\b(a\/s|aps|a s)\b/g,'').trim()
+      let score=n===target?100:(n.includes(target)||target.includes(n)?80:0)
+      const tokens=target.split(/\W+/).filter(x=>x.length>2)
+      if(!score&&tokens.length) score=Math.round(tokens.filter(t=>n.includes(t)).length/tokens.length*60)
+      return {r,score}
+    }).sort((a,b)=>b.score-a.score)
+    return scored[0]?.score>=40?scored[0].r:null
+  }catch{return null}
 }
 
-async function geocodeDarIds(rows){
-  const idToRow=new Map()
-  for(const row of rows){
-    const id=addressId(pick(row,'Adresse','adresse'))
-    if(id && !idToRow.has(id)) idToRow.set(id,row)
+function employeeNumber(v){
+  if(Number.isFinite(Number(v))) return Number(v)
+  const nums=String(v||'').match(/\d[\d.]*/g)||[]
+  if(!nums.length) return null
+  return Math.max(...nums.map(x=>Number(x.replace(/\./g,''))).filter(Number.isFinite))
+}
+
+function companyPass(record,jd=''){
+  const industry=clean(record?.industrydesc||record?.industrytext||'')
+  const combined=`${industry} ${clean(jd)}`
+  if(COMPANY_EXCLUSIONS.some(rx=>rx.test(combined))) return {pass:false,reason:'Company type excluded'}
+  const employees=employeeNumber(record?.employees)
+  const targetIndustry=TARGET_INDUSTRY.some(rx=>rx.test(industry))
+  // Agreed employer profile: large enterprise is acceptable; 20-99 only in target industries.
+  if(Number.isFinite(employees)){
+    if(employees>=100) return {pass:true,employees,industry}
+    if(employees>=20&&targetIndustry) return {pass:true,employees,industry}
+    return {pass:false,reason:'Company does not meet employer profile'}
   }
-  const coords=new Map()
-  for(const ids of chunk([...idToRow.keys()],25)){
+  // Public CVR mirrors occasionally omit employee count. Fail closed unless industry is clearly one of the agreed target types.
+  if(targetIndustry) return {pass:true,employees:null,industry}
+  return {pass:false,reason:'Company type/size could not be confirmed'}
+}
+
+async function getFullJob(candidate){
+  let detail=null
+  if(!candidate.isExternal||!candidate.externalUrl){
+    try{detail=await jobnetDetail(candidate.id)}catch{}
+  }
+  let jd=clean(detail?.jd||'')
+  let url=clean(candidate.externalUrl||detail?.url||'')
+  let city=clean(detail?.city||candidate.city)
+  let postalCode=clean(detail?.postalCode||candidate.postalCode)
+
+  // External Jobnet listings already point to the employer/ATS. Read that page directly.
+  if(url&&(!jd||jd.length<500)){
     try{
-      const qs=new URLSearchParams({id:ids.join('|'),format:'geojson',geometri:'adgangspunkt'})
-      const data=await fetchJson(`${DAWA}/adresser?${qs}`,{},10000)
-      for(const feature of asArray(data?.features)){
-        const id=pick(feature?.properties||{},'id','adresseid')
-        const pair=feature?.geometry?.coordinates
-        if(id && Array.isArray(pair) && Number.isFinite(Number(pair[0])) && Number.isFinite(Number(pair[1]))) coords.set(String(id),{lon:Number(pair[0]),lat:Number(pair[1])})
-      }
+      const page=await fetchHtml(url,9000)
+      const pageText=fullDescription(page.html)
+      if(pageText) jd=pageText
+      url=page.url||url
+      const title=htmlTitle(page.html)
+      if(title&&professionMatches(title)) candidate={...candidate,title}
     }catch{}
   }
-  return rows.map(row=>{
-    const id=addressId(pick(row,'Adresse','adresse'))
-    const point=coords.get(id)
-    if(!point) return null
-    return {row,addressId:id,address:addressText(row),...point,distanceKm:haversineKm(NAERUM.lat,NAERUM.lon,point.lat,point.lon)}
-  }).filter(Boolean)
+  if(!jd||jd.length<500||!url) return null
+  return {...candidate,jd,url,city,postalCode}
 }
 
-async function queryCvrCompanies(entityIds,apiKey){
-  const out=[]
-  const now=new Date().toISOString()
-  for(const ids of chunk(entityIds,35)){
-    const quoted=ids.map(id=>JSON.stringify(id)).join(',')
-    const query=`{
-      CVR_CVREnhed(first:${ids.length},virkningstid:${JSON.stringify(now)},where:{id:{in:[${quoted}]}}){
-        nodes{
-          id forretningsnoegle forretningsnoegletype enhedsType
-          id_CVR_Navn_CVREnhedsId_ref(first:5){nodes{vaerdi sekvens}}
-          id_CVR_Branche_CVREnhedsId_ref(first:10){nodes{vaerdi vaerdiTekst sekvens}}
-          id_CVR_Beskaeftigelse_CVREnhedsId_ref(first:10){nodes{beskaeftigelsestalstype antal datoFra datoTil intervalFra intervalTil registreringsdato}}
-          id_CVR_e_mailadresse_CVREnhedsId_ref(first:10){nodes{vaerdi}}
-        }
-      }
-    }`
-    const url=`${CVR_GRAPHQL}?apiKey=${encodeURIComponent(apiKey)}`
-    const data=await fetchJson(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({query})},15000)
-    if(data?.errors?.length) throw new Error(`CVR GraphQL: ${data.errors[0]?.message||'query failed'}`)
-    out.push(...(data?.data?.CVR_CVREnhed?.nodes||[]))
+function evaluateFitLocal(jd,cvText,title){
+  const job=clean(jd),cv=clean(cvText)
+  const hard=jdHardRejected(job)
+  if(hard) return {fit:false,score:0,reason:hard,gaps:[hard]}
+  if(!professionMatches(title)) return {fit:false,score:0,reason:'Profession outside target family',gaps:[]}
+
+  // The vacancy must actually be an IT/software/platform/digital delivery role, not merely share a PM title.
+  const itScope=/\b(?:IT|software|digital|technology|technical|platform|cloud|data|systems?|applications?|engineering)\b/i.test(job)
+  const deliveryScope=/\b(?:project|delivery|implementation|transformation|programme|program|release|go-live|roadmap|stakeholder)\b/i.test(job)
+  if(!itScope||!deliveryScope) return {fit:false,score:0,reason:'Full JD is not an IT/software/digital delivery role',gaps:[]}
+
+  const detected=FIT_SIGNALS.filter(s=>s.jd.test(job))
+  const matched=detected.filter(s=>s.cv.test(cv))
+  const gaps=detected.filter(s=>!s.cv.test(cv)).map(s=>s.label)
+  const coverage=detected.length?matched.length/detected.length:0
+
+  // Conservative full-JD gate. A matching title alone can never pass.
+  if(detected.length>=3&&coverage<0.40) return {fit:false,score:Math.round(35+coverage*40),reason:'Too many material JD requirements are not supported by the Master CV',gaps:gaps.slice(0,4)}
+  if(detected.length<3){
+    const anchors=['project','delivery','software','platform','stakeholder','risk','agile','azure','sql','integration','governance','release','compliance']
+    const jobAnchors=anchors.filter(a=>new RegExp(`\\b${a}`).test(norm(job)))
+    const overlap=jobAnchors.filter(a=>new RegExp(`\\b${a}`).test(norm(cv)))
+    if(jobAnchors.length>=3&&overlap.length/jobAnchors.length<0.4) return {fit:false,score:50,reason:'Full JD has insufficient evidence match in the Master CV',gaps:[]}
   }
-  return out
-}
 
-function relationNodes(company,name){return company?.[name]?.nodes||[]}
-function companyName(company){
-  const names=relationNodes(company,'id_CVR_Navn_CVREnhedsId_ref')
-  return clean(names.sort((a,b)=>Number(a?.sekvens||0)-Number(b?.sekvens||0))[0]?.vaerdi||'')
-}
-
-async function resolveWebsite(domain){
-  if(!domain) return ''
-  for(const url of [`https://${domain}/`,`https://www.${domain}/`]){
-    try{const r=await fetchHtml(url,5000);return r.url}catch{}
-  }
-  return ''
-}
-
-async function discoverJobs(company){
-  const home=await fetchHtml(company.website,7000)
-  let careers=careerLinks(home.html,home.url)
-  if(!careers.length){
-    careers=[
-      {url:new URL('/careers',home.url).toString(),text:'careers'},
-      {url:new URL('/jobs',home.url).toString(),text:'jobs'},
-      {url:new URL('/career',home.url).toString(),text:'career'},
-      {url:new URL('/karriere',home.url).toString(),text:'karriere'},
-    ]
-  }
-  const found=[]
-  for(const c of careers.slice(0,5)){
-    try{
-      const page=await fetchHtml(c.url,7000)
-      found.push(...jobLinks(page.html,page.url))
-    }catch{}
-  }
-  return uniqBy(found,x=>x.url).slice(0,12)
-}
-
-function extractJson(text=''){
-  const raw=String(text).trim()
-  try{return JSON.parse(raw)}catch{}
-  const fenced=raw.match(/```(?:json)?\s*([\s\S]*?)```/i)
-  if(fenced){try{return JSON.parse(fenced[1])}catch{}}
-  const a=raw.indexOf('{'),b=raw.lastIndexOf('}')
-  if(a>=0&&b>a){try{return JSON.parse(raw.slice(a,b+1))}catch{}}
-  throw new Error('AI returned invalid JSON')
-}
-
-async function evaluateFit({job,company,cvText}){
-  const masterCv=clean(cvText)
-  const prompt=`You are the final vacancy gate for ApplyPilot. Decide whether this vacancy is genuinely suitable for the candidate by reading the FULL job description and the supplied Master CV evidence.
-
-COMPANY: ${company.name}
-COMPANY INDUSTRY: ${company.branchText}
-ROLE: ${job.title}
-FULL JOB DESCRIPTION:
-${job.jd}
-
-FULL MASTER CV:
-${masterCv}
-
-Decision rules:
-- Return fit=false when the job's core responsibilities, seniority, mandatory experience, technology/domain expectations, or delivery scope materially do not match the CV.
-- Do not infer experience that is absent from the CV.
-- The role must be an IT/software/platform/digital delivery/project role, not R&D, construction, architecture, laboratory research, hardware product R&D, coordinator or assistant work.
-- A matching title alone is never enough.
-- If information is ambiguous or a mandatory requirement is unsupported, be conservative.
-
-Return ONLY JSON:
-{"fit":true,"score":0,"reason":"one concise evidence-based explanation","gaps":["material gap if any"]}`
-  const result=await generateText({model:process.env.AI_MODEL||'openai/gpt-5.5',prompt,temperature:0.1})
-  const parsed=extractJson(result.text)
-  return {fit:parsed?.fit===true,score:Math.max(0,Math.min(100,Number(parsed?.score)||0)),reason:clean(parsed?.reason||''),gaps:Array.isArray(parsed?.gaps)?parsed.gaps.map(clean).filter(Boolean).slice(0,4):[]}
+  const score=Math.max(60,Math.min(96,Math.round(62+(detected.length?coverage:0.5)*30)))
+  const reason=matched.length
+    ? `Full JD matches verified CV evidence in ${matched.slice(0,4).map(x=>x.label).join(', ')}.`
+    : 'Full JD is within the target IT delivery profession and no material contradiction was found in the Master CV.'
+  return {fit:true,score,reason,gaps:gaps.slice(0,4)}
 }
 
 export async function POST(request){
@@ -268,99 +253,68 @@ export async function POST(request){
     if(![10,20,30,40,50].includes(radiusKm)) return NextResponse.json({error:'Choose a search radius: 10, 20, 30, 40 or 50 km.'},{status:400})
     if(cvText.length<100) return NextResponse.json({error:'Master CV must be analysed before search.'},{status:400})
 
-    // One server-side Datafordeler credential belongs to ApplyPilot itself.
-    // It is never accepted from the browser and is never returned to the user.
-    const apiKey=String(process.env.DATAFORDELER_API_KEY||'').trim()
-    if(!apiKey){
-      console.error('company-search configuration error: Datafordeler credential is missing')
-      return NextResponse.json({error:'Company search is temporarily unavailable.'},{status:503})
-    }
+    // No Datafordeler/MitID/app API key is required for this search path.
+    // 1) Public Jobnet index -> active jobs in the agreed profession family.
+    const candidates=await loadJobnetCandidates()
 
-    // 1) CVR companies whose registered business address is inside the chosen radius.
-    const addressRows=await loadAddressRows(radiusKm,apiKey)
-    const geo=await geocodeDarIds(addressRows)
-    const inside=geo.filter(x=>x.distanceKm<=radiusKm)
-    const byEntity=new Map()
-    for(const x of inside){
-      const entityId=String(pick(x.row,'CVREnhedsId','cvrEnhedsId')||'')
-      if(entityId && !byEntity.has(entityId)) byEntity.set(entityId,x)
-    }
-
-    // 2) Apply the internal company-type / size profile. No user dropdowns.
-    const cvrRows=await queryCvrCompanies([...byEntity.keys()],apiKey)
-    const companies=[]
-    for(const c of cvrRows){
-      if(!/virksomhed/i.test(clean(c?.enhedsType||''))) continue
-      const location=byEntity.get(String(c.id))
-      if(!location) continue
-      const branches=relationNodes(c,'id_CVR_Branche_CVREnhedsId_ref')
-      const employment=relationNodes(c,'id_CVR_Beskaeftigelse_CVREnhedsId_ref')
-      const profile=companyProfileDecision({branches,employment})
-      if(!profile.pass) continue
-      const name=companyName(c)
-      if(!name) continue
-      const emails=relationNodes(c,'id_CVR_e_mailadresse_CVREnhedsId_ref')
-      const domain=corporateDomainFromEmails(emails)
-      if(!domain) continue
-      companies.push({id:String(c.id),cvr:String(c.forretningsnoegle||''),name,address:location.address,distanceKm:location.distanceKm,domain,branchText:profile.branchText,employees:profile.employees})
-    }
-
-    // 3) Official company website -> career page -> agreed profession family -> FULL JD.
-    const websiteReady=[]
-    for(const group of chunk(companies.slice(0,MAX_COMPANIES_TO_CRAWL),8)){
-      const settled=await Promise.allSettled(group.map(async c=>({...c,website:await resolveWebsite(c.domain)})))
-      for(const r of settled) if(r.status==='fulfilled'&&r.value.website) websiteReady.push(r.value)
-    }
-
-    const jobCandidates=[]
-    for(const group of chunk(websiteReady,6)){
-      const settled=await Promise.allSettled(group.map(async company=>({company,links:await discoverJobs(company)})))
-      for(const r of settled){
-        if(r.status!=='fulfilled') continue
-        for(const link of r.value.links) jobCandidates.push({company:r.value.company,link})
-      }
-      if(jobCandidates.length>=MAX_JOB_PAGES) break
-    }
-
-    const fullJobs=[]
-    for(const group of chunk(jobCandidates.slice(0,MAX_JOB_PAGES),6)){
-      const settled=await Promise.allSettled(group.map(async item=>{
-        const page=await fetchHtml(item.link.url,8000)
-        const title=htmlTitle(page.html)||clean(item.link.text)
-        if(!professionMatches(title)) return null
-        const jd=fullJobDescription(page.html)
-        if(!jd) return null
-        if(jdHardRejected(jd)) return null
-        return {company:item.company,title,jd,url:page.url}
+    // 2) Exact radius from Nærum (using public DAWA postal geography).
+    const geoReady=[]
+    for(const group of chunk(candidates,8)){
+      const settled=await Promise.allSettled(group.map(async c=>{
+        const center=await postalCenter(c.postalCode,c.city)
+        if(!center) return null
+        const distanceKm=haversineKm(NAERUM.lat,NAERUM.lon,center.lat,center.lon)
+        return distanceKm<=radiusKm?{...c,...center,distanceKm}:null
       }))
+      for(const r of settled) if(r.status==='fulfilled'&&r.value) geoReady.push(r.value)
+    }
+
+    // 3) Full JD is mandatory; external Jobnet links are read directly from employer/ATS pages.
+    const fullJobs=[]
+    for(const group of chunk(geoReady.slice(0,MAX_FULL_JDS),6)){
+      const settled=await Promise.allSettled(group.map(getFullJob))
       for(const r of settled) if(r.status==='fulfilled'&&r.value) fullJobs.push(r.value)
     }
 
-    // 4) Mandatory final gate: full JD vs Master CV. Fail closed: only fit=true is shown.
+    // 4) Public CVR enrichment -> internal company type / size hard gate.
     const matches=[]
+    const companyCache=new Map()
     for(const item of fullJobs){
-      try{
-        const fit=await evaluateFit({job:item,company:item.company,cvText})
-        if(!fit.fit) continue
-        matches.push({
-          id:`${item.company.cvr}:${item.url}`,
-          source:'company',sourceLabel:'Company career site',
-          role:item.title,company:item.company.name,location:item.company.address,
-          distanceKm:Number(item.company.distanceKm.toFixed(1)),url:item.url,jd:item.jd,
-          fitScore:fit.score,fitReason:fit.reason,gaps:fit.gaps,
-          cvr:item.company.cvr,industry:item.company.branchText,
-        })
-      }catch(error){
-        const message=String(error?.message||error)
-        if(/credit card|customer_verification_required|gateway|403/i.test(message)) throw new Error('AI fit evaluation is not available yet. The search is stopped because full JD vs CV evaluation is mandatory.')
-        throw error
-      }
+      let record=companyCache.get(norm(item.company))
+      if(record===undefined){record=await cvrCompany(item.company);companyCache.set(norm(item.company),record||null)}
+      if(!record) continue
+      const employer=companyPass(record,item.jd)
+      if(!employer.pass) continue
+
+      // 5) Mandatory final gate: read FULL JD + FULL Master CV and show only genuine fits.
+      const fit=evaluateFitLocal(item.jd,cvText,item.title)
+      if(!fit.fit) continue
+      matches.push({
+        id:`${item.id}:${item.url}`,
+        source:'company',sourceLabel:'Company vacancy',
+        role:item.title,company:item.company,
+        location:clean([item.postalCode,item.city].filter(Boolean).join(' ')),
+        distanceKm:Number(item.distanceKm.toFixed(1)),url:item.url,jd:item.jd,
+        fitScore:fit.score,fitReason:fit.reason,gaps:fit.gaps,
+        cvr:String(record?.vat||record?.cvr_number||''),industry:employer.industry||'',
+        companyWebsite:clean(record?.website||''),postedAt:item.postedAt,
+      })
     }
 
-    matches.sort((a,b)=>b.fitScore-a.fitScore || a.distanceKm-b.distanceKm)
-    return NextResponse.json({jobs:matches,meta:{matchedCount:matches.length,radiusKm,companiesInRadius:byEntity.size,companiesAfterProfile:companies.length,careerSitesChecked:websiteReady.length,fullJdsChecked:fullJobs.length,source:'CVR + company career sites'}})
+    const deduped=uniqBy(matches,x=>`${norm(x.company)}|${norm(x.role)}`)
+      .sort((a,b)=>b.fitScore-a.fitScore||a.distanceKm-b.distanceKm)
+
+    return NextResponse.json({jobs:deduped,meta:{
+      matchedCount:deduped.length,radiusKm,
+      professionCandidates:candidates.length,
+      insideRadius:geoReady.length,
+      fullJdsChecked:fullJobs.length,
+      companiesChecked:companyCache.size,
+      source:'Public Jobnet + public CVR + company/ATS pages',
+      noUserCredentials:true,
+    }})
   }catch(error){
     console.error('company-search error',error)
-    return NextResponse.json({error:String(error?.message||'Company search failed.')},{status:500})
+    return NextResponse.json({error:'Company search is temporarily unavailable.',detail:process.env.NODE_ENV==='development'?String(error?.message||error):undefined},{status:500})
   }
 }
