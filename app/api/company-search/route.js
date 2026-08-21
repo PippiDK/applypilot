@@ -35,19 +35,35 @@ const TARGET_EMPLOYEE_BANDS = ['20-49','50-99','100-199','200-499','500-999','10
 const LARGE_EMPLOYEE_BANDS = ['100-199','200-499','500-999','1000+']
 
 function clean(v=''){return String(v??'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()}
-function arr(v){
-  if(Array.isArray(v)) return v
-  if(Array.isArray(v?.Virksomheder)) return v.Virksomheder
-  if(Array.isArray(v?.virksomheder)) return v.virksomheder
-  if(Array.isArray(v?.Items)) return v.Items
-  if(Array.isArray(v?.items)) return v.items
+function findObjectArray(value,predicate,depth=0){
+  if(depth>5||value==null) return []
+  if(Array.isArray(value)){
+    if(value.some(item=>predicate(item))) return value
+    for(const item of value){
+      const found=findObjectArray(item,predicate,depth+1)
+      if(found.length) return found
+    }
+    return []
+  }
+  if(typeof value==='object'){
+    for(const child of Object.values(value)){
+      const found=findObjectArray(child,predicate,depth+1)
+      if(found.length) return found
+    }
+  }
   return []
+}
+function companyRows(v){
+  return findObjectArray(v,x=>x&&typeof x==='object'&&('Cvrnr' in x||'cvrnr' in x||'CVR' in x))
+}
+function branchRows(v){
+  return findObjectArray(v,x=>x&&typeof x==='object'&&('Kode' in x||'kode' in x)&&('Navn' in x||'navn' in x))
 }
 function chunk(items,size){const out=[];for(let i=0;i<items.length;i+=size)out.push(items.slice(i,i+size));return out}
 function uniq(items,key){const seen=new Set();return items.filter(x=>{const k=key(x);if(!k||seen.has(k))return false;seen.add(k);return true})}
 
 async function fetchJson(url,timeout=12000){
-  const res=await fetch(url,{headers:{'user-agent':'ApplyPilot/0.8 company-discovery'},signal:AbortSignal.timeout(timeout),cache:'no-store'})
+  const res=await fetch(url,{headers:{'user-agent':'ApplyPilot/0.8.1 company-discovery','accept':'application/json'},signal:AbortSignal.timeout(timeout),cache:'no-store'})
   if(!res.ok) throw new Error(`${new URL(url).hostname}: ${res.status}`)
   return res.json()
 }
@@ -100,9 +116,9 @@ async function municipalitiesForRadius(radiusKm){
 }
 
 async function targetBranchCodes(){
-  const data=await fetchJson(`${CVR}/branchekoder`,12000)
-  const rows=Array.isArray(data)?data:(data?.Branchekoder||data?.branchekoder||data?.Items||data?.items||[])
-  return (Array.isArray(rows)?rows:[])
+  const data=await fetchJson(`${CVR}/branchekoder?format=json`,12000)
+  const rows=branchRows(data)
+  return rows
     .filter(x=>TARGET_INDUSTRY.some(rx=>rx.test(clean(x?.Navn||x?.navn||''))))
     .map(x=>String(x?.Kode||x?.kode||''))
     .filter(Boolean)
@@ -111,8 +127,9 @@ async function targetBranchCodes(){
 async function cvrCompanies(params){
   const qs=new URLSearchParams()
   for(const [k,v] of Object.entries(params)) if(v) qs.set(k,v)
+  qs.set('format','json')
   const data=await fetchJson(`${CVR}/virksomheder?${qs}`,14000)
-  return arr(data)
+  return companyRows(data)
 }
 
 async function loadCandidateCompanies(municipalities,branchCodes){
