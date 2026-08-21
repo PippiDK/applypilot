@@ -105,7 +105,7 @@ export function buildReviewChanges(facts,item){
     if(aligned.length) why=`Keeps the verified experience intact and brings ${aligned.slice(0,3).join(', ')} wording into clearer focus for this role.`
     if(!changed) why=aligned.length?`Already strongly aligned with this role through ${aligned.slice(0,3).join(', ')}; no factual expansion is needed.`:'Already clear and evidence-based; no factual expansion is needed.'
     return {id:fact.id,original,updated,why,terms:aligned,changed,rank:index}
-  })
+  }).filter(change=>change.changed)
 }
 
 export function applicationPackState(cvData){

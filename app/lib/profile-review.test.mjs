@@ -67,9 +67,10 @@ test('live LinkedIn request remains freshness-only and cannot include profile or
 
 test('review helpers accept current live LinkedIn result shape',()=>{
   const item={job:{sourceJobId:'123',title:'Technical Project Manager',company:'Example',location:'Denmark',description:'Platform migration, stakeholder and risk ownership.'},evaluation:{score:8.7,match:[],gaps:[]}}
-  const facts=[{id:'FACT-001',text:'Led platform migration and stakeholder delivery.',verified:true}]
+  const facts=[{id:'FACT-001',text:'Worked closely with platform engineering teams in order to deliver migration releases.',verified:true}]
   const changes=buildReviewChanges(facts,item)
   assert.ok(changes.length>=1)
+  assert.equal(changes[0].changed,true)
   assert.equal(item.evaluation.score,8.7)
 })
 
@@ -92,4 +93,21 @@ test('merged UI restores Application Pack, CV Update Review and Truth Guard',()=
   assert.match(source,/Accept all safe changes/)
   assert.match(source,/Keep original/)
   assert.match(source,/Accept change/)
+})
+
+test('buildReviewChanges omits CV evidence when normalized original and updated text are the same',()=>{
+  const facts=[{
+    id:'FACT-ALIGNED',
+    text:'Established the delivery foundation, including infrastructure, data platforms, team setup, and delivery',
+    verified:true
+  }]
+  const item={job:{title:'AWS Migration Project Manager',description:'Platform migration, data delivery and infrastructure.'}}
+  const changes=buildReviewChanges(facts,item)
+  assert.deepEqual(changes,[])
+})
+
+test('CV review shows a neutral empty state when there are no actual wording changes',()=>{
+  const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+  assert.match(source,/No CV changes proposed\./)
+  assert.doesNotMatch(source,/No usable CV evidence was found for this review/)
 })

@@ -190,7 +190,7 @@ export default function Home(){
         <div className="changeWhy"><div><small>WHY CHANGED</small><p>{change.why}</p></div><div><small>SOURCE</small><p>Existing Master CV experience only · no new claim added</p></div></div>
         <div className="evidenceActions"><button className={'secondary '+(decision==='original'?'chosen':'')} onClick={()=>setDecision(change.id,'original')}>Keep original</button><button className={'primary smallPrimary '+(decision==='accepted'?'chosenPrimary':'')} onClick={()=>setDecision(change.id,'accepted')} disabled={!change.changed}>{change.changed?'Accept change':'No change needed'}</button></div>
       </div>})}
-      {!proposedChanges.length&&<div className="errorBox">No usable CV evidence was found for this review. Re-analyse the Master CV.</div>}
+      {!proposedChanges.length&&<div className="muted">No CV changes proposed.</div>}
       <div className="reviewFooter"><span>Cover letter generation comes next, after CV updates are reviewed.</span><button className="secondary" onClick={()=>setReviewOpen(false)}>Close review</button></div>
     </div></div>}
   </main>
