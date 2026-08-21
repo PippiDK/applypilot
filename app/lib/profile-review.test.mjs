@@ -122,3 +122,12 @@ test('all Master CV entry points use the full six-step Search Profile flow',()=>
   assert.match(source,/Detected signals:/)
   assert.match(source,/Step \{profileStep\} of 6/)
 })
+
+
+test('profile strip reports whether a Master CV is loaded without changing search behavior',()=>{
+  const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+  assert.match(source,/const resumeLoaded=Boolean\(cvData\?\.fileName\)/)
+  assert.match(source,/resumeLoaded\?'Profile ready':'Profile empty'/)
+  assert.doesNotMatch(source,/profileReady\?'✓ Search profile saved':'Profile loaded'/)
+  assert.match(source,/body:JSON\.stringify\(\{freshnessDays\}\)/)
+})

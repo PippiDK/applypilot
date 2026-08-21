@@ -36,6 +36,7 @@ export default function Home(){
   },[])
 
   const profileReady=Boolean(profile.savedAt)
+  const resumeLoaded=Boolean(cvData?.fileName)
   const pack=applicationPackState(cvData)
   const reviewFacts=useMemo(()=>Array.isArray(cvData?.facts)?cvData.facts.filter(f=>f&&f.verified!==false):[],[cvData])
   const proposedChanges=useMemo(()=>active?buildReviewChanges(reviewFacts,active):[],[reviewFacts,active])
@@ -120,7 +121,7 @@ export default function Home(){
       <div className="metric"><b>{state.loading?'…':jobs.length}</b><span>matches</span></div>
     </section>
 
-    <div className="profileStrip"><b>{profileReady?'✓ Search profile saved':'Profile loaded'}</b><span>{profileReady?profile.roles.split(',').slice(0,2).join(' · '):'Senior IT Project / Delivery · Denmark'}</span><span>JD responsibilities 40% · experience/domain 25% · geography 20% · career/comp 15%</span><button className="profileEditButton" onClick={startProfile}>{profileReady?'Edit profile':'Search profile'}</button><button className="cvButton" onClick={startProfile}>{cvData?.fileName?`✓ ${cvData.fileName}`:'Upload Master CV'}</button></div>
+    <div className="profileStrip"><b>{resumeLoaded?'Profile ready':'Profile empty'}</b><span>{profileReady?profile.roles.split(',').slice(0,2).join(' · '):'Senior IT Project / Delivery · Denmark'}</span><span>JD responsibilities 40% · experience/domain 25% · geography 20% · career/comp 15%</span><button className="profileEditButton" onClick={startProfile}>{profileReady?'Edit profile':'Search profile'}</button><button className="cvButton" onClick={startProfile}>{cvData?.fileName?`✓ ${cvData.fileName}`:'Upload Master CV'}</button></div>
 
     <section className="controls">
       <div><small>POSTED WITHIN</small><div className="choices">{WINDOWS.map(days=><button key={days} className={freshnessDays===days?'choice selected':'choice'} onClick={()=>setFreshnessDays(days)}>{days} day{days===1?'':'s'}</button>)}</div></div>
