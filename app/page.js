@@ -9,7 +9,9 @@ function salary(job){ if(job.salaryMinDkkMonth==null&&job.salaryMaxDkkMonth==nul
 export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(7)
   const [jobs,setJobs]=useState([])
+  const [selected,setSelected]=useState(null)
   const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null})
+  const active=jobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||jobs[0]||null
 
   async function search(){
     setJobs([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null})
@@ -41,21 +43,29 @@ export default function Home(){
     {state.stats&&<div className="searchMeta"><span><b>{state.stats.discovered}</b> jobs discovered</span><span><b>{state.stats.fullJdVerified}</b> full JDs read</span><span><b>{state.stats.evaluated}</b> worthwhile after evaluation</span><span>Coverage: <b>{state.coverage?.status}</b></span></div>}
     {state.coverage?.detail&&<div className="warningBox">Partial source access: {state.coverage.detail}</div>}
 
-    <section className="results">
-      <div className="listHead"><div><p className="eyebrow">RESULTS</p><h2>Current matches</h2></div><small>Maximum 10 · Poor fit excluded</small></div>
-      {!state.loading&&!state.error&&!state.stats&&<div className="empty">Run the LinkedIn search. No other source is used in this milestone.</div>}
-      {state.loading&&<div className="empty">Searching LinkedIn public pages and reading full job descriptions…</div>}
-      {!state.loading&&state.stats&&jobs.length===0&&<div className="empty">NO STRONG NEW MATCHES FOUND.</div>}
-      {jobs.map(({job,evaluation},i)=><article className="jobCard" key={job.sourceJobId}>
-        <div className="scoreBlock"><b>{evaluation.score.toFixed(1)}</b><span>/10</span><em>{evaluation.verdict}</em></div>
-        <div className="jobMain">
-          <div className="jobTop"><div><h3>{job.title}</h3><p>{job.company} · {job.location}</p></div><span className={`action ${evaluation.action.toLowerCase()}`}>{evaluation.action}</span></div>
-          <div className="facts"><span>{dateText(job.publishedAt)}</span><span>{job.remoteType==='unknown'?'Work model unverified':job.remoteType}</span><span>{job.employmentType}</span><span>{salary(job)}</span></div>
-          <div className="detailGrid"><div><small>MATCH</small>{evaluation.match.map((x,n)=><p key={n}>✓ {x}</p>)}</div><div><small>GAPS</small>{evaluation.gaps.length?evaluation.gaps.map((x,n)=><p key={n}>· {x}</p>):<p>· No material gap detected</p>}</div></div>
-          <div className="breakdown"><span>Delivery <b>{evaluation.breakdown.responsibilitiesDelivery}</b></span><span>Experience/domain <b>{evaluation.breakdown.experienceDomain}</b></span><span>Geography <b>{evaluation.breakdown.geographyWorkModel}</b></span><span>Career/comp <b>{evaluation.breakdown.careerCompensation}</b></span></div>
-          <div className="links"><a href={job.originalUrl} target="_blank" rel="noreferrer">Open LinkedIn vacancy ↗</a>{job.officialUrl&&<a href={job.officialUrl} target="_blank" rel="noreferrer">Employer link ↗</a>}</div>
-        </div>
-      </article>)}
+    <section className="grid">
+      <div className="list">
+        <div className="listHead"><h2>Live matches</h2><small>Newest {freshnessDays} days</small></div>
+        {!state.loading&&!state.error&&!state.stats&&<div className="empty">Run the LinkedIn search. No other source is used in this milestone.</div>}
+        {state.loading&&<div className="empty">Searching LinkedIn public pages and reading full job descriptions…</div>}
+        {!state.loading&&state.stats&&jobs.length===0&&<div className="empty">NO STRONG NEW MATCHES FOUND.</div>}
+        {jobs.map(item=>{const {job,evaluation}=item; const score=Math.round(evaluation.score*10); return <button key={job.sourceJobId} onClick={()=>setSelected(item)} className={'job '+(active?.job.sourceJobId===job.sourceJobId?'active':'')}>
+          <span className="score">{score}%</span>
+          <span><b>{job.title}</b><small>{job.company} · {job.location}</small><small className="sourceLine">LinkedIn · {dateText(job.publishedAt)}</small></span>
+          <span>→</span>
+        </button>})}
+      </div>
+
+      <div className="panel">
+        {active?(()=>{const {job,evaluation}=active; const score=Math.round(evaluation.score*10); return <>
+          <div className="panelTop"><div><span className="pill">{evaluation.verdict.toUpperCase()}</span><h2>{job.title}</h2><p>{job.company} · {job.location}</p><small className="sourceLine">Source: LinkedIn · {dateText(job.publishedAt)}</small></div><div className="bigScore">{score}%</div></div>
+          <div className="panelFacts"><span>{job.remoteType==='unknown'?'Work model unverified':job.remoteType}</span><span>{job.employmentType}</span><span>{salary(job)}</span></div>
+          <div className="section"><h3>Why this fits</h3>{evaluation.match.length?evaluation.match.map((x,n)=><p key={n}>✓ {x}</p>):<p>✓ No additional match detail returned</p>}</div>
+          <div className="section"><h3>Gap / unknown</h3>{evaluation.gaps.length?evaluation.gaps.map((x,n)=><p key={n}>⚠ {x}</p>):<p>✓ No material gap detected</p>}</div>
+          <div className="section"><h3>Score breakdown</h3><div className="breakdown"><span>Delivery <b>{evaluation.breakdown.responsibilitiesDelivery}</b></span><span>Experience/domain <b>{evaluation.breakdown.experienceDomain}</b></span><span>Geography <b>{evaluation.breakdown.geographyWorkModel}</b></span><span>Career/comp <b>{evaluation.breakdown.careerCompensation}</b></span></div></div>
+          <div className="actions"><a className="primary openLink" href={job.originalUrl} target="_blank" rel="noreferrer">Open LinkedIn vacancy</a>{job.officialUrl&&<a className="secondary openLink" href={job.officialUrl} target="_blank" rel="noreferrer">Employer link</a>}</div>
+        </>})():<div className="emptyPanel"><h2>No selected vacancy</h2><p>{state.loading?'Searching LinkedIn public pages…':'Run the LinkedIn search to see matching vacancies.'}</p></div>}
+      </div>
     </section>
     <footer>Milestone: LinkedIn public search only · no CVR · no Jobnet · no additional sources</footer>
   </main>
