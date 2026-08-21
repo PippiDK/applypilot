@@ -1,10 +1,16 @@
-# ApplyPilot Web MVP v0.4
+# ApplyPilot Web MVP v0.4.1
 
 Human-in-the-loop job-search autopilot for senior IT / project / delivery professionals.
 
-## v0.4 — CV Update Review
+## v0.4.1 — Review Quality Fix
 
 - Removes the Career Fact Bank from the user-facing interface
+
+- Shows only **real wording changes** in Proposed CV updates
+- Hides bullets that are already aligned and unchanged
+- Review counters now count only actual proposed changes
+- **Accept all safe changes** applies only to actual diffs
+- When no wording change is needed, shows a clear **No CV wording changes needed** state
 - Keeps CV evidence internally as the Truth Guard / source-of-truth layer
 - Adds a user-facing **CV Update Review** summary on the dashboard
 - Shows **Original → Updated** wording for every proposed CV change
@@ -19,7 +25,7 @@ Human-in-the-loop job-search autopilot for senior IT / project / delivery profes
 
 ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.
 
-The current v0.4 rewriting layer is deliberately conservative and deterministic. It does not yet use an LLM and does not add unsupported claims.
+The current v0.4.1 rewriting layer is deliberately conservative and deterministic. It does not yet use an LLM and does not add unsupported claims.
 
 ## Current limitations
 

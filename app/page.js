@@ -94,12 +94,12 @@ export default function Home(){
  const proposedChanges=changes.filter(x=>x.changed)
  const alignedTerms=useMemo(()=>[...new Set(changes.flatMap(x=>x.terms))],[changes])
  const jobKey=`${selected.company}|${selected.role}`
- const reviewedCount=changes.filter(c=>decisions[`${jobKey}|${c.id}`]).length
+ const reviewedCount=proposedChanges.filter(c=>decisions[`${jobKey}|${c.id}`]).length
 
  function setDecision(id,value){setDecisions(p=>({...p,[`${jobKey}|${id}`]:value}))}
  function acceptAll(){
   const next={...decisions}
-  changes.forEach(c=>{next[`${jobKey}|${c.id}`]=c.changed?'accepted':'original'})
+  proposedChanges.forEach(c=>{next[`${jobKey}|${c.id}`]='accepted'})
   setDecisions(next)
  }
  function startProfile(){setDraft(profileReady?profile:defaultProfile);setStep(1);setOpen(true);setParseState({loading:false,error:''})}
@@ -157,14 +157,15 @@ export default function Home(){
   {reviewOpen&&<div className="overlay" onMouseDown={e=>{if(e.target===e.currentTarget)setReviewOpen(false)}}><div className="modal reviewModal"><div className="modalHead"><div><p className="eyebrow">CV UPDATE REVIEW</p><h2>{selected.role}</h2><p className="muted">{selected.company} · {selected.location}</p></div><button className="close" onClick={()=>setReviewOpen(false)}>×</button></div>
    <div className="reviewDashboard"><div><b>{proposedChanges.length}</b><span>wording changes proposed</span></div><div><b>0</b><span>bullets reordered in this prototype</span></div><div><b>{alignedTerms.length}</b><span>role terms already supported</span></div><div className="zeroClaims"><b>0</b><span>unsupported claims added</span></div></div>
    <div className="truth compact"><b>Truth Guard active</b><span>Updated wording may only restate evidence already present in your Master CV. Internal evidence IDs are hidden from the user interface.</span></div>
-   <div className="reviewToolbar"><div><h3>Proposed CV updates</h3><p>{reviewedCount} of {changes.length} reviewed</p></div><button className="secondary" onClick={acceptAll}>Accept all safe changes</button></div>
-   {changes.map((c,i)=>{const decision=decisions[`${jobKey}|${c.id}`];return <div className={'changeCard '+(decision?'decided':'')} key={c.id}>
-    <div className="changeHead"><span>CV change {i+1}</span><b>{decision==='accepted'?'Accepted':decision==='original'?'Original kept':c.changed?'Review needed':'Already aligned'}</b></div>
+   <div className="reviewToolbar"><div><h3>Proposed CV updates</h3><p>{reviewedCount} of {proposedChanges.length} reviewed</p></div>{proposedChanges.length>0&&<button className="secondary" onClick={acceptAll}>Accept all safe changes</button>}</div>
+   {proposedChanges.map((c,i)=>{const decision=decisions[`${jobKey}|${c.id}`];return <div className={'changeCard '+(decision?'decided':'')} key={c.id}>
+    <div className="changeHead"><span>CV change {i+1}</span><b>{decision==='accepted'?'Accepted':decision==='original'?'Original kept':'Review needed'}</b></div>
     <div className="compareGrid"><div className="compareBox"><small>ORIGINAL</small><p>{c.original}</p></div><div className="compareArrow">→</div><div className="compareBox updatedBox"><small>UPDATED</small><p>{c.updated}</p></div></div>
     <div className="changeWhy"><div><small>WHY CHANGED</small><p>{c.why}</p></div><div><small>SOURCE</small><p>Existing Master CV experience only · no new claim added</p></div></div>
-    <div className="evidenceActions"><button className={'secondary '+(decision==='original'?'chosen':'')} onClick={()=>setDecision(c.id,'original')}>Keep original</button><button className={'primary smallPrimary '+(decision==='accepted'?'chosenPrimary':'')} onClick={()=>setDecision(c.id,'accepted')} disabled={!c.changed}>{c.changed?'Accept change':'No change needed'}</button></div>
+    <div className="evidenceActions"><button className={'secondary '+(decision==='original'?'chosen':'')} onClick={()=>setDecision(c.id,'original')}>Keep original</button><button className={'primary smallPrimary '+(decision==='accepted'?'chosenPrimary':'')} onClick={()=>setDecision(c.id,'accepted')}>Accept change</button></div>
    </div>})}
    {!changes.length&&<div className="errorBox">No usable CV evidence was found for this review. Re-analyse the Master CV.</div>}
+   {changes.length>0&&proposedChanges.length===0&&<div className="successBox noChangesBox"><b>✓ No CV wording changes needed</b><span>The strongest verified CV evidence is already aligned with this role. Nothing is shown as a proposed update unless the wording actually changes.</span></div>}
    <div className="reviewFooter"><span>Cover letter generation comes next, after CV updates are reviewed.</span><button className="secondary" onClick={()=>setReviewOpen(false)}>Close review</button></div>
   </div></div>}
  </main>
