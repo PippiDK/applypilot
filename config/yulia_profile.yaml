@@ -1,0 +1,266 @@
+profile_name: "Senior IT Project & Delivery — Master Prompt v2"
+
+# Discovery only. The actual JD always overrides the title.
+discovery_queries:
+  - Senior Project Manager
+  - IT Project Manager
+  - Technical Project Manager
+  - Delivery Manager
+  - Delivery Lead
+  - Software Delivery Lead
+  - Implementation Manager
+  - Integration Project Manager
+  - Transformation Project Manager
+  - Program Manager
+  - Software Execution Lead
+  - IT-projektleder
+  - Teknisk projektleder
+
+discovery_title_signals:
+  - project manager
+  - projektleder
+  - project lead
+  - delivery manager
+  - delivery lead
+  - execution lead
+  - implementation manager
+  - implementation lead
+  - integration project manager
+  - transformation project manager
+  - transformation lead
+  - program manager
+  - programme manager
+  - programleder
+  - platform delivery
+  - technology project
+  - digital project
+  - business technology
+  - portfolio delivery
+  - it-projektleder
+  - teknisk projektleder
+  - digital projektleder
+  - implementeringsprojektleder
+  - transformationsprojektleder
+  - programleder
+
+priority_domains:
+  - software
+  - enterprise software
+  - digital transformation
+  - systems integration
+  - platform implementation
+  - IT governance
+  - PMO
+  - compliance
+  - risk
+  - data platform
+  - BI
+  - analytics
+  - infrastructure
+  - enterprise applications
+  - business systems
+  - automation
+  - cyber security
+  - financial IT
+  - fintech
+
+fintech_priority_terms:
+  - fintech
+  - banking
+  - trading
+  - post-trade
+  - payments
+  - regulatory reporting
+  - aml
+  - compliance systems
+  - tax
+  - financial data
+
+technology_delivery_signals:
+  - software
+  - IT
+  - technology
+  - digital
+  - platform
+  - engineering
+  - integration
+  - cloud
+  - infrastructure
+  - data
+  - enterprise applications
+  - business systems
+  - automation
+  - cyber security
+
+# The user asked that real ownership, not coordination, is central.
+delivery_ownership_signals:
+  - own scope
+  - scope ownership
+  - budget
+  - risk
+  - dependencies
+  - milestones
+  - delivery outcomes
+  - delivery ownership
+  - accountable
+  - accountability
+  - executive reporting
+  - senior stakeholder
+  - cross-functional delivery
+  - engineering teams
+  - distributed teams
+  - implementation
+  - roadmap
+  - governance
+
+release_lifecycle_signals:
+  - release
+  - release readiness
+  - SIT
+  - UAT
+  - cutover
+  - go-live
+  - hypercare
+  - handover
+  - transition to operations
+
+product_role_required_signals:
+  - delivery ownership
+  - engineering teams
+  - timelines
+  - milestones
+  - risks
+  - dependencies
+  - release
+  - implementation
+  - delivery outcomes
+
+# Only terms present in BOTH the JD and the supplied Master CV count as direct evidence overlap.
+resume_evidence_terms:
+  - project management
+  - delivery management
+  - software delivery
+  - enterprise software
+  - platform
+  - systems integration
+  - digital transformation
+  - agile
+  - scrum
+  - SAFe
+  - Azure
+  - SQL
+  - Power BI
+  - data warehouse
+  - DWH
+  - regulatory
+  - compliance
+  - AML
+  - banking
+  - fintech
+  - trading
+  - post-trade
+  - payments
+  - stakeholder management
+  - risk management
+  - dependency management
+  - budget
+  - release
+  - cutover
+  - go-live
+  - hypercare
+  - distributed teams
+  - international teams
+  - implementation
+  - governance
+  - PMO
+
+hard_filters:
+  rnd_title_patterns:
+    - "\\br&d\\b"
+    - "research"
+    - "drug discovery"
+    - "laboratory"
+    - "hardware development"
+    - "product development"
+    - "medical device.*development"
+  rnd_body_signals:
+    - research programme
+    - scientific research
+    - drug discovery
+    - laboratory development
+    - new physical product
+    - hardware development
+    - product R&D
+    - engineering product development
+  bau_support_signals:
+    - BAU
+    - IT support
+    - service operations
+    - ticket ownership
+    - service management
+    - incident management
+    - operational support
+  coordination_only_signals:
+    - coordination
+    - facilitation
+    - meeting management
+    - status reporting
+    - backlog administration
+
+geography:
+  preferred_locations:
+    - Nærum
+    - Hørsholm
+    - Lyngby
+    - Kongens Lyngby
+    - Virum
+    - Holte
+    - Vedbæk
+    - Gentofte
+    - Hellerup
+    - Ballerup
+
+compensation:
+  permanent_target_dkk_month: 80000
+  permanent_acceptable_min_dkk_month: 75000
+  permanent_negative_below_dkk_month: 70000
+  permanent_strong_negative_below_dkk_month: 60000
+  contract_min_dkk_month_equivalent: 80000
+
+weights:
+  responsibilities_delivery: 0.40
+  experience_domain: 0.25
+  geography_work_model: 0.20
+  career_compensation: 0.15
+
+# Every required source from the Master Prompt. Unsupported sources are explicitly reported ACCESS LIMITED.
+required_source_registry:
+  - [Jobnet, Public job boards]
+  - [Jobindex, Public job boards]
+  - [LinkedIn Jobs, Public job boards]
+  - [Workindenmark, Public job boards]
+  - [The Hub, Public job boards]
+  - [StepStone Denmark, Public job boards]
+  - [Ofir, Public job boards]
+  - [Jobs in Copenhagen, Public job boards]
+  - [Jobfinder / Ingeniøren, Public job boards]
+  - [Glassdoor Jobs, Public job boards]
+  - [emagine, Recruitment / consulting]
+  - [Ework Verama, Recruitment / consulting]
+  - [Hays Denmark, Recruitment / consulting]
+  - [Randstad Denmark, Recruitment / consulting]
+  - [Capax Recruitment, Recruitment / consulting]
+  - [GlobeSearch, Recruitment / consulting]
+  - [RDT Engineers, Recruitment / consulting]
+  - [EPICO, Recruitment / consulting]
+  - [7N, Recruitment / consulting]
+  - [Jobgether, Remote EU / Europe]
+  - [Europe Remotely, Remote EU / Europe]
+  - [We Work Remotely, Remote EU / Europe]
+  - [Remote OK, Remote EU / Europe]
+  - [Himalayas, Remote EU / Europe]
+  - [Welcome to the Jungle, Remote EU / Europe]
+  - [Landing.jobs, Remote EU / Europe]
+
+  - [Email job alerts / talent communities, Email job alerts / talent communities]
+  - [Official target company career pages, Official career pages of target companies]
