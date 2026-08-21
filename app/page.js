@@ -158,8 +158,6 @@ export default function Home(){
       </div>
     </section>
 
-    {active&&<section className="cvReviewSummary"><div><p className="eyebrow">CV UPDATE REVIEW</p><h2>{pack.cvReady?'Tailored CV ready for review':'Analyse your CV to prepare updates'}</h2><p>{pack.cvReady?'See exactly what ApplyPilot proposes to change before anything is used in an application.':'Upload a master CV to create a reviewable tailored version.'}</p></div>{pack.cvReady?<div className="reviewStats"><div><b>{proposedChanges.filter(change=>change.changed).length}</b><span>wording changes</span></div><div><b>{alignedTerms.length}</b><span>role terms aligned</span></div><div><b>0</b><span>unsupported claims</span></div><button className="ghost" onClick={()=>setReviewOpen(true)}>Review CV changes</button></div>:<button className="ghost" onClick={()=>setCvOpen(true)}>Upload Master CV</button>}</section>}
-
     <footer>Milestone: LinkedIn public search only · no CVR · no Jobnet · no additional sources</footer>
 
     {cvOpen&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget)setCvOpen(false)}}><div className="modal cvModal">
