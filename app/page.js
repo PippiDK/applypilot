@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'
 import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'
+import {requestJobAnalysis} from './lib/jd-analysis-client.js'
 
 const WINDOWS=[1,3,7,14]
 
@@ -20,6 +21,7 @@ export default function Home(){
   const [profileOpen,setProfileOpen]=useState(false)
   const [profileStep,setProfileStep]=useState(1)
   const [reviewOpen,setReviewOpen]=useState(false)
+  const [jdAnalysisState,setJdAnalysisState]=useState({loading:false,error:'',analysis:null,token:'',jobKey:''})
   const [decisions,setDecisions]=useState({})
   const active=jobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||jobs[0]||null
 
@@ -121,6 +123,19 @@ export default function Home(){
     setProfileStep(1)
   }
 
+  async function runJobAnalysis(){
+    if(!active||!resumeLoaded) return
+    const runKey=active.job.sourceJobId||`${active.job.title}|${active.job.company}`
+    setReviewOpen(true)
+    setJdAnalysisState({loading:true,error:'',analysis:null,token:'',jobKey:runKey})
+    try{
+      const result=await requestJobAnalysis({sourceVersion:cvData.sourceVersion,job:active.job})
+      setJdAnalysisState({loading:false,error:'',analysis:result.analysis,token:result.token||'',jobKey:runKey})
+    }catch(error){
+      setJdAnalysisState({loading:false,error:error.message||'Job analysis failed safely. Please try again.',analysis:null,token:'',jobKey:runKey})
+    }
+  }
+
   function setDecision(id,value){setDecisions(current=>({...current,[`${jobKey}|${id}`]:value}))}
 
   function acceptAll(){
@@ -169,7 +184,7 @@ export default function Home(){
           <div className="section"><h3>Gap / unknown</h3>{evaluation.gaps.length?evaluation.gaps.map((x,n)=><p key={n}>⚠ {x}</p>):<p>✓ No material gap detected</p>}</div>
           <div className="section"><h3>Score breakdown</h3><div className="breakdown"><span>Delivery <b>{evaluation.breakdown.responsibilitiesDelivery}</b></span><span>Experience/domain <b>{evaluation.breakdown.experienceDomain}</b></span><span>Geography <b>{evaluation.breakdown.geographyWorkModel}</b></span><span>Career/comp <b>{evaluation.breakdown.careerCompensation}</b></span></div></div>
           <div className="section"><h3>Application pack</h3><div className="docs"><div>{pack.cvReady?'✓':'○'} Tailored CV <span className={pack.cvReady?'ready':'pending'}>{pack.tailoredCvLabel}</span></div><div>○ Cover letter <span className="pending">{pack.coverLetterLabel}</span></div></div></div>
-          <div className="actions reviewActions">{pack.cvReady?<button className="primary" onClick={()=>setReviewOpen(true)}>Review CV changes</button>:<button className="primary" onClick={startProfile}>Upload CV</button>}<a className="secondary openLink" href={job.originalUrl} target="_blank" rel="noreferrer">Open LinkedIn vacancy</a>{job.officialUrl&&<a className="secondary openLink" href={job.officialUrl} target="_blank" rel="noreferrer">Employer link</a>}</div>
+          <div className="actions reviewActions">{pack.cvReady?<button className="primary" onClick={runJobAnalysis}>Review CV changes</button>:<button className="primary" onClick={startProfile}>Upload CV</button>}<a className="secondary openLink" href={job.originalUrl} target="_blank" rel="noreferrer">Open LinkedIn vacancy</a>{job.officialUrl&&<a className="secondary openLink" href={job.officialUrl} target="_blank" rel="noreferrer">Employer link</a>}</div>
         </>})():<div className="emptyPanel"><h2>No selected vacancy</h2><p>{state.loading?'Searching LinkedIn public pages…':'Run the LinkedIn search to see matching vacancies.'}</p></div>}
       </div>
     </section>
@@ -189,9 +204,16 @@ export default function Home(){
     </div></div>}
 
     {reviewOpen&&active&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget)setReviewOpen(false)}}><div className="modal reviewModal"><div className="modalHead"><div><p className="eyebrow">CV UPDATE REVIEW</p><h2>{active.job.title}</h2><p className="muted">{active.job.company} · {active.job.location}</p></div><button className="close" onClick={()=>setReviewOpen(false)}>×</button></div>
+      <div className="jdPretest"><p className="eyebrow">JD ANALYSIS PRETEST · OPENAI</p>
+        {jdAnalysisState.jobKey!==jobKey?<div className="muted">Select Review CV changes to analyse this vacancy.</div>:jdAnalysisState.loading?<div className="jdLoading">Reading job description with OpenAI…</div>:jdAnalysisState.error?<div className="errorBox"><b>JD analysis failed safely</b><span>{jdAnalysisState.error}</span></div>:jdAnalysisState.analysis?<>
+          <div className="jdGrid"><div><small>Role mission</small><p>{jdAnalysisState.analysis.roleMission}</p></div><div><small>Candidate positioning</small><p>{jdAnalysisState.analysis.candidatePositioning}</p></div></div>
+          <div className="jdSection"><h3>Hiring priorities</h3>{jdAnalysisState.analysis.priorities.map(priority=><div className="jdPriority" key={priority.id}><div className="jdPriorityHead"><b>{priority.rank}. {priority.requirement}</b><span>{priority.kind.replace('_',' ')}</span></div><p>{priority.why}</p><small>JD evidence</small>{priority.jdEvidence.map((evidence,index)=><blockquote key={index}>{evidence}</blockquote>)}</div>)}</div>
+          <div className="jdSection"><h3>Must-haves</h3>{jdAnalysisState.analysis.priorities.filter(priority=>priority.kind==='must_have').length?jdAnalysisState.analysis.priorities.filter(priority=>priority.kind==='must_have').map(priority=><p key={priority.id}>✓ {priority.requirement}</p>):<p className="muted">No priority was classified as a hard must-have.</p>}</div>
+        </>:null}
+      </div>
       <div className="reviewDashboard"><div><b>{proposedChanges.filter(change=>change.changed).length}</b><span>summary change proposed</span></div><div><b>0</b><span>bullets reordered · Step 2</span></div><div><b>{alignedTerms.length}</b><span>role terms already supported</span></div><div className="zeroClaims"><b>0</b><span>unsupported claims added</span></div></div>
       <div className="truth compact"><b>Truth Guard active</b><span>Updated wording may only restate evidence already present in your Master CV. Internal evidence IDs are hidden from the user interface.</span></div>
-      <div className="reviewToolbar"><div><h3>Tailored Summary</h3><p>{reviewedCount} of {proposedChanges.length} reviewed</p></div>{proposedChanges.some(change=>change.changed)&&<button className="secondary" onClick={acceptAll}>Accept all safe changes</button>}</div>
+      <div className="reviewToolbar"><div><h3>Tailored Summary — Legacy Summary preview · not Task 3</h3><p>{reviewedCount} of {proposedChanges.length} reviewed</p></div>{proposedChanges.some(change=>change.changed)&&<button className="secondary" onClick={acceptAll}>Accept all safe changes</button>}</div>
       {proposedChanges.map((change,index)=>{const decision=decisions[`${jobKey}|${change.id}`];return <div className={'changeCard '+(decision?'decided':'')} key={change.id}>
         <div className="changeHead"><span>SUMMARY</span><b>{decision==='accepted'?'Accepted':decision==='original'?'Original kept':change.changed?'Review needed':'Already aligned'}</b></div>
         <div className="compareGrid"><div className="compareBox"><small>ORIGINAL</small><p>{change.original}</p></div><div className="compareArrow">→</div><div className="compareBox updatedBox"><small>UPDATED</small><p>{change.updated}</p></div></div>
