@@ -114,7 +114,7 @@ export default function Home(){
   }
 
   return <main>
-    <header><div><div className="brand">ApplyPilot</div><div className="tag">Search less. Apply better.</div></div><div className="headerActions"><div className={`sourceBadge profileStatus ${resumeLoaded?'ready':'empty'}`}>{resumeLoaded?'Profile ready':'Profile empty'}</div><div className="sourceBadge">LINKEDIN · PUBLIC</div></div></header>
+    <header><div><div className="brand">ApplyPilot</div><div className="tag">Search less. Apply better.</div></div><div className="headerActions"><div className={`sourceBadge profileStatus ${resumeLoaded?'statusReady':'statusEmpty'}`}>{resumeLoaded?'Profile ready':'Profile empty'}</div><div className="sourceBadge">LINKEDIN · PUBLIC</div></div></header>
 
     <section className="hero">
       <div><p className="eyebrow">ONE SOURCE · END-TO-END</p><h1>Find Senior IT Project & Delivery roles in Denmark.</h1><p>LinkedIn public search → full job description → Master CV evaluation → worthwhile matches only.</p></div>
