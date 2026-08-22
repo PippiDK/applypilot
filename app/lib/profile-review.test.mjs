@@ -59,11 +59,10 @@ test('application pack becomes reviewable only when verified fact-bank evidence 
   assert.equal(applicationPackState({facts:[{verified:true,text:'Led delivery'}]}).cvReady,true)
 })
 
-test('live LinkedIn request remains freshness-only and cannot include profile or CV',()=>{
+test('live LinkedIn request uses freshness plus the active Source CV text, but not Search Profile data',()=>{
   const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
-  assert.match(source,/body:JSON\.stringify\(\{freshnessDays\}\)/)
+  assert.match(source,/body:JSON\.stringify\(\{freshnessDays,cvText:cvData\.cvText\}\)/)
   assert.doesNotMatch(source,/JSON\.stringify\(\{freshnessDays\s*,\s*profile/)
-  assert.doesNotMatch(source,/JSON\.stringify\(\{freshnessDays\s*,\s*cvData/)
 })
 
 test('review helpers accept current live LinkedIn result shape',()=>{
@@ -127,12 +126,12 @@ test('Source CV upload entry points keep the existing six-step Search Profile fl
 })
 
 
-test('profile status requires a complete ready Source CV without changing search behavior',()=>{
+test('profile status requires a complete ready Source CV and search uses that Source CV',()=>{
   const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
   assert.match(source,/const resumeLoaded=isSourceCvReady\(cvData\)/)
   assert.match(source,/resumeLoaded\?'Profile ready':'Profile empty'/)
   assert.doesNotMatch(source,/profileReady\?'✓ Search profile saved':'Profile loaded'/)
-  assert.match(source,/body:JSON\.stringify\(\{freshnessDays\}\)/)
+  assert.match(source,/body:JSON\.stringify\(\{freshnessDays,cvText:cvData\.cvText\}\)/)
 })
 
 test('Version 2 proposes a JD-specific safe rewrite when the Master CV already supports the requirement',()=>{

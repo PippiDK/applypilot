@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseSearchHtml, parseDetailHtml, evaluateJob, salaryMonthlyDkk, searchLinkedIn, MASTER_CV_TEXT } from './linkedin-search.js'
+import { parseSearchHtml, parseDetailHtml, evaluateJob, salaryMonthlyDkk, searchLinkedIn } from './linkedin-search.js'
+
+const TEST_RESUME=`Senior IT Project and Delivery Manager with enterprise software delivery, systems integration, governance, regulated financial IT, data platforms, Agile delivery, release and go-live experience.`
 
 const SEARCH_HTML=`<!doctype html><html><body><ul>
 <li><div class="base-card"><a class="base-card__full-link" href="https://www.linkedin.com/jobs/view/software-execution-lead-at-velux-4440077540?trk=x"></a><h3 class="base-search-card__title">Software Execution Lead</h3><h4 class="base-search-card__subtitle">VELUX</h4><span class="job-search-card__location">Hørsholm, Capital Region of Denmark, Denmark</span><time datetime="2026-08-20"></time></div></li>
@@ -30,31 +32,31 @@ test('hybrid delivery methodology is not treated as hybrid work model',()=>{
 
 test('Danish preferred is not a hard reject',()=>{
  const job=parseDetailHtml(parseSearchHtml(SEARCH_HTML)[0],detailHtml(),new Date('2026-08-21T12:00:00Z'))
- const result=evaluateJob(job,MASTER_CV_TEXT); assert.equal(result.hardExclusion,false); assert.ok(result.score>=6)
+ const result=evaluateJob(job,TEST_RESUME); assert.equal(result.hardExclusion,false); assert.ok(result.score>=6)
 })
 
 test('mandatory Danish is a hard reject',()=>{
  const d=`Lead end-to-end IT project delivery with technology teams, scope, milestones, risks, dependencies, budget and governance. Fluency in English and Danish is mandatory. `.repeat(4)
  const job=parseDetailHtml(parseSearchHtml(SEARCH_HTML)[0],detailHtml({description:d}),new Date('2026-08-21T12:00:00Z'))
- const result=evaluateJob(job); assert.equal(result.hardExclusion,true); assert.match(result.gaps[0],/Mandatory/i)
+ const result=evaluateJob(job,TEST_RESUME); assert.equal(result.hardExclusion,true); assert.match(result.gaps[0],/Mandatory/i)
 })
 
 test('construction PM is rejected even with generic PM language',()=>{
  const d=`Senior Project Manager delivering building construction projects and data centres. Manage contractors, MEP, construction site interfaces, budget, risks, milestones, governance and senior stakeholders. `.repeat(4)
  const job=parseDetailHtml({...parseSearchHtml(SEARCH_HTML)[0],title:'Senior Project Manager'},detailHtml({title:'Senior Project Manager',description:d}),new Date('2026-08-21T12:00:00Z'))
- const result=evaluateJob(job); assert.equal(result.hardExclusion,true); assert.match(result.gaps[0],/construction/i)
+ const result=evaluateJob(job,TEST_RESUME); assert.equal(result.hardExclusion,true); assert.match(result.gaps[0],/construction/i)
 })
 
 test('corporate IT in research-heavy company is not rejected as R&D',()=>{
  const d=`Lead end-to-end Corporate IT delivery of an enterprise platform used by scientific research and drug discovery teams. This is Group IT and enterprise software, not product R&D. Own scope, timeline, budget, risks, dependencies, governance, systems integration and go-live. `.repeat(4)
  const job=parseDetailHtml({...parseSearchHtml(SEARCH_HTML)[0],title:'Senior IT Project Manager'},detailHtml({title:'Senior IT Project Manager',company:'PharmaCo',description:d}),new Date('2026-08-21T12:00:00Z'))
- const result=evaluateJob(job); assert.equal(result.hardExclusion,false)
+ const result=evaluateJob(job,TEST_RESUME); assert.equal(result.hardExclusion,false)
 })
 
 test('remote Europe does not prove Denmark eligibility',()=>{
  const d=`Fully remote role in Europe. Lead end-to-end software platform delivery with scope, budget, risks, dependencies, technology teams, governance and implementation outcomes. `.repeat(4)
  const job=parseDetailHtml({...parseSearchHtml(SEARCH_HTML)[0],title:'Senior IT Project Manager'},detailHtml({title:'Senior IT Project Manager',location:'Remote Europe',country:'',description:d}),new Date('2026-08-21T12:00:00Z'))
- assert.equal(job.remoteType,'remote'); assert.equal(job.remoteEligibility,'UNVERIFIED'); assert.equal(evaluateJob(job).breakdown.geographyWorkModel,5)
+ assert.equal(job.remoteType,'remote'); assert.equal(job.remoteEligibility,'UNVERIFIED'); assert.equal(evaluateJob(job,TEST_RESUME).breakdown.geographyWorkModel,5)
 })
 
 test('monthly DKK salary range is parsed conservatively',()=>{
@@ -64,19 +66,39 @@ test('monthly DKK salary range is parsed conservatively',()=>{
 
 test('expired explicit validThrough closes vacancy',()=>{
  const job=parseDetailHtml(parseSearchHtml(SEARCH_HTML)[0],detailHtml({validThrough:'2026-08-20'}),new Date('2026-08-21T12:00:00Z'))
- assert.equal(job.vacancyStatus,'CLOSED'); assert.equal(evaluateJob(job).hardExclusion,true)
+ assert.equal(job.vacancyStatus,'CLOSED'); assert.equal(evaluateJob(job,TEST_RESUME).hardExclusion,true)
 })
 
 test('one-source E2E: LinkedIn guest search -> guest detail -> evaluator returns VELUX fixture',async()=>{
  const urls=[]
  const fetcher=async url=>{ urls.push(url); return url.includes('/seeMoreJobPostings/search')?SEARCH_HTML:detailHtml() }
- const result=await searchLinkedIn({freshnessDays:7,fetcher,now:new Date('2026-08-21T12:00:00Z')})
+ const result=await searchLinkedIn({freshnessDays:7,resume:TEST_RESUME,fetcher,now:new Date('2026-08-21T12:00:00Z')})
  assert.match(urls[0],/\/jobs-guest\/jobs\/api\/seeMoreJobPostings\/search/)
  assert.ok(urls.some(url=>/\/jobs-guest\/jobs\/api\/jobPosting\/4440077540/.test(url)))
  assert.equal(result.stats.discovered,1); assert.equal(result.stats.fullJdVerified,1); assert.equal(result.jobs.length,1); assert.equal(result.jobs[0].job.company,'VELUX'); assert.ok(result.jobs[0].evaluation.score>=6)
 })
 
+test('experience score comes from the supplied Source CV text',()=>{
+ const job=parseDetailHtml(parseSearchHtml(SEARCH_HTML)[0],detailHtml(),new Date('2026-08-21T12:00:00Z'))
+ const relevant=evaluateJob(job,TEST_RESUME)
+ const unrelated=evaluateJob(job,`Museum curator with exhibition planning, art history, collections care and public programming experience. `.repeat(3))
+ assert.ok(relevant.breakdown.experienceDomain>unrelated.breakdown.experienceDomain)
+})
+
 test('all LinkedIn search failures are surfaced, never fake zero results',async()=>{
  const fetcher=async()=>{throw new Error('LinkedIn HTTP 429')}
- await assert.rejects(()=>searchLinkedIn({fetcher}),/LinkedIn public search unavailable/)
+ await assert.rejects(()=>searchLinkedIn({resume:TEST_RESUME,fetcher}),/LinkedIn public search unavailable/)
+})
+
+
+test('job evaluation requires an uploaded Source CV instead of a built-in fallback',()=>{
+ const job=parseDetailHtml(parseSearchHtml(SEARCH_HTML)[0],detailHtml(),new Date('2026-08-21T12:00:00Z'))
+ assert.throws(()=>evaluateJob(job),/Source CV/i)
+})
+
+test('LinkedIn search requires Source CV text before discovery/evaluation starts',async()=>{
+ let calls=0
+ const fetcher=async()=>{calls++; return SEARCH_HTML}
+ await assert.rejects(()=>searchLinkedIn({freshnessDays:7,fetcher}),/Source CV/i)
+ assert.equal(calls,0)
 })

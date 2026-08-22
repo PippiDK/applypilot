@@ -26,9 +26,6 @@ const TITLE_SIGNALS = [
 const PREFERRED_LOCATIONS = ['nærum','hørsholm','lyngby','kongens lyngby','virum','holte','vedbæk','gentofte','hellerup','ballerup']
 const FINTECH_TERMS = ['fintech','banking','bank','trading','post-trade','payments','regulatory reporting','aml','compliance systems','financial data','risk & compliance']
 
-export const MASTER_CV_TEXT = `
-Senior IT Project and Delivery Manager with 18+ years across enterprise, digital, financial and regulated environments and 7+ years of end-to-end delivery ownership. Enterprise software platform delivery, systems integration, digital transformation, Agile and Hybrid delivery, SAFe, Scrum, Azure DevOps, Jira, Confluence, MS Project, Azure Data, SQL, Data Warehouse, DWH, Power BI. Scope, roadmap, budget, schedule, risks, dependencies, RAID, executive reporting, senior stakeholder management, cross-functional and distributed teams across Denmark, India and Poland. Release readiness, SIT, SAT, UAT, cutover, go-live, hypercare, operational handover. Financial IT experience in banking, trading, post-trade, AML, regulatory reporting, compliance, fee and tax engines, BI, data platforms and automation. Platform implementation and migration, governance and PMO practices.
-`
 
 const RESPONSIBILITY_CATEGORIES = {
   end_to_end: [/end[- ]to[- ]end.{0,80}(deliver|delivery|project|programme|program|execution|ownership)/i, /\b(full lifecycle|full life cycle)\b/i, /\b(own|owns|owned|take|takes|taking)\b.{0,35}\b(full|end[- ]to[- ]end)?\s*(delivery|lifecycle|project|programme|program)\b/i, /\blead and deliver\b/i, /\blead delivery\b/i],
@@ -306,7 +303,7 @@ function responsibilityScore(job){
   return [round1(score), names.length?[`Delivery evidence: ${names.slice(0,6).map(x=>pretty[x]).join(', ')}`]:[], score<7?['Delivery ownership is weaker than the target profile']:[]]
 }
 
-function experienceScore(job,resume=MASTER_CV_TEXT){
+function experienceScore(job,resume){
   const jd=`${job.title} ${job.description}`
   const tech=Object.keys(matchCategories(jd,TECHNOLOGY_CATEGORIES))
   const jdEv=matchCategories(jd,EVIDENCE_CATEGORIES), cvEv=matchCategories(resume,EVIDENCE_CATEGORIES)
@@ -318,7 +315,7 @@ function experienceScore(job,resume=MASTER_CV_TEXT){
   const pretty={project_delivery:'end-to-end delivery',platform:'enterprise/platform delivery',integration:'systems integration',transformation:'transformation',agile:'Agile/Hybrid',data:'data/BI',financial:'Financial IT',regulatory:'regulatory/compliance',governance:'governance/PMO',risk_dependency:'risk/dependency management',stakeholders:'stakeholder leadership',budget:'budget/financial control',release:'release/go-live',distributed:'distributed delivery',implementation:'implementation/migration',cloud:'cloud/Azure'}
   const notes=[],gaps=[]
   if(finance) notes.push('Financial IT / regulated-domain priority match')
-  if(overlap.length) notes.push(`JD ↔ Master CV evidence: ${overlap.slice(0,6).map(x=>pretty[x]).join(', ')}`); else gaps.push('Direct JD ↔ Master CV evidence overlap is limited')
+  if(overlap.length) notes.push(`JD ↔ Source CV evidence: ${overlap.slice(0,6).map(x=>pretty[x]).join(', ')}`); else gaps.push('Direct JD ↔ Source CV evidence overlap is limited')
   if(!tech.length) gaps.push('Technology/digital scope is not explicit in the JD')
   return [round1(score),notes,gaps]
 }
@@ -361,10 +358,12 @@ function careerScore(job){
   return [round1(clamp(score,0,10)),notes,gaps]
 }
 
-export function evaluateJob(job,resume=MASTER_CV_TEXT){
+export function evaluateJob(job,resume){
+  const sourceCv=String(resume??'').trim()
+  if(sourceCv.length<100) throw new Error('Source CV text is required for job evaluation.')
   const exclusion=hardExclusion(job)
   if(exclusion) return {score:0,verdict:'Poor fit',action:'Reject',match:[],gaps:[exclusion],hardExclusion:true,breakdown:{responsibilitiesDelivery:0,experienceDomain:0,geographyWorkModel:0,careerCompensation:0}}
-  const [r,rn,rg]=responsibilityScore(job),[e,en,eg]=experienceScore(job,resume),[g,gn,gg]=geographyScore(job),[c,cn,cg]=careerScore(job)
+  const [r,rn,rg]=responsibilityScore(job),[e,en,eg]=experienceScore(job,sourceCv),[g,gn,gg]=geographyScore(job),[c,cn,cg]=careerScore(job)
   const score=round1(r*.40+e*.25+g*.20+c*.15)
   const verdict=score>=9?'Strong fit':score>=7.5?'Plausible fit':score>=6?'Stretch fit':'Poor fit'
   const action=score>=9?'Apply':score>=7.5?'Consider':score>=6?'Hold':'Reject'
@@ -398,7 +397,9 @@ async function mapLimit(items,limit,fn){
   await Promise.all(Array.from({length:Math.min(limit,items.length)},worker)); return results
 }
 
-export async function searchLinkedIn({freshnessDays=7,maxDetails=24,fetcher=fetchHtml,now=new Date()}={}){
+export async function searchLinkedIn({freshnessDays=7,resume,maxDetails=24,fetcher=fetchHtml,now=new Date()}={}){
+  const sourceCv=String(resume??'').trim()
+  if(sourceCv.length<100) throw new Error('Source CV text is required for LinkedIn evaluation.')
   const seconds=Math.max(86400,Number(freshnessDays||7)*86400)
   const diagnostics={searchRequests:0,searchFailures:0,searchRows:0,detailRequests:0,detailFailures:0,incompleteDetails:0}
   const searchResults=await mapLimit(DISCOVERY_QUERIES,5,async query=>{
@@ -421,7 +422,7 @@ export async function searchLinkedIn({freshnessDays=7,maxDetails=24,fetcher=fetc
   for(const d of details){ if(d.status==='fulfilled'){if(d.value) jobs.push(d.value); else diagnostics.incompleteDetails++} else {diagnostics.detailFailures++;errors.push(String(d.reason?.message||d.reason))} }
   if(unique.length>0&&jobs.length===0&&diagnostics.detailFailures+diagnostics.incompleteDetails===unique.length) throw new Error(`LinkedIn job details unavailable: ${errors.at(-1)||'no full JD could be read'}`)
   const evaluated=[]
-  for(const job of jobs){ const published=safeDate(job.publishedAt); if(published && (now.getTime()-published.getTime())>Number(freshnessDays||7)*86400000+21600000) continue; if(!discoveryCandidate(job)) continue; const evaluation=evaluateJob(job); if(evaluation.hardExclusion||evaluation.verdict==='Poor fit') continue; evaluated.push({job,evaluation}) }
+  for(const job of jobs){ const published=safeDate(job.publishedAt); if(published && (now.getTime()-published.getTime())>Number(freshnessDays||7)*86400000+21600000) continue; if(!discoveryCandidate(job)) continue; const evaluation=evaluateJob(job,sourceCv); if(evaluation.hardExclusion||evaluation.verdict==='Poor fit') continue; evaluated.push({job,evaluation}) }
   evaluated.sort((a,b)=>b.evaluation.score-a.evaluation.score || (safeDate(b.job.publishedAt)?.getTime()||0)-(safeDate(a.job.publishedAt)?.getTime()||0))
   const coverage=diagnostics.searchFailures||diagnostics.detailFailures?'ACCESS LIMITED':evaluated.length?'SEARCHED':'NO RELEVANT RESULTS'
   return {jobs:evaluated.slice(0,10),coverage:{source:'LinkedIn Jobs',status:coverage,detail:errors[0]||null},stats:{discovered:unique.length,fullJdVerified:jobs.length,evaluated:evaluated.length,returned:Math.min(10,evaluated.length)},diagnostics}

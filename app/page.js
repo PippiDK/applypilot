@@ -85,9 +85,13 @@ export default function Home(){
   }
 
   async function search(){
+    if(!resumeLoaded){
+      setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null})
+      return
+    }
     setJobs([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null})
     try{
-      const res=await fetch('/api/linkedin-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays})})
+      const res=await fetch('/api/linkedin-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,cvText:cvData.cvText})})
       const data=await res.json()
       if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
       setJobs(Array.isArray(data.jobs)?data.jobs:[])
@@ -140,7 +144,7 @@ export default function Home(){
       <button className="primary" onClick={search} disabled={state.loading}>{state.loading?'Reading LinkedIn JDs…':'Search LinkedIn'}</button>
     </section>
 
-    {state.error&&<div className="errorBox"><b>LinkedIn search failed</b><span>{state.error}</span></div>}
+    {state.error&&<div className="errorBox"><b>{state.error==='Please Upload Your CV'?'Please Upload Your CV':'LinkedIn search failed'}</b>{state.error!=='Please Upload Your CV'&&<span>{state.error}</span>}</div>}
     {state.stats&&<div className="searchMeta"><span><b>{state.stats.discovered}</b> jobs discovered</span><span><b>{state.stats.fullJdVerified}</b> full JDs read</span><span><b>{state.stats.evaluated}</b> worthwhile after evaluation</span><span>Coverage: <b>{state.coverage?.status}</b></span></div>}
     {state.coverage?.detail&&<div className="warningBox">Partial source access: {state.coverage.detail}</div>}
 
