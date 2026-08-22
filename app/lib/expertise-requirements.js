@@ -91,6 +91,7 @@ export async function extractExpertiseRequirements(job,modelCall){
     instructions:EXPERTISE_REQUIREMENT_INSTRUCTIONS,
     input:{title,company:text(job?.company),jobDescription:description},
     schema:expertiseRequirementsSchema,
+    maxOutputTokens:12000,
     modelCall
   })
   return validateExpertiseRequirements(result,description)

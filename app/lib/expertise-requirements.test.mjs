@@ -105,3 +105,10 @@ test('accepts all five approved expertise categories and three importance levels
   ]}
   assert.equal(validateExpertiseRequirements(value,JD),value)
 })
+
+test('Expertise requirement extraction gets a dedicated larger output-token budget',async()=>{
+  let captured
+  const modelCall=async args=>{captured=args; return structuredClone(MODEL_RESULT)}
+  await extractExpertiseRequirements({title:'Assoc Director AI Product Manager',company:'Novo Nordisk',description:JD},modelCall)
+  assert.equal(captured.maxOutputTokens,12000)
+})

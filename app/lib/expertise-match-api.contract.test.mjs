@@ -15,3 +15,15 @@ test('expertise-match API does not modify or call LinkedIn search code',()=>{
   assert.doesNotMatch(route,/linkedin-search/)
   assert.doesNotMatch(route,/searchLinkedIn/)
 })
+
+test('expertise-match API surfaces only safe actionable AI failure categories',()=>{
+  assert.match(route,/AI_CONFIG_MISSING/)
+  assert.match(route,/AI_PROVIDER_HTTP_401/)
+  assert.match(route,/AI_PROVIDER_HTTP_429/)
+  assert.match(route,/AI_PROVIDER_HTTP_400/)
+  assert.match(route,/AI_PROVIDER_INCOMPLETE_MAX_OUTPUT_TOKENS/)
+  assert.match(route,/console\.error/)
+  const errorCalls=[...route.matchAll(/console\.error\(([^\n]+)\)/g)].map(match=>match[1])
+  assert.ok(errorCalls.length>=1)
+  for(const call of errorCalls){ assert.doesNotMatch(call,/cvText|job|description|body/i) }
+})
