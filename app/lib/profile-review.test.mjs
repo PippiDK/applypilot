@@ -131,3 +131,25 @@ test('profile strip reports whether a Master CV is loaded without changing searc
   assert.doesNotMatch(source,/profileReady\?'✓ Search profile saved':'Profile loaded'/)
   assert.match(source,/body:JSON\.stringify\(\{freshnessDays\}\)/)
 })
+
+test('Version 2 proposes a JD-specific safe rewrite when the Master CV already supports the requirement',()=>{
+  const facts=[{
+    id:'FACT-V2-001',
+    text:'Led full lifecycle delivery of a software platform across international engineering teams in Denmark, India and Poland, including release readiness for go-live and transition to operations.',
+    verified:true
+  }]
+  const item={job:{
+    title:'Integration Project Manager',
+    description:'Own end-to-end software delivery across distributed engineering teams, with release readiness and go-live accountability.'
+  }}
+  const changes=buildReviewChanges(facts,item)
+  assert.equal(changes.length,1)
+  assert.equal(changes[0].original,facts[0].text)
+  assert.match(changes[0].updated,/end-to-end lifecycle/i)
+  assert.match(changes[0].updated,/distributed international engineering teams/i)
+  assert.match(changes[0].updated,/release and go-live readiness/i)
+  assert.doesNotMatch(changes[0].updated,/go-live readiness for go-live/i)
+  assert.equal(changes[0].updated.includes('budget'),false)
+  assert.equal(changes[0].updated.includes('Azure'),false)
+  assert.match(changes[0].why,/End-to-end delivery|Distributed \/ international teams|Release readiness \/ go-live/i)
+})
