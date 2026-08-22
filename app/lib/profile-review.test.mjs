@@ -108,7 +108,7 @@ test('buildReviewChanges omits CV evidence when normalized original and updated 
 
 test('CV review shows a neutral empty state when there are no actual wording changes',()=>{
   const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
-  assert.match(source,/No CV changes proposed\./)
+  assert.match(source,/No Summary change proposed\./)
   assert.doesNotMatch(source,/No usable CV evidence was found for this review/)
 })
 
@@ -152,4 +152,90 @@ test('Version 2 proposes a JD-specific safe rewrite when the Master CV already s
   assert.equal(changes[0].updated.includes('budget'),false)
   assert.equal(changes[0].updated.includes('Azure'),false)
   assert.match(changes[0].why,/End-to-end delivery|Distributed \/ international teams|Release readiness \/ go-live/i)
+})
+
+test('Version 2 Step 1 tailors only the Master CV summary and never adds unsupported JD claims',()=>{
+  const cvData={
+    summary:'Senior IT Project & Delivery Manager with enterprise software experience. Experienced in stakeholder governance across international teams. HBS Leadership certified.',
+    facts:[
+      {id:'FACT-SUM-001',text:'Led full lifecycle delivery of a software platform, managing systems integration dependencies, delivery risks and governance across international teams.',verified:true}
+    ]
+  }
+  const item={job:{
+    title:'Integration Project Manager',
+    description:'Lead end-to-end delivery, systems integration, risk and dependency management and governance. Azure architecture experience is required.'
+  }}
+
+  const changes=buildReviewChanges(cvData,item)
+  assert.equal(changes.length,1)
+  assert.equal(changes[0].id,'SUMMARY')
+  assert.equal(changes[0].type,'summary')
+  assert.equal(changes[0].original,cvData.summary)
+  assert.match(changes[0].updated,/end-to-end delivery/i)
+  assert.match(changes[0].updated,/systems integration/i)
+  assert.match(changes[0].updated,/risk and dependency management/i)
+  assert.match(changes[0].updated,/delivery governance/i)
+  assert.doesNotMatch(changes[0].updated,/Azure/i)
+})
+
+test('Version 2 Step 1 keeps all original summary sentences but moves the most JD-relevant sentence first',()=>{
+  const cvData={
+    summary:'HBS Leadership certified professional with broad enterprise experience. Senior IT Project Manager leading software platform delivery and systems integration. Background includes regulatory reporting and quality assurance.',
+    facts:[
+      {id:'FACT-SUM-002',text:'Led software platform delivery and systems integration across cross-functional teams.',verified:true}
+    ]
+  }
+  const item={job:{title:'Integration Project Manager',description:'Own software platform integration and delivery.'}}
+
+  const [change]=buildReviewChanges(cvData,item)
+  const sentences=[
+    'HBS Leadership certified professional with broad enterprise experience.',
+    'Senior IT Project Manager leading software platform delivery and systems integration.',
+    'Background includes regulatory reporting and quality assurance.'
+  ]
+  for(const sentence of sentences) assert.ok(change.updated.includes(sentence),`missing original sentence: ${sentence}`)
+  assert.ok(change.updated.indexOf(sentences[1])<change.updated.indexOf(sentences[0]))
+})
+
+test('Version 2 Step 1 can read the Master CV summary from a complete saved preview',()=>{
+  const cvData={
+    preview:'Yulia Example\nSenior IT Project & Delivery Manager\nPROFESSIONAL SUMMARY\nSenior IT delivery leader with enterprise software experience. Strong stakeholder governance across international teams.\nPROFESSIONAL EXPERIENCE\nSenior Project Manager | Example A/S | 2022–2026',
+    facts:[{id:'FACT-SUM-003',text:'Led end-to-end software delivery across international teams with stakeholder governance.',verified:true}]
+  }
+  const item={job:{title:'Senior Delivery Manager',description:'Lead end-to-end software delivery and stakeholder governance.'}}
+  const [change]=buildReviewChanges(cvData,item)
+  assert.equal(change.id,'SUMMARY')
+  assert.equal(change.original,'Senior IT delivery leader with enterprise software experience. Strong stakeholder governance across international teams.')
+  assert.doesNotMatch(change.original,/PROFESSIONAL EXPERIENCE/i)
+})
+
+test('Version 2 Step 1 UI reviews the Summary only and leaves bullet reordering for Step 2',()=>{
+  const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+  assert.match(source,/buildReviewChanges\(cvData,active\)/)
+  assert.doesNotMatch(source,/buildReviewChanges\(reviewFacts,active\)/)
+  assert.match(source,/summary change proposed/)
+  assert.match(source,/Tailored Summary/)
+  assert.match(source,/Step 1 updates Summary only/)
+  assert.match(source,/bullets reordered · Step 2/)
+})
+
+
+test('Version 2 Step 1 stops Professional Summary extraction before Core Competences',()=>{
+  const cvData={
+    preview:'YULIA BJØRNBERG\nSenior IT Project / Delivery Manager\nProfessional Summary\nSenior IT Project and Delivery Manager with 18+ years of experience in regulated enterprise environments.\nExperienced in PMO collaboration, governance and stakeholder management.\nCore Competences\nEnd-to-End Project Delivery • Project Governance • Risk & Dependency Management',
+    facts:[{id:'FACT-SUM-004',text:'Led end-to-end delivery with project governance and risk and dependency management.',verified:true}]
+  }
+  const item={job:{title:'Senior Delivery Manager',description:'End-to-end delivery, governance and dependency management.'}}
+  const [change]=buildReviewChanges(cvData,item)
+  assert.equal(change.original,'Senior IT Project and Delivery Manager with 18+ years of experience in regulated enterprise environments. Experienced in PMO collaboration, governance and stakeholder management.')
+  assert.doesNotMatch(change.original,/Core Competences|Risk & Dependency Management/)
+})
+
+test('Version 2 Step 1 refuses a truncated legacy preview instead of tailoring a partial Summary',()=>{
+  const cvData={
+    preview:'YULIA BJØRNBERG\nProfessional Summary\nSenior IT Project and Delivery Manager with 18+ years of experience. Experienced in governance and end-to-end delivery but this preview is cut before the next CV section',
+    facts:[{id:'FACT-SUM-005',text:'Led end-to-end delivery with governance.',verified:true}]
+  }
+  const item={job:{title:'Delivery Manager',description:'End-to-end delivery and governance.'}}
+  assert.deepEqual(buildReviewChanges(cvData,item),[])
 })

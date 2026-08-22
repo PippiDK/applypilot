@@ -22,3 +22,10 @@ test('current UI exposes PDF DOCX resume upload and saves parsed Fact Bank local
   assert.match(page, /applypilot-master-cv/)
   assert.match(page, /facts/)
 })
+
+
+test('Version 2 Step 1 stores the complete Professional Summary separately from the short preview', () => {
+  assert.match(route, /extractSummaryFromText/)
+  assert.match(route, /summary:extractSummaryFromText\(text\)/)
+  assert.match(page, /summary:data\.summary\|\|''/)
+})

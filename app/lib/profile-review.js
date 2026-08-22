@@ -46,7 +46,7 @@ const REQUIREMENT_CATALOG=[
   {
     id:'governance',
     label:'Programme / delivery governance',
-    jd:[/programme governance/i,/program governance/i,/delivery governance/i,/structured governance/i,/PMO/i],
+    jd:[/programme governance/i,/program governance/i,/delivery governance/i,/structured governance/i,/\bgovernance\b/i,/PMO/i],
     evidence:[/governance/i,/roadmap/i,/backlog governance/i,/PMO/i]
   },
   {
@@ -210,7 +210,7 @@ function matchedTerms(text,terms){
   return terms.filter(term=>lower.includes(term.toLowerCase()))
 }
 
-export function buildReviewChanges(facts,item){
+function buildLegacyBulletChanges(facts,item){
   const terms=deriveReviewTerms(item)
   const requirements=extractJobRequirements(item)
   const supportedRequirements=requirements.filter(req=>requirementSupported(req,facts))
@@ -241,6 +241,133 @@ export function buildReviewChanges(facts,item){
     if(!changed) why=aligned.length?`Already strongly aligned with this role through ${aligned.slice(0,3).join(', ')}; no factual expansion is needed.`:'Already clear and evidence-based; no factual expansion is needed.'
     return {id:fact.id,original,updated,why,terms:aligned,requirements:applied,changed,rank:index}
   }).filter(change=>change.changed)
+}
+
+const SUMMARY_PHRASES={
+  end_to_end:'end-to-end delivery',
+  distributed:'distributed international teams',
+  release:'release and go-live readiness',
+  risk_dependency:'risk and dependency management',
+  integration:'systems integration',
+  governance:'delivery governance',
+  regulatory:'regulatory and compliance delivery',
+  agile:'Agile/Hybrid delivery'
+}
+
+const SUMMARY_HEADING=/^(professional\s+summary|summary|professional\s+profile|profile|career\s+summary|executive\s+summary)$/i
+const SUMMARY_STOP_HEADING=/^(professional\s+experience|work\s+experience|experience|employment|career\s+history|skills|core\s+competenc(?:e|es|ies)|key\s+skills|technical\s+skills|education|certifications?|courses?)$/i
+
+export function extractSummaryFromText(text=''){
+  const raw=String(text).replace(/\r/g,'\n')
+  const lines=raw.split('\n').map(line=>line.trim()).filter(Boolean)
+  const headingIndex=lines.findIndex(line=>SUMMARY_HEADING.test(line))
+  if(headingIndex>=0){
+    const stopIndex=lines.findIndex((line,index)=>index>headingIndex&&SUMMARY_STOP_HEADING.test(line))
+    if(stopIndex<0) return ''
+    const summary=cleanSource(lines.slice(headingIndex+1,stopIndex).join(' '))
+    return summary.length>=40?summary:''
+  }
+
+  const stopIndex=lines.findIndex(line=>SUMMARY_STOP_HEADING.test(line))
+  const headerArea=lines.slice(0,stopIndex>=0?stopIndex:Math.min(lines.length,10))
+  const candidates=headerArea.filter((line,index)=>index>=1&&line.length>=55&&!/@|https?:\/\/|linkedin|\+?\d[\d ()-]{6,}/i.test(line))
+  return cleanSource(candidates.join(' '))
+}
+
+function extractMasterSummary(cvData={}){
+  const explicit=cleanSource(cvData?.summary||'')
+  if(explicit) return explicit
+  return extractSummaryFromText(cvData?.preview||'')
+}
+
+function splitSummarySentences(summary=''){
+  const value=cleanSource(summary)
+  if(!value) return []
+  const sentences=value.match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[]
+  return sentences.map(sentence=>sentence.trim()).filter(Boolean)
+}
+
+function summarySentenceScore(sentence,item){
+  const lower=String(sentence).toLowerCase()
+  const terms=deriveReviewTerms(item)
+  let score=terms.reduce((total,term)=>total+(lower.includes(term.toLowerCase())?2:0),0)
+  if(/\b(senior|project manager|delivery manager|delivery lead|technical project)\b/i.test(sentence)) score+=1
+  return score
+}
+
+function rankedSummaryRequirements(item,facts=[]){
+  const text=jobText(item)
+  const title=String(item?.job?.title||'')
+  return extractJobRequirements(item)
+    .filter(req=>requirementSupported(req,facts))
+    .map((req,index)=>{
+      const titleHit=matchesAny(title,req.jd)?1000:0
+      const positions=req.jd.map(pattern=>{
+        const flags=pattern.flags.replace('g','')
+        const match=new RegExp(pattern.source,flags).exec(text)
+        return match?match.index:Number.POSITIVE_INFINITY
+      })
+      const first=Math.min(...positions)
+      return {req,index,priority:titleHit+(Number.isFinite(first)?Math.max(0,500-first):0)}
+    })
+    .sort((a,b)=>b.priority-a.priority||a.index-b.index)
+    .map(entry=>entry.req)
+}
+
+function naturalList(values=[]){
+  if(values.length<=1) return values[0]||''
+  if(values.length===2) return `${values[0]} and ${values[1]}`
+  return `${values.slice(0,-1).join(', ')}, and ${values.at(-1)}`
+}
+
+function buildSummaryReviewChanges(cvData,item){
+  const original=extractMasterSummary(cvData)
+  const facts=Array.isArray(cvData?.facts)?cvData.facts:[]
+  if(!original||!facts.length) return []
+
+  const sentences=splitSummarySentences(original)
+  if(!sentences.length) return []
+
+  const ranked=sentences
+    .map((sentence,index)=>({sentence,index,score:summarySentenceScore(sentence,item)}))
+    .sort((a,b)=>b.score-a.score||a.index-b.index)
+    .map(entry=>entry.sentence)
+
+  const supportedRequirements=rankedSummaryRequirements(item,facts)
+  const phrases=supportedRequirements
+    .map(req=>SUMMARY_PHRASES[req.id])
+    .filter(Boolean)
+    .filter(phrase=>!new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i').test(original))
+    .slice(0,4)
+
+  const emphasis=phrases.length?`Relevant experience includes ${naturalList(phrases)}.`:''
+  const updatedParts=[...ranked]
+  if(emphasis) updatedParts.splice(Math.min(1,updatedParts.length),0,emphasis)
+  const updated=cleanSource(updatedParts.join(' '))
+  const normalizedOriginal=cleanSource(original)
+  if(!updated||updated===normalizedOriginal) return []
+
+  const requirementLabels=supportedRequirements.slice(0,4).map(req=>req.label)
+  const why=requirementLabels.length
+    ?`Rebalances the Summary toward this JD’s verified priorities: ${naturalList(requirementLabels)}. Every original Summary sentence is retained; unsupported JD claims are excluded.`
+    :'Reorders existing Summary sentences so the most role-relevant evidence appears first without adding new claims.'
+
+  return [{
+    id:'SUMMARY',
+    type:'summary',
+    original:normalizedOriginal,
+    updated,
+    why,
+    terms:deriveReviewTerms(item),
+    requirements:requirementLabels,
+    changed:true,
+    rank:0
+  }]
+}
+
+export function buildReviewChanges(cvDataOrFacts,item){
+  if(Array.isArray(cvDataOrFacts)) return buildLegacyBulletChanges(cvDataOrFacts,item)
+  return buildSummaryReviewChanges(cvDataOrFacts,item)
 }
 
 export function applicationPackState(cvData){
