@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'
+import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'
 
 const WINDOWS=[1,3,7,14]
 
@@ -24,29 +25,37 @@ export default function Home(){
 
   useEffect(()=>{
     try{
-      const savedCvRaw=localStorage.getItem('applypilot-master-cv')
+      const savedSourceRaw=localStorage.getItem(SOURCE_CV_STORAGE_KEY)
+      const legacyCvRaw=savedSourceRaw?null:localStorage.getItem(LEGACY_CV_STORAGE_KEY)
+      const storedCvRaw=savedSourceRaw||legacyCvRaw
+      const savedCv=normalizeStoredSourceCv(storedCvRaw?JSON.parse(storedCvRaw):null)
       const savedProfileRaw=localStorage.getItem('applypilot-profile')
-      const savedCv=savedCvRaw?JSON.parse(savedCvRaw):null
       const savedProfile=mergeProfile(savedProfileRaw?JSON.parse(savedProfileRaw):{})
       const hydrated=resumeToProfile(savedProfile,savedCv)
-      if(savedCv) setCvData(savedCv)
+      if(savedCv){
+        setCvData(savedCv)
+        if(!savedSourceRaw&&isSourceCvReady(savedCv)){
+          localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(savedCv))
+          localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
+        }
+      }
       setProfile(hydrated)
       setDraft(hydrated)
     }catch{}
   },[])
 
   const profileReady=Boolean(profile.savedAt)
-  const resumeLoaded=Boolean(cvData?.fileName)
-  const pack=applicationPackState(cvData)
+  const resumeLoaded=isSourceCvReady(cvData)
+  const pack=applicationPackState(resumeLoaded?cvData:null)
   const reviewFacts=useMemo(()=>Array.isArray(cvData?.facts)?cvData.facts.filter(f=>f&&f.verified!==false):[],[cvData])
-  const proposedChanges=useMemo(()=>active?buildReviewChanges(cvData,active):[],[cvData,active])
+  const proposedChanges=useMemo(()=>resumeLoaded&&active?buildReviewChanges(cvData,active):[],[cvData,active,resumeLoaded])
   const alignedTerms=useMemo(()=>active?deriveReviewTerms(active):[],[active])
   const jobKey=active?.job?.sourceJobId||''
   const reviewedCount=proposedChanges.filter(change=>decisions[`${jobKey}|${change.id}`]).length
   const profileCompletion=useMemo(()=>{
-    const fields=[draft.cvName,draft.roles,draft.geography?.length,draft.salary,draft.exclusions]
+    const fields=[resumeLoaded,draft.roles,draft.geography?.length,draft.salary,draft.exclusions]
     return Math.round(fields.filter(Boolean).length/fields.length*100)
-  },[draft])
+  },[draft,resumeLoaded])
 
   async function parseCv(file){
     if(!file) return
@@ -57,9 +66,12 @@ export default function Home(){
       const res=await fetch('/api/parse-cv',{method:'POST',body:form})
       const data=await res.json()
       if(!res.ok) throw new Error(data.error||'CV parsing failed.')
-      const saved={fileName:data.fileName,chars:data.chars,summary:data.summary||'',facts:data.facts||[],skills:data.skills||[],preview:data.preview||'',parsedAt:new Date().toISOString()}
-      localStorage.setItem('applypilot-master-cv',JSON.stringify(saved))
+      const saved=buildSourceCvRecord(data,new Date().toISOString())
+      localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(saved))
+      localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
       setCvData(saved)
+      setDecisions({})
+      setReviewOpen(false)
       setProfile(current=>{
         const next=resumeToProfile(current,saved)
         if(current.savedAt) localStorage.setItem('applypilot-profile',JSON.stringify(next))
@@ -117,11 +129,11 @@ export default function Home(){
     <header><div><div className="brand">ApplyPilot</div><div className="tag">Search less. Apply better.</div></div><div className="headerActions"><div className={`sourceBadge profileStatus ${resumeLoaded?'statusReady':'statusEmpty'}`}>{resumeLoaded?'Profile ready':'Profile empty'}</div><div className="sourceBadge">LINKEDIN · PUBLIC</div></div></header>
 
     <section className="hero">
-      <div><p className="eyebrow">ONE SOURCE · END-TO-END</p><h1>Find Senior IT Project & Delivery roles in Denmark.</h1><p>LinkedIn public search → full job description → Master CV evaluation → worthwhile matches only.</p></div>
+      <div><p className="eyebrow">ONE SOURCE · END-TO-END</p><h1>Find Senior IT Project & Delivery roles in Denmark.</h1><p>LinkedIn public search → full job description → CV evaluation → worthwhile matches only.</p></div>
       <div className="metric"><b>{state.loading?'…':jobs.length}</b><span>matches</span></div>
     </section>
 
-    <div className="profileStrip"><span>{profileReady?profile.roles.split(',').slice(0,2).join(' · '):'Senior IT Project / Delivery · Denmark'}</span><span>JD responsibilities 40% · experience/domain 25% · geography 20% · career/comp 15%</span><button className="profileEditButton" onClick={startProfile}>{profileReady?'Edit profile':'Search profile'}</button><button className="cvButton" onClick={startProfile}>{cvData?.fileName?`✓ ${cvData.fileName}`:'Upload Master CV'}</button></div>
+    <div className="profileStrip"><span>{profileReady?profile.roles.split(',').slice(0,2).join(' · '):'Senior IT Project / Delivery · Denmark'}</span><span>JD responsibilities 40% · experience/domain 25% · geography 20% · career/comp 15%</span><button className="profileEditButton" onClick={startProfile}>{profileReady?'Edit profile':'Search profile'}</button><button className="cvButton" onClick={startProfile}>{resumeLoaded?`✓ ${cvData.fileName}`:cvData?.fileName?'Re-upload CV':'Upload CV'}</button></div>
 
     <section className="controls">
       <div><small>POSTED WITHIN</small><div className="choices">{WINDOWS.map(days=><button key={days} className={freshnessDays===days?'choice selected':'choice'} onClick={()=>setFreshnessDays(days)}>{days} day{days===1?'':'s'}</button>)}</div></div>
@@ -153,7 +165,7 @@ export default function Home(){
           <div className="section"><h3>Gap / unknown</h3>{evaluation.gaps.length?evaluation.gaps.map((x,n)=><p key={n}>⚠ {x}</p>):<p>✓ No material gap detected</p>}</div>
           <div className="section"><h3>Score breakdown</h3><div className="breakdown"><span>Delivery <b>{evaluation.breakdown.responsibilitiesDelivery}</b></span><span>Experience/domain <b>{evaluation.breakdown.experienceDomain}</b></span><span>Geography <b>{evaluation.breakdown.geographyWorkModel}</b></span><span>Career/comp <b>{evaluation.breakdown.careerCompensation}</b></span></div></div>
           <div className="section"><h3>Application pack</h3><div className="docs"><div>{pack.cvReady?'✓':'○'} Tailored CV <span className={pack.cvReady?'ready':'pending'}>{pack.tailoredCvLabel}</span></div><div>○ Cover letter <span className="pending">{pack.coverLetterLabel}</span></div></div></div>
-          <div className="actions reviewActions">{pack.cvReady?<button className="primary" onClick={()=>setReviewOpen(true)}>Review CV changes</button>:<button className="primary" onClick={startProfile}>Upload / analyse CV</button>}<a className="secondary openLink" href={job.originalUrl} target="_blank" rel="noreferrer">Open LinkedIn vacancy</a>{job.officialUrl&&<a className="secondary openLink" href={job.officialUrl} target="_blank" rel="noreferrer">Employer link</a>}</div>
+          <div className="actions reviewActions">{pack.cvReady?<button className="primary" onClick={()=>setReviewOpen(true)}>Review CV changes</button>:<button className="primary" onClick={startProfile}>Upload CV</button>}<a className="secondary openLink" href={job.originalUrl} target="_blank" rel="noreferrer">Open LinkedIn vacancy</a>{job.officialUrl&&<a className="secondary openLink" href={job.officialUrl} target="_blank" rel="noreferrer">Employer link</a>}</div>
         </>})():<div className="emptyPanel"><h2>No selected vacancy</h2><p>{state.loading?'Searching LinkedIn public pages…':'Run the LinkedIn search to see matching vacancies.'}</p></div>}
       </div>
     </section>
@@ -163,12 +175,12 @@ export default function Home(){
     {profileOpen&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget)closeProfile()}}><div className="modal profileModal">
       <div className="modalHead"><div><p className="eyebrow">BUILD YOUR SEARCH AGENT</p><h2>Search profile</h2></div><button className="close" onClick={closeProfile}>×</button></div>
       <div className="progress"><span style={{width:`${profileStep/6*100}%`}}></span></div><div className="stepMeta"><span>Step {profileStep} of 6</span><span>{profileCompletion}% profile data</span></div>
-      {profileStep===1&&<div className="wizard"><h3>Upload your master CV</h3><p>ApplyPilot reads your CV and creates a private evidence layer used to verify every proposed CV update. The evidence layer stays behind the scenes.</p><label className="upload"><input type="file" accept=".pdf,.docx" onChange={event=>parseCv(event.target.files?.[0])} disabled={cvState.loading}/><b>{cvState.loading?'Analysing CV…':draft.cvName?'✓ '+draft.cvName:'Choose CV file'}</b><span>PDF or DOCX · max 8 MB</span></label>{cvState.error&&<div className="errorBox"><b>CV parsing failed</b><span>{cvState.error}</span></div>}{draft.factBank?.length>0&&<div className="successBox"><b>✓ CV analysed successfully</b><span>{draft.skills?.length?`Detected signals: ${draft.skills.slice(0,8).join(' · ')}`:'Verified CV evidence is ready.'}</span></div>}</div>}
+      {profileStep===1&&<div className="wizard"><h3>Upload your CV</h3><p>ApplyPilot reads the complete CV and prepares it as the active Source CV for later CV analysis. The uploaded source remains unchanged.</p><label className="upload"><input type="file" accept=".pdf,.docx" onChange={event=>parseCv(event.target.files?.[0])} disabled={cvState.loading}/><b>{cvState.loading?'Analysing CV…':resumeLoaded?'✓ '+cvData.fileName:cvData?.fileName?'Re-upload CV':'Choose CV file'}</b><span>PDF or DOCX · max 8 MB</span></label>{cvState.error&&<div className="errorBox"><b>CV parsing failed</b><span>{cvState.error}</span></div>}{resumeLoaded&&<div className="successBox"><b>✓ Source CV ready</b><span>{draft.skills?.length?`Detected signals: ${draft.skills.slice(0,8).join(' · ')}`:'Complete CV text is prepared for later analysis.'}</span></div>}</div>}
       {profileStep===2&&<div className="wizard"><h3>Which roles should we search for?</h3><p>Save the job titles you want your Search Profile to remember. In this milestone, the live LinkedIn engine keeps its existing search logic unchanged.</p><textarea value={draft.roles} onChange={event=>setDraft(current=>({...current,roles:event.target.value}))} rows="5"/></div>}
       {profileStep===3&&<div className="wizard"><h3>Where can you work?</h3><p>Save the work models that belong in your Search Profile.</p><div className="choiceGrid">{['Denmark hybrid','Denmark onsite','Remote EU/EMEA','Remote worldwide'].map(value=><button key={value} onClick={()=>toggleGeo(value)} className={draft.geography.includes(value)?'choice selected':'choice'}>{draft.geography.includes(value)?'✓ ':''}{value}</button>)}</div></div>}
       {profileStep===4&&<div className="wizard"><h3>Minimum acceptable monthly salary</h3><p>Save your permanent-role salary floor in the Search Profile.</p><div className="salary"><input type="number" min="0" step="1000" value={draft.salary} onChange={event=>setDraft(current=>({...current,salary:event.target.value}))}/><span>DKK / month</span></div></div>}
       {profileStep===5&&<div className="wizard"><h3>What should ApplyPilot exclude?</h3><p>Save hard no-go roles, industries, languages or working conditions in your Search Profile.</p><textarea value={draft.exclusions} onChange={event=>setDraft(current=>({...current,exclusions:event.target.value}))} rows="6"/></div>}
-      {profileStep===6&&<div className="wizard review"><h3>Confirm your search profile</h3><p>This saves your Search Profile for the next product step. The current LinkedIn search engine remains unchanged in this milestone.</p><div className="reviewRow"><span>CV</span><b>{draft.cvName||'Not uploaded yet'}</b></div><div className="reviewRow"><span>CV analysis</span><b>{draft.factBank?.length?'Ready — evidence verified':'CV not analysed'}</b></div><div className="reviewRow"><span>Target roles</span><b>{draft.roles||'Not set'}</b></div><div className="reviewRow"><span>Geography</span><b>{draft.geography.length?draft.geography.join(' · '):'Not set'}</b></div><div className="reviewRow"><span>Salary floor</span><b>{draft.salary?Number(draft.salary).toLocaleString('en-DK')+' DKK/month':'Not set'}</b></div><div className="reviewRow"><span>Exclude</span><b>{draft.exclusions||'None'}</b></div><div className="truth"><b>Truth rule</b><span>ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.</span></div></div>}
+      {profileStep===6&&<div className="wizard review"><h3>Confirm your search profile</h3><p>This saves your Search Profile for the next product step. The current LinkedIn search engine remains unchanged in this milestone.</p><div className="reviewRow"><span>CV</span><b>{resumeLoaded?cvData.fileName:cvData?.fileName?'Re-upload required':'Not uploaded yet'}</b></div><div className="reviewRow"><span>CV preparation</span><b>{resumeLoaded?'Ready — complete Source CV prepared':'CV not ready'}</b></div><div className="reviewRow"><span>Target roles</span><b>{draft.roles||'Not set'}</b></div><div className="reviewRow"><span>Geography</span><b>{draft.geography.length?draft.geography.join(' · '):'Not set'}</b></div><div className="reviewRow"><span>Salary floor</span><b>{draft.salary?Number(draft.salary).toLocaleString('en-DK')+' DKK/month':'Not set'}</b></div><div className="reviewRow"><span>Exclude</span><b>{draft.exclusions||'None'}</b></div><div className="truth"><b>Truth rule</b><span>ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.</span></div></div>}
       <div className="modalActions"><button className="secondary" onClick={()=>profileStep===1?closeProfile():setProfileStep(step=>step-1)}>{profileStep===1?'Cancel':'Back'}</button>{profileStep<6?<button className="primary" disabled={profileStep===1&&cvState.loading} onClick={()=>setProfileStep(step=>step+1)}>Continue</button>:<button className="primary" onClick={saveProfile}>Save profile</button>}</div>
     </div></div>}
 

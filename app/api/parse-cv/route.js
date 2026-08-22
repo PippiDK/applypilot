@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import mammoth from 'mammoth'
+import { createHash } from 'node:crypto'
 import { extractSummaryFromText } from '../../lib/profile-review.js'
 
 export const runtime = 'nodejs'
@@ -37,7 +38,7 @@ function makeFacts(text='') {
     facts.push({
       id:`FACT-${String(facts.length+1).padStart(3,'0')}`,
       text:normalized,
-      source:'Master CV',
+      source:'Source CV',
       verified:true
     })
     if (facts.length >= 80) break
@@ -49,7 +50,7 @@ function makeFacts(text='') {
       if(normalized.length<30||normalized.length>350) continue
       const key=normalized.toLowerCase(); if(seen.has(key)) continue
       seen.add(key)
-      facts.push({id:`FACT-${String(facts.length+1).padStart(3,'0')}`,text:normalized,source:'Master CV',verified:true})
+      facts.push({id:`FACT-${String(facts.length+1).padStart(3,'0')}`,text:normalized,source:'Source CV',verified:true})
       if(facts.length>=30) break
     }
   }
@@ -71,6 +72,8 @@ export async function POST(request){
 
     const name=(file.name||'cv').toLowerCase()
     const buffer=Buffer.from(await file.arrayBuffer())
+    const sourceVersion=`sha256:${createHash('sha256').update(buffer).digest('hex')}`
+    const fileType=file.type|| (name.endsWith('.pdf')?'application/pdf':name.endsWith('.docx')?'application/vnd.openxmlformats-officedocument.wordprocessingml.document':name.endsWith('.txt')?'text/plain':'')
     let text=''
 
     if(name.endsWith('.pdf')){
@@ -89,7 +92,7 @@ export async function POST(request){
     }else if(name.endsWith('.txt')){
       text=buffer.toString('utf8')
     }else{
-      return NextResponse.json({error:'For v0.3 please upload PDF or DOCX. Legacy .doc files are not supported yet.'},{status:400})
+      return NextResponse.json({error:'Please upload PDF or DOCX. Legacy .doc files are not supported.'},{status:400})
     }
 
     text=cleanText(text)
@@ -97,7 +100,11 @@ export async function POST(request){
 
     const facts=makeFacts(text)
     return NextResponse.json({
+      status:'ready',
       fileName:file.name,
+      fileSize:file.size,
+      fileType,
+      sourceVersion,
       chars:text.length,
       cvText:text,
       summary:extractSummaryFromText(text),

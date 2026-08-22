@@ -113,21 +113,23 @@ test('CV review shows a neutral empty state when there are no actual wording cha
   assert.doesNotMatch(source,/No usable CV evidence was found for this review/)
 })
 
-test('all Master CV entry points use the full six-step Search Profile flow',()=>{
+test('Source CV upload entry points keep the existing six-step Search Profile flow',()=>{
   const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
   assert.doesNotMatch(source,/setCvOpen/)
   assert.doesNotMatch(source,/cvOpen&&/)
   assert.match(source,/className="cvButton" onClick=\{startProfile\}/)
-  assert.match(source,/Upload \/ analyse CV<\/button>/)
+  assert.match(source,/Upload CV<\/button>/)
+  assert.match(source,/Upload your CV/)
+  assert.doesNotMatch(source,/Upload your master CV/i)
   assert.doesNotMatch(source,/onClick=\{\(\)=>setCvOpen\(true\)\}[^>]*>Upload \/ analyse CV/)
   assert.match(source,/Detected signals:/)
   assert.match(source,/Step \{profileStep\} of 6/)
 })
 
 
-test('profile strip reports whether a Master CV is loaded without changing search behavior',()=>{
+test('profile status requires a complete ready Source CV without changing search behavior',()=>{
   const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
-  assert.match(source,/const resumeLoaded=Boolean\(cvData\?\.fileName\)/)
+  assert.match(source,/const resumeLoaded=isSourceCvReady\(cvData\)/)
   assert.match(source,/resumeLoaded\?'Profile ready':'Profile empty'/)
   assert.doesNotMatch(source,/profileReady\?'✓ Search profile saved':'Profile loaded'/)
   assert.match(source,/body:JSON\.stringify\(\{freshnessDays\}\)/)
