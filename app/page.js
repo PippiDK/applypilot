@@ -39,7 +39,7 @@ export default function Home(){
   const resumeLoaded=Boolean(cvData?.fileName)
   const pack=applicationPackState(cvData)
   const reviewFacts=useMemo(()=>Array.isArray(cvData?.facts)?cvData.facts.filter(f=>f&&f.verified!==false):[],[cvData])
-  const proposedChanges=useMemo(()=>active?buildReviewChanges(cvData,active):[],[cvData,active])
+  const proposedChanges=useMemo(()=>active?buildReviewChanges(reviewFacts,active):[],[reviewFacts,active])
   const alignedTerms=useMemo(()=>active?deriveReviewTerms(active):[],[active])
   const jobKey=active?.job?.sourceJobId||''
   const reviewedCount=proposedChanges.filter(change=>decisions[`${jobKey}|${change.id}`]).length
@@ -57,7 +57,7 @@ export default function Home(){
       const res=await fetch('/api/parse-cv',{method:'POST',body:form})
       const data=await res.json()
       if(!res.ok) throw new Error(data.error||'CV parsing failed.')
-      const saved={fileName:data.fileName,chars:data.chars,summary:data.summary||'',facts:data.facts||[],skills:data.skills||[],preview:data.preview||'',parsedAt:new Date().toISOString()}
+      const saved={fileName:data.fileName,chars:data.chars,facts:data.facts||[],skills:data.skills||[],preview:data.preview||'',parsedAt:new Date().toISOString()}
       localStorage.setItem('applypilot-master-cv',JSON.stringify(saved))
       setCvData(saved)
       setProfile(current=>{
@@ -173,17 +173,17 @@ export default function Home(){
     </div></div>}
 
     {reviewOpen&&active&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget)setReviewOpen(false)}}><div className="modal reviewModal"><div className="modalHead"><div><p className="eyebrow">CV UPDATE REVIEW</p><h2>{active.job.title}</h2><p className="muted">{active.job.company} · {active.job.location}</p></div><button className="close" onClick={()=>setReviewOpen(false)}>×</button></div>
-      <div className="reviewDashboard"><div><b>{proposedChanges.filter(change=>change.changed).length}</b><span>summary change proposed</span></div><div><b>0</b><span>bullets reordered · Step 2</span></div><div><b>{alignedTerms.length}</b><span>role terms already supported</span></div><div className="zeroClaims"><b>0</b><span>unsupported claims added</span></div></div>
+      <div className="reviewDashboard"><div><b>{proposedChanges.filter(change=>change.changed).length}</b><span>wording changes proposed</span></div><div><b>0</b><span>bullets reordered in this prototype</span></div><div><b>{alignedTerms.length}</b><span>role terms already supported</span></div><div className="zeroClaims"><b>0</b><span>unsupported claims added</span></div></div>
       <div className="truth compact"><b>Truth Guard active</b><span>Updated wording may only restate evidence already present in your Master CV. Internal evidence IDs are hidden from the user interface.</span></div>
-      <div className="reviewToolbar"><div><h3>Tailored Summary</h3><p>{reviewedCount} of {proposedChanges.length} reviewed</p></div>{proposedChanges.some(change=>change.changed)&&<button className="secondary" onClick={acceptAll}>Accept all safe changes</button>}</div>
+      <div className="reviewToolbar"><div><h3>Proposed CV updates</h3><p>{reviewedCount} of {proposedChanges.length} reviewed</p></div>{proposedChanges.some(change=>change.changed)&&<button className="secondary" onClick={acceptAll}>Accept all safe changes</button>}</div>
       {proposedChanges.map((change,index)=>{const decision=decisions[`${jobKey}|${change.id}`];return <div className={'changeCard '+(decision?'decided':'')} key={change.id}>
-        <div className="changeHead"><span>SUMMARY</span><b>{decision==='accepted'?'Accepted':decision==='original'?'Original kept':change.changed?'Review needed':'Already aligned'}</b></div>
+        <div className="changeHead"><span>CV change {index+1}</span><b>{decision==='accepted'?'Accepted':decision==='original'?'Original kept':change.changed?'Review needed':'Already aligned'}</b></div>
         <div className="compareGrid"><div className="compareBox"><small>ORIGINAL</small><p>{change.original}</p></div><div className="compareArrow">→</div><div className="compareBox updatedBox"><small>UPDATED</small><p>{change.updated}</p></div></div>
         <div className="changeWhy"><div><small>WHY CHANGED</small><p>{change.why}</p></div><div><small>SOURCE</small><p>Existing Master CV experience only · no new claim added</p></div></div>
         <div className="evidenceActions"><button className={'secondary '+(decision==='original'?'chosen':'')} onClick={()=>setDecision(change.id,'original')}>Keep original</button><button className={'primary smallPrimary '+(decision==='accepted'?'chosenPrimary':'')} onClick={()=>setDecision(change.id,'accepted')} disabled={!change.changed}>{change.changed?'Accept change':'No change needed'}</button></div>
       </div>})}
-      {!proposedChanges.length&&<div className="muted">No Summary change proposed.</div>}
-      <div className="reviewFooter"><span>Step 1 updates Summary only. Bullet reordering comes next in Step 2.</span><button className="secondary" onClick={()=>setReviewOpen(false)}>Close review</button></div>
+      {!proposedChanges.length&&<div className="muted">No CV changes proposed.</div>}
+      <div className="reviewFooter"><span>Cover letter generation comes next, after CV updates are reviewed.</span><button className="secondary" onClick={()=>setReviewOpen(false)}>Close review</button></div>
     </div></div>}
   </main>
 }
