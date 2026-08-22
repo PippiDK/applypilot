@@ -17,6 +17,10 @@ const MODEL_RESULT={
       importance:'core',
       requirement:'Lead the end-to-end lifecycle of AI, analytics, and data products from ideation through deployment and value realization.',
       minimumYears:0,
+      evidenceRule:'all_groups',
+      evidenceGroups:[
+        {label:'AI/data product lifecycle',directEvidenceTerms:['AI product lifecycle','AI delivery','data products'],transferableEvidenceTerms:['end-to-end delivery','product lifecycle','data delivery']}
+      ],
       directEvidenceTerms:['AI product lifecycle','AI delivery','data products'],
       transferableEvidenceTerms:['end-to-end delivery','product lifecycle','data delivery'],
       jdEvidence:['Lead the end-to-end lifecycle of AI, analytics, and data products from ideation through deployment and value realization.']
@@ -28,6 +32,12 @@ const MODEL_RESULT={
       importance:'critical',
       requirement:'Minimum 5 years of managing complex cross-functional Data & AI initiatives.',
       minimumYears:5,
+      evidenceRule:'all_groups',
+      evidenceGroups:[
+        {label:'data',directEvidenceTerms:['data initiatives','data platform','analytics initiatives'],transferableEvidenceTerms:['BI initiatives']},
+        {label:'AI',directEvidenceTerms:['AI initiatives','artificial intelligence'],transferableEvidenceTerms:[]},
+        {label:'initiative leadership',directEvidenceTerms:['managing complex cross-functional','initiative leadership'],transferableEvidenceTerms:['cross-functional delivery']}
+      ],
       directEvidenceTerms:['Data & AI initiatives','AI initiatives'],
       transferableEvidenceTerms:['data initiatives','analytics initiatives'],
       jdEvidence:['Minimum 5 years of managing complex cross-functional Data & AI initiatives.']
@@ -39,6 +49,13 @@ const MODEL_RESULT={
       importance:'critical',
       requirement:'Experience delivering Data, Analytics, Machine Learning, or Generative AI solutions.',
       minimumYears:0,
+      evidenceRule:'any_group',
+      evidenceGroups:[
+        {label:'Data',directEvidenceTerms:['data delivery','data solutions','data platform'],transferableEvidenceTerms:['Data Warehouse','DWH']},
+        {label:'Analytics',directEvidenceTerms:['analytics delivery','analytics solutions','BI','business intelligence'],transferableEvidenceTerms:['Power BI']},
+        {label:'Machine Learning',directEvidenceTerms:['Machine Learning','ML delivery'],transferableEvidenceTerms:[]},
+        {label:'Generative AI',directEvidenceTerms:['Generative AI','GenAI delivery'],transferableEvidenceTerms:[]}
+      ],
       directEvidenceTerms:['Machine Learning','Generative AI','ML delivery','GenAI delivery'],
       transferableEvidenceTerms:['data delivery','analytics delivery','data platform'],
       jdEvidence:['Experience delivering Data, Analytics, Machine Learning, or Generative AI solutions.']
@@ -50,6 +67,10 @@ const MODEL_RESULT={
       importance:'core',
       requirement:'Strong awareness of ethical and responsible AI practices.',
       minimumYears:0,
+      evidenceRule:'all_groups',
+      evidenceGroups:[
+        {label:'Responsible AI',directEvidenceTerms:['Responsible AI','ethical AI'],transferableEvidenceTerms:['AI governance','data governance']}
+      ],
       directEvidenceTerms:['Responsible AI','ethical AI'],
       transferableEvidenceTerms:['AI governance','data governance'],
       jdEvidence:['Strong awareness of ethical and responsible AI practices.']
@@ -61,6 +82,10 @@ const MODEL_RESULT={
       importance:'core',
       requirement:'Build and maintain strong relationships with senior leaders and key decision-makers.',
       minimumYears:0,
+      evidenceRule:'all_groups',
+      evidenceGroups:[
+        {label:'senior stakeholder relationships',directEvidenceTerms:['senior stakeholders','executive stakeholders','senior leaders'],transferableEvidenceTerms:['stakeholder management','executive reporting']}
+      ],
       directEvidenceTerms:['senior stakeholders','executive stakeholders','senior leaders'],
       transferableEvidenceTerms:['stakeholder management','executive reporting'],
       jdEvidence:['Build and maintain strong relationships with senior leaders and key decision-makers.']
@@ -76,7 +101,11 @@ test('extracts grounded structured professional requirements using injected AI o
   assert.equal(result.requirements[1].importance,'critical')
   assert.equal(result.requirements[1].minimumYears,5)
   assert.equal(result.requirements[2].category,'technical_platform_capabilities')
+  assert.equal(result.requirements[2].evidenceRule,'any_group')
+  assert.equal(result.requirements[2].evidenceGroups.length,4)
   assert.match(captured.instructions,/Do not evaluate the candidate/i)
+  assert.match(captured.instructions,/alternatives.*or.*any_group/is)
+  assert.match(captured.instructions,/and.*all_groups/is)
   assert.equal(captured.input.jobDescription,JD)
 })
 

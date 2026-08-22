@@ -1,4 +1,5 @@
 import {EXPERTISE_CATEGORIES,EXPERTISE_IMPORTANCE} from './expertise-requirements.js'
+import {detectCvStructure} from './cv-sections.js'
 
 const IMPORTANCE_WEIGHT={critical:3,core:2,supporting:1}
 const STATUS_CREDIT={MATCHED:1,PARTIAL:.5,NOT_EVIDENCED:0}
@@ -49,6 +50,16 @@ function durationEvidence(cvText,terms,minimumYears){
     if(!(terms||[]).some(term=>termPresent(sentence,term))) continue
     if(yearsInSentence(sentence).some(years=>years>=minimumYears)) return true
   }
+  try{
+    const structure=detectCvStructure(cvText)
+    const currentYear=new Date().getUTCFullYear()
+    for(const role of structure.employmentSections||[]){
+      if(!(terms||[]).some(term=>termPresent(role.sectionText,term))) continue
+      const endYear=role.openEnded?currentYear:Number(role.endYear)
+      const startYear=Number(role.startYear)
+      if(Number.isFinite(startYear)&&Number.isFinite(endYear)&&Math.max(0,endYear-startYear)>=minimumYears) return true
+    }
+  }catch{}
   return false
 }
 
@@ -63,7 +74,46 @@ function evidenceExcerpt(cvText,term=''){
   return original.slice(start,end).replace(/\s+/g,' ').trim()
 }
 
+function matchEvidenceGroup(group,cvText=''){
+  const directTerm=firstPresentTerm(cvText,group?.directEvidenceTerms||[])
+  if(directTerm) return {status:'MATCHED',evidenceTerm:directTerm,evidenceExcerpt:evidenceExcerpt(cvText,directTerm)}
+  const transferableTerm=firstPresentTerm(cvText,group?.transferableEvidenceTerms||[])
+  if(transferableTerm) return {status:'PARTIAL',evidenceTerm:transferableTerm,evidenceExcerpt:evidenceExcerpt(cvText,transferableTerm)}
+  return {status:'NOT_EVIDENCED',evidenceTerm:'',evidenceExcerpt:''}
+}
+
 export function matchRequirementEvidence(requirement,cvText=''){
+  const groups=Array.isArray(requirement?.evidenceGroups)?requirement.evidenceGroups.filter(Boolean):[]
+  const rule=requirement?.evidenceRule
+  if(groups.length&&['any_group','all_groups'].includes(rule)){
+    const groupResults=groups.map(group=>({...matchEvidenceGroup(group,cvText),label:String(group?.label||'').trim()}))
+    const directGroups=groupResults.filter(x=>x.status==='MATCHED')
+    const partialGroups=groupResults.filter(x=>x.status==='PARTIAL')
+    const firstEvidence=directGroups[0]||partialGroups[0]||{evidenceTerm:'',evidenceExcerpt:''}
+
+    if(rule==='any_group'){
+      if(directGroups.length){
+        const directTerms=groups.flatMap(group=>group.directEvidenceTerms||[])
+        if(Number(requirement?.minimumYears||0)>0&&!durationEvidence(cvText,directTerms,Number(requirement.minimumYears))){
+          return {status:'PARTIAL',evidenceTerm:firstEvidence.evidenceTerm,evidenceExcerpt:firstEvidence.evidenceExcerpt,reason:'Required duration is not evidenced for the same capability in Source CV',groupResults}
+        }
+        return {status:'MATCHED',evidenceTerm:firstEvidence.evidenceTerm,evidenceExcerpt:firstEvidence.evidenceExcerpt,reason:'At least one acceptable capability alternative is directly evidenced in Source CV',groupResults}
+      }
+      if(partialGroups.length) return {status:'PARTIAL',evidenceTerm:firstEvidence.evidenceTerm,evidenceExcerpt:firstEvidence.evidenceExcerpt,reason:'An acceptable capability alternative is only partially evidenced in Source CV',groupResults}
+      return {status:'NOT_EVIDENCED',evidenceTerm:'',evidenceExcerpt:'',reason:'No acceptable capability alternative is evidenced in Source CV',groupResults}
+    }
+
+    if(directGroups.length===groups.length){
+      const directTerms=groups.flatMap(group=>group.directEvidenceTerms||[])
+      if(Number(requirement?.minimumYears||0)>0&&!durationEvidence(cvText,directTerms,Number(requirement.minimumYears))){
+        return {status:'PARTIAL',evidenceTerm:firstEvidence.evidenceTerm,evidenceExcerpt:firstEvidence.evidenceExcerpt,reason:'Required duration is not evidenced for the same capability in Source CV',groupResults}
+      }
+      return {status:'MATCHED',evidenceTerm:firstEvidence.evidenceTerm,evidenceExcerpt:firstEvidence.evidenceExcerpt,reason:'All required capability groups are directly evidenced in Source CV',groupResults}
+    }
+    if(directGroups.length||partialGroups.length) return {status:'PARTIAL',evidenceTerm:firstEvidence.evidenceTerm,evidenceExcerpt:firstEvidence.evidenceExcerpt,reason:'Some required capability groups are evidenced in Source CV',groupResults}
+    return {status:'NOT_EVIDENCED',evidenceTerm:'',evidenceExcerpt:'',reason:'Required capability groups are not evidenced in Source CV',groupResults}
+  }
+
   const directTerm=firstPresentTerm(cvText,requirement?.directEvidenceTerms||[])
   const transferableTerm=firstPresentTerm(cvText,requirement?.transferableEvidenceTerms||[])
   if(directTerm){
