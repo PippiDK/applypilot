@@ -21,9 +21,21 @@ export const jobAnalysisSchema={
         required:['id','rank','kind','requirement','why','jdEvidence']
       }
     },
+    mustHaves:{
+      type:'array',maxItems:10,
+      items:{
+        type:'object',additionalProperties:false,
+        properties:{
+          id:{type:'string',minLength:1},
+          requirement:{type:'string',minLength:1},
+          jdEvidence:{type:'array',minItems:1,maxItems:3,items:{type:'string',minLength:1}}
+        },
+        required:['id','requirement','jdEvidence']
+      }
+    },
     gapsToAvoid:{type:'array',items:{type:'string'}}
   },
-  required:['roleMission','candidatePositioning','priorities','gapsToAvoid']
+  required:['roleMission','candidatePositioning','priorities','mustHaves','gapsToAvoid']
 }
 
 export function validateJobAnalysis(value){
@@ -40,6 +52,15 @@ export function validateJobAnalysis(value){
     if(!text(priority.requirement)||!text(priority.why)) throw new Error('Invalid JD priority text.')
     if(!Array.isArray(priority.jdEvidence)||priority.jdEvidence.length<1||priority.jdEvidence.some(excerpt=>!text(excerpt))) throw new Error('Every JD priority requires JD evidence.')
     if(priority.rank!==index+1) throw new Error('JD priorities must be ranked in order.')
+  }
+  if(!Array.isArray(value.mustHaves)) throw new Error('JD analysis requires a separate must-haves qualification list.')
+  const mustHaveIds=new Set()
+  for(const mustHave of value.mustHaves){
+    if(!mustHave||typeof mustHave!=='object') throw new Error('Invalid JD must-have.')
+    if(!text(mustHave.id)||mustHaveIds.has(text(mustHave.id))) throw new Error('JD must-have IDs must be unique.')
+    mustHaveIds.add(text(mustHave.id))
+    if(!text(mustHave.requirement)) throw new Error('Invalid JD must-have requirement.')
+    if(!Array.isArray(mustHave.jdEvidence)||mustHave.jdEvidence.length<1||mustHave.jdEvidence.some(excerpt=>!text(excerpt))) throw new Error('Every JD must-have requires JD evidence.')
   }
   if(!Array.isArray(value.gapsToAvoid)) throw new Error('Invalid JD gaps list.')
   return value

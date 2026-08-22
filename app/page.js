@@ -3,11 +3,15 @@ import { useEffect, useMemo, useState } from 'react'
 import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'
 import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'
 import {requestJobAnalysis} from './lib/jd-analysis-client.js'
+import {requestExpertiseMatch} from './lib/expertise-match-client.js'
+import {evaluateJobConditions} from './lib/job-conditions.js'
 
 const WINDOWS=[1,3,7,14]
 
 function dateText(value){ if(!value) return 'Date unavailable'; const d=new Date(value); if(!Number.isFinite(d.getTime())) return 'Date unavailable'; const days=Math.max(0,Math.floor((Date.now()-d.getTime())/86400000)); return days===0?'Today':days===1?'1 day ago':`${days} days ago` }
 function salary(job){ if(job.salaryMinDkkMonth==null&&job.salaryMaxDkkMonth==null) return 'Insufficient data'; if(job.salaryMinDkkMonth!=null&&job.salaryMaxDkkMonth!=null) return `${job.salaryMinDkkMonth.toLocaleString('en-DK')}–${job.salaryMaxDkkMonth.toLocaleString('en-DK')} DKK/month`; return `${(job.salaryMinDkkMonth??job.salaryMaxDkkMonth).toLocaleString('en-DK')} DKK/month` }
+function conditionScore(value){ return value==null?'N/A':`${value}%` }
+function acceptedWorkModels(geography=[]){ const joined=(geography||[]).join(' ').toLowerCase(); return [joined.includes('hybrid')?'hybrid':'',joined.includes('remote')?'remote':'',joined.includes('onsite')?'onsite':''].filter(Boolean) }
 
 export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(7)
@@ -22,6 +26,7 @@ export default function Home(){
   const [profileStep,setProfileStep]=useState(1)
   const [reviewOpen,setReviewOpen]=useState(false)
   const [jdAnalysisState,setJdAnalysisState]=useState({loading:false,error:'',analysis:null,token:'',jobKey:''})
+  const [expertiseState,setExpertiseState]=useState({loading:false,error:'',analysis:null,jobKey:''})
   const [decisions,setDecisions]=useState({})
   const active=jobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||jobs[0]||null
 
@@ -53,11 +58,24 @@ export default function Home(){
   const proposedChanges=useMemo(()=>resumeLoaded&&active?buildReviewChanges(cvData,active):[],[cvData,active,resumeLoaded])
   const alignedTerms=useMemo(()=>active?deriveReviewTerms(active):[],[active])
   const jobKey=active?.job?.sourceJobId||''
+  const conditionProfile=useMemo(()=>({...profile,acceptedWorkModels:acceptedWorkModels(profile.geography)}),[profile])
+  const jobConditions=useMemo(()=>active?evaluateJobConditions(active.job,conditionProfile):null,[active,conditionProfile])
   const reviewedCount=proposedChanges.filter(change=>decisions[`${jobKey}|${change.id}`]).length
   const profileCompletion=useMemo(()=>{
     const fields=[resumeLoaded,draft.roles,draft.geography?.length,draft.salary,draft.exclusions]
     return Math.round(fields.filter(Boolean).length/fields.length*100)
   },[draft,resumeLoaded])
+
+  useEffect(()=>{
+    if(!active||!resumeLoaded){ setExpertiseState({loading:false,error:'',analysis:null,jobKey:''}); return }
+    const runKey=active.job.sourceJobId||`${active.job.title}|${active.job.company}`
+    let stale=false
+    setExpertiseState({loading:true,error:'',analysis:null,jobKey:runKey})
+    requestExpertiseMatch({job:active.job,cvText:cvData.cvText})
+      .then(analysis=>{if(!stale)setExpertiseState({loading:false,error:'',analysis,jobKey:runKey})})
+      .catch(error=>{if(!stale)setExpertiseState({loading:false,error:error.message||'Expertise Match analysis failed safely. Please try again.',analysis:null,jobKey:runKey})})
+    return ()=>{stale=true}
+  },[jobKey,resumeLoaded,cvData?.sourceVersion])
 
   async function parseCv(file){
     if(!file) return
@@ -177,12 +195,33 @@ export default function Home(){
       </div>
 
       <div className="panel">
-        {active?(()=>{const {job,evaluation}=active; const score=Math.round(evaluation.score*10); return <>
-          <div className="panelTop"><div><span className="pill">{evaluation.verdict.toUpperCase()}</span><h2>{job.title}</h2><p>{job.company} · {job.location}</p><small className="sourceLine">Source: LinkedIn · {dateText(job.publishedAt)}</small></div><div className="bigScore">{score}%</div></div>
-          <div className="panelFacts"><span>{job.remoteType==='unknown'?'Work model unverified':job.remoteType}</span><span>{job.employmentType}</span><span>{salary(job)}</span></div>
-          <div className="section"><h3>Why this fits</h3>{evaluation.match.length?evaluation.match.map((x,n)=><p key={n}>✓ {x}</p>):<p>✓ No additional match detail returned</p>}</div>
-          <div className="section"><h3>Gap / unknown</h3>{evaluation.gaps.length?evaluation.gaps.map((x,n)=><p key={n}>⚠ {x}</p>):<p>✓ No material gap detected</p>}</div>
-          <div className="section"><h3>Score breakdown</h3><div className="breakdown"><span>Delivery <b>{evaluation.breakdown.responsibilitiesDelivery}</b></span><span>Experience/domain <b>{evaluation.breakdown.experienceDomain}</b></span><span>Geography <b>{evaluation.breakdown.geographyWorkModel}</b></span><span>Career/comp <b>{evaluation.breakdown.careerCompensation}</b></span></div></div>
+        {active?(()=>{const {job}=active; const expertise=expertiseState.jobKey===jobKey?expertiseState.analysis:null; return <>
+          <div className="panelTop expertiseHeader"><div><h2>{job.title}</h2><p>{job.company} · {job.location}</p><small className="sourceLine">Source: LinkedIn · {dateText(job.publishedAt)}</small></div></div>
+
+          <div className="expertiseHero">
+            <div className="expertiseHeroHead"><div><p className="eyebrow">EXPERTISE MATCH</p><p className="expertiseIntro">Full JD ↔ Source CV professional expertise only</p></div><div className="expertiseScore">{expertiseState.loading&&expertiseState.jobKey===jobKey?'…':expertise?`${expertise.expertiseMatch}%`:'N/A'}</div></div>
+            {expertiseState.loading&&expertiseState.jobKey===jobKey&&<div className="expertiseLoading">Analysing professional requirements and Source CV evidence…</div>}
+            {expertiseState.error&&expertiseState.jobKey===jobKey&&<div className="errorBox"><b>Expertise Match analysis failed safely</b><span>{expertiseState.error}</span></div>}
+            {expertise&&<>
+              <div className="expertiseSection"><h3>Why you fit</h3>{expertise.whyYouFit.length?expertise.whyYouFit.map((item,index)=><p key={index}>✓ {item}</p>):<p className="muted">No direct professional match evidence returned.</p>}</div>
+              <div className="expertiseSection"><h3>Expertise gaps</h3>{expertise.expertiseGaps.length?expertise.expertiseGaps.map((item,index)=><p key={index}>⚠ {item}</p>):<p>✓ No material expertise gap detected in the analysed requirements.</p>}</div>
+              <div className="expertiseSection"><h3>Expertise breakdown</h3><div className="expertiseBreakdown">
+                <div><span>Delivery / execution</span><b>{conditionScore(expertise.breakdown.delivery_execution?.score)}</b></div>
+                <div><span>Domain & functional expertise</span><b>{conditionScore(expertise.breakdown.domain_functional_expertise?.score)}</b></div>
+                <div><span>Technical / platform capabilities</span><b>{conditionScore(expertise.breakdown.technical_platform_capabilities?.score)}</b></div>
+                <div><span>Leadership & stakeholder scope</span><b>{conditionScore(expertise.breakdown.leadership_stakeholder_scope?.score)}</b></div>
+                <div><span>Required experience / qualifications</span><b>{conditionScore(expertise.breakdown.required_experience_qualifications?.score)}</b></div>
+              </div></div>
+            </>}
+          </div>
+
+          <div className="conditionGrid">
+            <div className="conditionCard"><small>Area</small><b>{conditionScore(jobConditions?.area.score)}</b><span>{jobConditions?.area.value||'Not stated'}</span></div>
+            <div className="conditionCard"><small>Salary</small><b>{conditionScore(jobConditions?.salary.score)}</b><span>{jobConditions?.salary.value||'Not stated'}</span></div>
+            <div className="conditionCard"><small>Employment type</small><b>{conditionScore(jobConditions?.employmentType.score)}</b><span>{jobConditions?.employmentType.value||'Not stated'}</span></div>
+            <div className="conditionCard"><small>Work model</small><b>{conditionScore(jobConditions?.workModel.score)}</b><span>{jobConditions?.workModel.value||'Not stated'}</span></div>
+          </div>
+
           <div className="section"><h3>Application pack</h3><div className="docs"><div>{pack.cvReady?'✓':'○'} Tailored CV <span className={pack.cvReady?'ready':'pending'}>{pack.tailoredCvLabel}</span></div><div>○ Cover letter <span className="pending">{pack.coverLetterLabel}</span></div></div></div>
           <div className="actions reviewActions">{pack.cvReady?<button className="primary" onClick={runJobAnalysis}>Review CV changes</button>:<button className="primary" onClick={startProfile}>Upload CV</button>}<a className="secondary openLink" href={job.originalUrl} target="_blank" rel="noreferrer">Open LinkedIn vacancy</a>{job.officialUrl&&<a className="secondary openLink" href={job.officialUrl} target="_blank" rel="noreferrer">Employer link</a>}</div>
         </>})():<div className="emptyPanel"><h2>No selected vacancy</h2><p>{state.loading?'Searching LinkedIn public pages…':'Run the LinkedIn search to see matching vacancies.'}</p></div>}
@@ -208,7 +247,7 @@ export default function Home(){
         {jdAnalysisState.jobKey!==jobKey?<div className="muted">Select Review CV changes to analyse this vacancy.</div>:jdAnalysisState.loading?<div className="jdLoading">Reading job description with OpenAI…</div>:jdAnalysisState.error?<div className="errorBox"><b>JD analysis failed safely</b><span>{jdAnalysisState.error}</span></div>:jdAnalysisState.analysis?<>
           <div className="jdGrid"><div><small>Role mission</small><p>{jdAnalysisState.analysis.roleMission}</p></div><div><small>Candidate positioning</small><p>{jdAnalysisState.analysis.candidatePositioning}</p></div></div>
           <div className="jdSection"><h3>Hiring priorities</h3>{jdAnalysisState.analysis.priorities.map(priority=><div className="jdPriority" key={priority.id}><div className="jdPriorityHead"><b>{priority.rank}. {priority.requirement}</b><span>{priority.kind.replace('_',' ')}</span></div><p>{priority.why}</p><small>JD evidence</small>{priority.jdEvidence.map((evidence,index)=><blockquote key={index}>{evidence}</blockquote>)}</div>)}</div>
-          <div className="jdSection"><h3>Must-haves</h3>{jdAnalysisState.analysis.priorities.filter(priority=>priority.kind==='must_have').length?jdAnalysisState.analysis.priorities.filter(priority=>priority.kind==='must_have').map(priority=><p key={priority.id}>✓ {priority.requirement}</p>):<p className="muted">No priority was classified as a hard must-have.</p>}</div>
+          <div className="jdSection"><h3>Must-haves</h3>{jdAnalysisState.analysis.mustHaves?.length?jdAnalysisState.analysis.mustHaves.map(mustHave=><div className="jdMustHave" key={mustHave.id}><p>✓ {mustHave.requirement}</p><small>JD evidence</small>{mustHave.jdEvidence.map((evidence,index)=><blockquote key={index}>{evidence}</blockquote>)}</div>):<p className="muted">No explicit candidate qualification gate was found in the JD.</p>}</div>
         </>:null}
       </div>
       <div className="reviewDashboard"><div><b>{proposedChanges.filter(change=>change.changed).length}</b><span>summary change proposed</span></div><div><b>0</b><span>bullets reordered · Step 2</span></div><div><b>{alignedTerms.length}</b><span>role terms already supported</span></div><div className="zeroClaims"><b>0</b><span>unsupported claims added</span></div></div>
