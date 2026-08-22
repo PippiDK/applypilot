@@ -287,31 +287,118 @@ function splitSummarySentences(summary=''){
   return sentences.map(sentence=>sentence.trim()).filter(Boolean)
 }
 
-function summarySentenceScore(sentence,item){
-  const lower=String(sentence).toLowerCase()
-  const terms=deriveReviewTerms(item)
-  let score=terms.reduce((total,term)=>total+(lower.includes(term.toLowerCase())?2:0),0)
-  if(/\b(senior|project manager|delivery manager|delivery lead|technical project)\b/i.test(sentence)) score+=1
-  return score
+function wordCount(text=''){
+  const value=cleanSource(text)
+  return value?value.split(/\s+/).length:0
 }
 
-function rankedSummaryRequirements(item,facts=[]){
-  const text=jobText(item)
-  const title=String(item?.job?.title||'')
+function sentenceRequirementIds(sentence,item){
   return extractJobRequirements(item)
-    .filter(req=>requirementSupported(req,facts))
-    .map((req,index)=>{
-      const titleHit=matchesAny(title,req.jd)?1000:0
-      const positions=req.jd.map(pattern=>{
-        const flags=pattern.flags.replace('g','')
-        const match=new RegExp(pattern.source,flags).exec(text)
-        return match?match.index:Number.POSITIVE_INFINITY
-      })
-      const first=Math.min(...positions)
-      return {req,index,priority:titleHit+(Number.isFinite(first)?Math.max(0,500-first):0)}
-    })
-    .sort((a,b)=>b.priority-a.priority||a.index-b.index)
-    .map(entry=>entry.req)
+    .filter(req=>matchesAny(sentence,req.evidence))
+    .map(req=>req.id)
+}
+
+function sentenceTermMatches(sentence,item){
+  return matchedTerms(sentence,deriveReviewTerms(item))
+}
+
+function isProfessionalIdentity(sentence=''){
+  return /\b(senior|lead|manager|consultant|director|head)\b/i.test(sentence)
+    && /\b(project|delivery|program|programme|technology|technical|IT)\b/i.test(sentence)
+}
+
+function identitySentenceIndex(sentences=[]){
+  const withYears=sentences.findIndex(sentence=>isProfessionalIdentity(sentence)&&/\b\d+\+?\s*years?\b/i.test(sentence))
+  if(withYears>=0) return withYears
+  const role=sentences.findIndex(sentence=>isProfessionalIdentity(sentence))
+  return role>=0?role:0
+}
+
+function isConcreteProof(sentence=''){
+  return /^\s*(most recently|previously)\b/i.test(sentence)
+    || /\bNGSP\b/i.test(sentence)
+    || /\b\d+\+?\s*(?:specialists?|people|countries)\b/i.test(sentence)
+}
+
+
+function summaryCandidate(sentence,index,item){
+  const requirements=sentenceRequirementIds(sentence,item)
+  const terms=sentenceTermMatches(sentence,item)
+  let score=requirements.length*5+terms.length*2
+  if(isConcreteProof(sentence)) score+=4
+  if(/^\s*(skilled|strong|experienced)\b/i.test(sentence)&&score>0) score+=2
+  if(/^\s*responsible for\b/i.test(sentence)) score-=1
+  if(/^\s*(known for|comfortable)\b/i.test(sentence)&&requirements.length===0) score-=2
+  return {sentence,index,requirements,terms,score,words:wordCount(sentence),proof:isConcreteProof(sentence)}
+}
+
+function combinations(values,minSize,maxSize){
+  const result=[]
+  function walk(start,picked){
+    if(picked.length>=minSize) result.push([...picked])
+    if(picked.length===maxSize) return
+    for(let i=start;i<values.length;i++){
+      picked.push(values[i])
+      walk(i+1,picked)
+      picked.pop()
+    }
+  }
+  walk(0,[])
+  return result
+}
+
+function comboScore(identity,candidates){
+  const requirements=new Set()
+  const terms=new Set()
+  let base=0
+  let duplicateRequirementHits=0
+  let proofCount=0
+  for(const candidate of candidates){
+    base+=candidate.score
+    if(candidate.proof) proofCount+=1
+    for(const req of candidate.requirements){
+      if(requirements.has(req)) duplicateRequirementHits+=1
+      requirements.add(req)
+    }
+    for(const term of candidate.terms) terms.add(term)
+  }
+  const words=wordCount(identity)+candidates.reduce((total,candidate)=>total+candidate.words,0)
+  const lengthBonus=words>=90?24-Math.abs(105-words)*0.35:-(90-words)*0.45
+  const extraSentencePenalty=Math.max(0,candidates.length-3)*8
+  return base+requirements.size*8+terms.size*2+Math.min(proofCount,1)*4-duplicateRequirementHits*2+lengthBonus-extraSentencePenalty
+}
+
+function selectTailoredSummarySentences(sentences,item){
+  if(!sentences.length) return []
+  const identityIndex=identitySentenceIndex(sentences)
+  const identity=sentences[identityIndex]
+  const candidates=sentences
+    .map((sentence,index)=>summaryCandidate(sentence,index,item))
+    .filter(candidate=>candidate.index!==identityIndex&&candidate.score>0)
+
+  if(!candidates.length) return [identity]
+
+  const requiresProof=candidates.some(candidate=>candidate.proof)
+  const withLengthLimit=combinations(candidates,Math.min(2,candidates.length),Math.min(4,candidates.length))
+    .filter(combo=>wordCount(identity)+combo.reduce((total,candidate)=>total+candidate.words,0)<=120)
+  const viable=requiresProof?withLengthLimit.filter(combo=>combo.some(candidate=>candidate.proof)):withLengthLimit
+
+  const fallback=combinations(candidates,1,Math.min(4,candidates.length))
+    .filter(combo=>wordCount(identity)+combo.reduce((total,candidate)=>total+candidate.words,0)<=120)
+  const proofFallback=requiresProof?fallback.filter(combo=>combo.some(candidate=>candidate.proof)):fallback
+  const pool=viable.length?viable:proofFallback.length?proofFallback:fallback
+
+  if(!pool.length) return [identity]
+
+  const best=[...pool].sort((a,b)=>comboScore(identity,b)-comboScore(identity,a))[0]
+  const ordered=[...best].sort((a,b)=>{
+    const aCapability=/^\s*(skilled|strong|experienced)\b/i.test(a.sentence)?1:0
+    const bCapability=/^\s*(skilled|strong|experienced)\b/i.test(b.sentence)?1:0
+    if(aCapability!==bCapability) return bCapability-aCapability
+    if(a.proof!==b.proof) return Number(b.proof)-Number(a.proof)
+    return b.score-a.score||a.index-b.index
+  })
+  return [identity,...ordered.map(candidate=>candidate.sentence)]
 }
 
 function naturalList(values=[]){
@@ -328,29 +415,20 @@ function buildSummaryReviewChanges(cvData,item){
   const sentences=splitSummarySentences(original)
   if(!sentences.length) return []
 
-  const ranked=sentences
-    .map((sentence,index)=>({sentence,index,score:summarySentenceScore(sentence,item)}))
-    .sort((a,b)=>b.score-a.score||a.index-b.index)
-    .map(entry=>entry.sentence)
-
-  const supportedRequirements=rankedSummaryRequirements(item,facts)
-  const phrases=supportedRequirements
-    .map(req=>SUMMARY_PHRASES[req.id])
-    .filter(Boolean)
-    .filter(phrase=>!new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i').test(original))
-    .slice(0,4)
-
-  const emphasis=phrases.length?`Relevant experience includes ${naturalList(phrases)}.`:''
-  const updatedParts=[...ranked]
-  if(emphasis) updatedParts.splice(Math.min(1,updatedParts.length),0,emphasis)
-  const updated=cleanSource(updatedParts.join(' '))
+  const selected=selectTailoredSummarySentences(sentences,item)
+  const updated=cleanSource(selected.join(' '))
   const normalizedOriginal=cleanSource(original)
   if(!updated||updated===normalizedOriginal) return []
 
-  const requirementLabels=supportedRequirements.slice(0,4).map(req=>req.label)
+  const selectedText=selected.join(' ')
+  const requirementLabels=extractJobRequirements(item)
+    .filter(req=>matchesAny(selectedText,req.evidence)&&requirementSupported(req,facts))
+    .map(req=>req.label)
+    .slice(0,4)
+
   const why=requirementLabels.length
-    ?`Rebalances the Summary toward this JD’s verified priorities: ${naturalList(requirementLabels)}. Every original Summary sentence is retained; unsupported JD claims are excluded.`
-    :'Reorders existing Summary sentences so the most role-relevant evidence appears first without adding new claims.'
+    ?`Shortens the Summary and foregrounds verified evidence most relevant to this JD: ${naturalList(requirementLabels)}. The tailored text uses only sentences already present in the Master Summary.`
+    :'Shortens the Summary by keeping the professional identity first and prioritising existing Master Summary evidence relevant to this role.'
 
   return [{
     id:'SUMMARY',
