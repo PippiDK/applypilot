@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import mammoth from 'mammoth'
+import { extractSummaryFromText } from '../../lib/profile-review.js'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -99,6 +100,7 @@ export async function POST(request){
       fileName:file.name,
       chars:text.length,
       cvText:text,
+      summary:extractSummaryFromText(text),
       facts,
       skills:inferSkills(text),
       preview:text.slice(0,1800)

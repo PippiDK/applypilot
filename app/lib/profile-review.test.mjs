@@ -7,7 +7,8 @@ import {
   resumeToProfile,
   deriveReviewTerms,
   buildReviewChanges,
-  applicationPackState
+  applicationPackState,
+  extractSummaryFromText
 } from './profile-review.js'
 
 test('mergeProfile fills missing v0.4 search-profile fields without changing saved values',()=>{
@@ -108,7 +109,7 @@ test('buildReviewChanges omits CV evidence when normalized original and updated 
 
 test('CV review shows a neutral empty state when there are no actual wording changes',()=>{
   const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
-  assert.match(source,/No CV changes proposed\./)
+  assert.match(source,/No Summary change proposed\./)
   assert.doesNotMatch(source,/No usable CV evidence was found for this review/)
 })
 
@@ -130,4 +131,114 @@ test('profile strip reports whether a Master CV is loaded without changing searc
   assert.match(source,/resumeLoaded\?'Profile ready':'Profile empty'/)
   assert.doesNotMatch(source,/profileReady\?'✓ Search profile saved':'Profile loaded'/)
   assert.match(source,/body:JSON\.stringify\(\{freshnessDays\}\)/)
+})
+
+test('Version 2 proposes a JD-specific safe rewrite when the Master CV already supports the requirement',()=>{
+  const facts=[{
+    id:'FACT-V2-001',
+    text:'Led full lifecycle delivery of a software platform across international engineering teams in Denmark, India and Poland, including release readiness for go-live and transition to operations.',
+    verified:true
+  }]
+  const item={job:{
+    title:'Integration Project Manager',
+    description:'Own end-to-end software delivery across distributed engineering teams, with release readiness and go-live accountability.'
+  }}
+  const changes=buildReviewChanges(facts,item)
+  assert.equal(changes.length,1)
+  assert.equal(changes[0].original,facts[0].text)
+  assert.match(changes[0].updated,/end-to-end lifecycle/i)
+  assert.match(changes[0].updated,/distributed international engineering teams/i)
+  assert.match(changes[0].updated,/release and go-live readiness/i)
+  assert.doesNotMatch(changes[0].updated,/go-live readiness for go-live/i)
+  assert.equal(changes[0].updated.includes('budget'),false)
+  assert.equal(changes[0].updated.includes('Azure'),false)
+  assert.match(changes[0].why,/End-to-end delivery|Distributed \/ international teams|Release readiness \/ go-live/i)
+})
+
+test('Version 2 Step 1.1 creates a recruiter-length Summary with professional identity first and no generated filler',()=>{
+  const cvData={
+    summary:'Senior IT Delivery Manager with 18+ years of experience leading complex cross-functional initiatives across enterprise and digital environments, including 7+ years driving end-to-end delivery ownership across global organisations. Proven track record of leading large-scale technology and platform initiatives from initial scope and roadmap definition through execution, release readiness, go-live, and transition into stable operations. Experienced in leading agile and hybrid delivery across distributed product and engineering teams, coordinating work across business, technology, QA, operations, and external stakeholders to deliver high-impact digital solutions aligned with strategic and customer needs. Strong in translating complex business objectives into structured and executable delivery plans while maintaining focus on collaboration, delivery momentum, transparency, and measurable outcomes. Skilled in managing cross-functional initiatives involving product development, platform evolution, integrations, data and reporting solutions, and operational improvements within complex international environments. Comfortable navigating ambiguity, aligning stakeholders, balancing priorities, removing blockers, and maintaining delivery progress across multiple streams and dependencies. Most recently, led the end-to-end delivery of the Next Generation Service Platform (NGSP), a large-scale enterprise platform programme delivered through Agile/Hybrid execution across international teams in Denmark, India, and Poland. Responsible for integrated planning, backlog and roadmap governance, stakeholder coordination, risk management, budget oversight, and executive communication throughout the full programme lifecycle. Previously delivered complex initiatives within Financial IT covering AML, regulatory reporting, data platforms, BI solutions, automation, and platform stability improvements. Known for structured execution, strong stakeholder management, proactive problem solving, and the ability to build alignment and drive delivery in fast-moving and cross-functional environments.',
+    facts:[
+      {id:'FACT-SUM-001',text:'Led end-to-end delivery of the Next Generation Service Platform through integration milestones, release, go-live and stable operations.',verified:true},
+      {id:'FACT-SUM-002',text:'Owned integrated planning, roadmap governance, stakeholder coordination, risk and dependency management and executive reporting.',verified:true},
+      {id:'FACT-SUM-003',text:'Led Agile/Hybrid delivery across international teams in Denmark, India and Poland.',verified:true}
+    ]
+  }
+  const item={job:{
+    title:'Integration Project Manager',
+    description:'Lead end-to-end delivery of systems integration, risk and dependency management, delivery governance and senior stakeholder coordination. Azure architecture experience is required.'
+  }}
+
+  const [change]=buildReviewChanges(cvData,item)
+  assert.equal(change.id,'SUMMARY')
+  assert.equal(change.type,'summary')
+  assert.ok(change.updated.startsWith('Senior IT Delivery Manager with 18+ years of experience'),change.updated)
+
+  const words=change.updated.trim().split(/\s+/).length
+  assert.ok(words>=90&&words<=120,`expected 90-120 words, got ${words}`)
+
+  const outputSentences=change.updated.match(/[^.!?]+[.!?]+|[^.!?]+$/g).map(x=>x.trim())
+  assert.ok(outputSentences.length>=3&&outputSentences.length<=5,`expected 3-5 sentences, got ${outputSentences.length}`)
+  assert.match(change.updated,/integrations|integration/i)
+  assert.match(change.updated,/Next Generation Service Platform|NGSP/i)
+  assert.doesNotMatch(change.updated,/Relevant experience includes/i)
+  assert.doesNotMatch(change.updated,/Azure/i)
+  assert.doesNotMatch(change.updated,/Comfortable navigating ambiguity/i)
+
+  const originalSentences=cvData.summary.match(/[^.!?]+[.!?]+|[^.!?]+$/g).map(x=>x.trim())
+  for(const sentence of outputSentences){
+    assert.ok(originalSentences.includes(sentence),`generated sentence not present in Master Summary: ${sentence}`)
+  }
+})
+
+test('Version 2 Step 1.1 de-emphasises less relevant Summary content instead of retaining every sentence',()=>{
+  const cvData={
+    summary:'Senior IT Project Manager with 18+ years of enterprise technology experience and 7+ years of end-to-end delivery ownership. Led enterprise platform integrations across international teams with risk and dependency management. Experienced in delivery governance, senior stakeholder coordination, release readiness and go-live. Previously worked with regulatory reporting and compliance initiatives in Financial IT. HBS Leadership certified with broad organisational leadership training. Earlier career included extensive quality assurance and test management responsibilities across financial systems.',
+    facts:[
+      {id:'FACT-SUM-004',text:'Led enterprise platform integrations across international teams with risk and dependency management.',verified:true},
+      {id:'FACT-SUM-005',text:'Managed delivery governance, senior stakeholder coordination, release readiness and go-live.',verified:true}
+    ]
+  }
+  const item={job:{title:'Integration Project Manager',description:'Own platform integration, dependencies, governance, release and stakeholder delivery.'}}
+
+  const [change]=buildReviewChanges(cvData,item)
+  assert.ok(change.updated.startsWith('Senior IT Project Manager with 18+ years'))
+  assert.match(change.updated,/platform integrations/i)
+  assert.match(change.updated,/delivery governance/i)
+  assert.doesNotMatch(change.updated,/HBS Leadership certified/i)
+  assert.doesNotMatch(change.updated,/Earlier career included extensive quality assurance/i)
+})
+
+test('Version 2 Step 1 can read the Master CV summary from a complete saved preview',()=>{
+  const preview='Yulia Example\nSenior IT Project & Delivery Manager\nPROFESSIONAL SUMMARY\nSenior IT delivery leader with enterprise software experience. Strong stakeholder governance across international teams.\nPROFESSIONAL EXPERIENCE\nSenior Project Manager | Example A/S | 2022–2026'
+  const summary=extractSummaryFromText(preview)
+  assert.equal(summary,'Senior IT delivery leader with enterprise software experience. Strong stakeholder governance across international teams.')
+  assert.doesNotMatch(summary,/PROFESSIONAL EXPERIENCE/i)
+})
+
+test('Version 2 Step 1 UI reviews the Summary only and leaves bullet reordering for Step 2',()=>{
+  const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+  assert.match(source,/buildReviewChanges\(cvData,active\)/)
+  assert.doesNotMatch(source,/buildReviewChanges\(reviewFacts,active\)/)
+  assert.match(source,/summary change proposed/)
+  assert.match(source,/Tailored Summary/)
+  assert.match(source,/Step 1 updates Summary only/)
+  assert.match(source,/bullets reordered · Step 2/)
+})
+
+
+test('Version 2 Step 1 stops Professional Summary extraction before Core Competences',()=>{
+  const preview='YULIA BJØRNBERG\nSenior IT Project / Delivery Manager\nProfessional Summary\nSenior IT Project and Delivery Manager with 18+ years of experience in regulated enterprise environments.\nExperienced in PMO collaboration, governance and stakeholder management.\nCore Competences\nEnd-to-End Project Delivery • Project Governance • Risk & Dependency Management'
+  const summary=extractSummaryFromText(preview)
+  assert.equal(summary,'Senior IT Project and Delivery Manager with 18+ years of experience in regulated enterprise environments. Experienced in PMO collaboration, governance and stakeholder management.')
+  assert.doesNotMatch(summary,/Core Competences|Risk & Dependency Management/)
+})
+
+test('Version 2 Step 1 refuses a truncated legacy preview instead of tailoring a partial Summary',()=>{
+  const cvData={
+    preview:'YULIA BJØRNBERG\nProfessional Summary\nSenior IT Project and Delivery Manager with 18+ years of experience. Experienced in governance and end-to-end delivery but this preview is cut before the next CV section',
+    facts:[{id:'FACT-SUM-005',text:'Led end-to-end delivery with governance.',verified:true}]
+  }
+  const item={job:{title:'Delivery Manager',description:'End-to-end delivery and governance.'}}
+  assert.deepEqual(buildReviewChanges(cvData,item),[])
 })
