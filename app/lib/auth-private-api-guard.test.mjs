@@ -35,3 +35,12 @@ test('shared guard returns a uniform 401 when no authenticated user exists',asyn
   assert.match(source,/Unauthorized/)
   assert.match(source,/auth\.getUser\(\)/)
 })
+
+test('shared guard exposes normalized role and an admin-only guard',async()=>{
+  const source=await readFile(new URL('./auth/require-user.js',import.meta.url),'utf8')
+  assert.match(source,/getUserRole/)
+  assert.match(source,/role\s*:\s*getUserRole\(user\)/)
+  assert.match(source,/export async function requireAdmin/)
+  assert.match(source,/status\s*:\s*403/)
+  assert.match(source,/Forbidden/)
+})

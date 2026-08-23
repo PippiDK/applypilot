@@ -22,3 +22,8 @@ export function normalizeOtpType(value){
   const type=String(value??'').trim()
   return type==='email'||type==='invite'?type:null
 }
+
+export function getUserRole(user){
+  if(!user) return null
+  return user?.app_metadata?.applypilot_role==='admin'?'admin':'user'
+}

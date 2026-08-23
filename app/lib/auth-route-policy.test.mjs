@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import * as policy from './auth/route-policy.js'
 import {
   isApiPath,
   isPublicPagePath,
@@ -22,3 +23,18 @@ test('backslash redirect is rejected',()=>assert.equal(sanitizeNextPath('/\\evil
 test('email OTP type is accepted',()=>assert.equal(normalizeOtpType('email'),'email'))
 test('invite OTP type is accepted',()=>assert.equal(normalizeOtpType('invite'),'invite'))
 test('unsupported OTP type is rejected',()=>assert.equal(normalizeOtpType('recovery'),null))
+
+
+test('role policy exposes a server-safe ApplyPilot role resolver',()=>{
+  assert.equal(typeof policy.getUserRole,'function')
+})
+
+test('role policy recognizes admin only from protected app_metadata',()=>{
+  assert.equal(policy.getUserRole({app_metadata:{applypilot_role:'admin'}}),'admin')
+})
+
+test('role policy fails closed and never trusts user-editable metadata',()=>{
+  assert.equal(policy.getUserRole(null),null)
+  assert.equal(policy.getUserRole({user_metadata:{applypilot_role:'admin'}}),'user')
+  assert.equal(policy.getUserRole({app_metadata:{applypilot_role:'owner'}}),'user')
+})
