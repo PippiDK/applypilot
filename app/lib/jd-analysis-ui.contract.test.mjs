@@ -21,3 +21,9 @@ test('pretest review renders JD mission, priorities, must-haves and positioning'
 test('pretest labels the old Summary mechanism as legacy so it is not mistaken for Task 3 output',()=>{
   assert.match(source,/Legacy Summary preview · not Task 3/)
 })
+
+
+test('Must-haves render from the dedicated analysis.mustHaves qualification list, not priority labels',()=>{
+  assert.match(source,/analysis\.mustHaves/)
+  assert.doesNotMatch(source,/priorities\.filter\(priority=>priority\.kind===['"]must_have['"]\)/)
+})

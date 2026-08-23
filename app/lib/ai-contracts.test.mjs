@@ -11,6 +11,10 @@ const validAnalysis={
     {id:'P2',rank:2,kind:'must_have',requirement:'Manage senior stakeholders',why:'Executive alignment',jdEvidence:['Manage senior stakeholders and communicate delivery risks clearly.']},
     {id:'P3',rank:3,kind:'supporting',requirement:'Coordinate integrations',why:'Technical dependency management',jdEvidence:['Coordinate integrations and cross-team dependencies.']}
   ],
+  mustHaves:[
+    {id:'M1',requirement:'5+ years leading complex cross-functional technology initiatives',jdEvidence:['Minimum 5 years leading complex cross-functional technology initiatives.']},
+    {id:'M2',requirement:'Experience with senior executive stakeholders',jdEvidence:['Demonstrated experience partnering with senior executives.']}
+  ],
   gapsToAvoid:['Do not assume ERP ownership.']
 }
 
@@ -39,4 +43,21 @@ test('requires exact JD evidence for every priority',async()=>{
   const broken=structuredClone(validAnalysis)
   broken.priorities[1].jdEvidence=[]
   assert.throws(()=>validateJobAnalysis(broken),/JD evidence/i)
+})
+
+
+test('requires an explicit mustHaves array separate from hiring priorities',async()=>{
+  const {validateJobAnalysis}=await load()
+  assert.equal(typeof validateJobAnalysis,'function')
+  const broken=structuredClone(validAnalysis)
+  delete broken.mustHaves
+  assert.throws(()=>validateJobAnalysis(broken),/must-haves/i)
+})
+
+test('must-haves use their own qualification requirements and JD evidence',async()=>{
+  const {validateJobAnalysis}=await load()
+  assert.equal(typeof validateJobAnalysis,'function')
+  const broken=structuredClone(validAnalysis)
+  broken.mustHaves=[{id:'M1',requirement:'',jdEvidence:[]}]
+  assert.throws(()=>validateJobAnalysis(broken),/must-have/i)
 })

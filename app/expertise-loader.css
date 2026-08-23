@@ -1,0 +1,30 @@
+/* Expertise Match loading indicator: animate the existing ellipsis as a three-dot wave.
+   Scoped to the loading state only; completed percentage scores are untouched. */
+.expertiseHero:has(.expertiseLoading) .expertiseScore{
+  width:56px;
+  height:20px;
+  margin-top:4px;
+  font-size:0;
+  line-height:0;
+  color:transparent;
+  background:
+    radial-gradient(circle,#7ee2b8 0 5px,transparent 5.5px) 0 9px/11px 11px no-repeat,
+    radial-gradient(circle,#7ee2b8 0 5px,transparent 5.5px) 22px 9px/11px 11px no-repeat,
+    radial-gradient(circle,#7ee2b8 0 5px,transparent 5.5px) 44px 9px/11px 11px no-repeat;
+  animation:expertiseDotsWave 1.15s ease-in-out infinite;
+}
+
+@keyframes expertiseDotsWave{
+  0%,70%,100%{background-position:0 9px,22px 9px,44px 9px}
+  14%{background-position:0 0,22px 9px,44px 9px}
+  28%{background-position:0 9px,22px 0,44px 9px}
+  42%{background-position:0 9px,22px 9px,44px 0}
+  56%{background-position:0 9px,22px 9px,44px 9px}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .expertiseHero:has(.expertiseLoading) .expertiseScore{
+    animation:none;
+    background-position:0 9px,22px 9px,44px 9px;
+  }
+}
