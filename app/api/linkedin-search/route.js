@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
 import { searchLinkedIn } from '../../lib/linkedin-search.js'
+import { requireUser } from '../../lib/auth/require-user.js'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 export async function POST(request){
+  const auth=await requireUser()
+  if(!auth.user) return auth.response
+
   try{
     const body=await request.json().catch(()=>({}))
     const freshnessDays=[1,3,7,14].includes(Number(body?.freshnessDays))?Number(body.freshnessDays):7

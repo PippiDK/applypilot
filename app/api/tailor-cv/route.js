@@ -2,16 +2,22 @@ import {createHash} from 'node:crypto'
 import {NextResponse} from 'next/server'
 import {analyzeJob} from '../../lib/tailoring-pipeline.js'
 import {deriveTailoringSecret,signTailoringToken} from '../../lib/tailoring-token.js'
+import {requireUser} from '../../lib/auth/require-user.js'
 
 export const dynamic='force-dynamic'
 const text=value=>String(value??'').trim()
 const hash=value=>`sha256:${createHash('sha256').update(String(value??'').normalize('NFKC').replace(/\s+/g,' ').trim()).digest('hex')}`
 
 export async function GET(){
+  const auth=await requireUser()
+  if(!auth.user) return auth.response
   return NextResponse.json({error:'Retired in ApplyPilot v1.0. LinkedIn-only milestone is active.'},{status:410})
 }
 
 export async function POST(request){
+  const auth=await requireUser()
+  if(!auth.user) return auth.response
+
   try{
     const body=await request.json()
     if(body?.action !== 'analyze_job') return NextResponse.json({error:'Unsupported tailoring action.'},{status:400})
