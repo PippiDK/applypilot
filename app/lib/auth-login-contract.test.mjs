@@ -7,8 +7,8 @@ const page=()=>readFile(new URL('../login/page.js',import.meta.url),'utf8')
 
 test('login is passwordless email-only UI',async()=>{
   const source=await form()
-  assert.match(source,/type="email"/)
-  assert.doesNotMatch(source,/type="password"/)
+  assert.match(source,/type=\"email\"/)
+  assert.doesNotMatch(source,/type=\"password\"/)
 })
 
 test('magic-link request forbids automatic user creation',async()=>{
@@ -16,9 +16,9 @@ test('magic-link request forbids automatic user creation',async()=>{
   assert.match(source,/shouldCreateUser\s*:\s*false/)
 })
 
-test('magic-link request carries current origin as redirect target',async()=>{
+test('magic-link request uses the auth confirm route on the current deployment',async()=>{
   const source=await form()
-  assert.match(source,/emailRedirectTo\s*:\s*window\.location\.origin/)
+  assert.match(source,/emailRedirectTo\s*:\s*`\$\{window\.location\.origin\}\/auth\/confirm`/)
 })
 
 test('login response copy does not reveal whether email exists',async()=>{
