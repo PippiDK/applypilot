@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import mammoth from 'mammoth'
 import { createHash } from 'node:crypto'
 import { extractSummaryFromText } from '../../lib/profile-review.js'
+import { requireUser } from '../../lib/auth/require-user.js'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -64,6 +65,9 @@ function inferSkills(text='') {
 }
 
 export async function POST(request){
+  const auth=await requireUser()
+  if(!auth.user) return auth.response
+
   try{
     const form = await request.formData()
     const file = form.get('file')

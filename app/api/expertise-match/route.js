@@ -1,5 +1,6 @@
 import {NextResponse} from 'next/server'
 import {analyzeExpertiseMatch} from '../../lib/expertise-service.js'
+import {requireUser} from '../../lib/auth/require-user.js'
 
 export const dynamic='force-dynamic'
 const text=value=>String(value??'').trim()
@@ -15,6 +16,9 @@ function safeExpertiseError(error){
 }
 
 export async function POST(request){
+  const auth=await requireUser()
+  if(!auth.user) return auth.response
+
   try{
     const body=await request.json()
     const job={
