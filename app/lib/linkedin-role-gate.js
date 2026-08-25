@@ -53,7 +53,6 @@ const TECH_SCOPE_CATEGORIES={
   ai_delivery:/\bai (?:strategy|transformation|implementation|platform|programme|program|delivery)\b/i,
 }
 
-
 const ENTERPRISE_IT_ANCHORS={
   org_it:/\b(?:enterprise|corporate|group) it\b|\binformation technology\b|\bit organisation\b|\bit organization\b/i,
   enterprise_apps:/\benterprise applications?\b|\bbusiness applications?\b|\bbusiness systems?\b|\benterprise systems?\b/i,
@@ -70,12 +69,16 @@ const NON_ENTERPRISE_DOMAIN_CATEGORIES={
   industrial_delivery:/\b(?:manufacturing line|plant equipment|mechanical|electrical equipment|industrial equipment|fabrication|procurement of equipment)\b/i,
 }
 
-
 const PRIMARY_ENTERPRISE_DELIVERY_OBJECT_PATTERNS=[
   /\b(?:deliver|delivery of|implement|implementation of|migrate|migration of|replace|moderni[sz]e|transform|roll out|rollout|deploy|upgrade)\b.{0,90}\b(?:enterprise software|software platform|enterprise applications?|business applications?|business systems?|it systems?|technology platform|data platform|cloud platform|digital platform|it infrastructure|cloud infrastructure|network infrastructure|cloud services?|workplace platforms?)\b/i,
   /\b(?:enterprise software|software platform|enterprise applications?|business applications?|business systems?|it systems?|technology platform|data platform|cloud platform|digital platform|it infrastructure|cloud infrastructure|network infrastructure|cloud services?|workplace platforms?)\b.{0,90}\b(?:delivery|implementation|migration|transformation|rollout|deployment|cutover|go[- ]live|project|programme|program)\b/i,
   /\b(?:group it|corporate it|enterprise it|information technology)\b.{0,120}\b(?:deliver|delivery|implementation|migration|platform|applications?|systems?|infrastructure|services?)\b/i,
 ]
+
+const HARD_NON_IT_DELIVERY_OBJECT_CATEGORIES={
+  built_environment:/\b(?:built environment|building permitting|construction programme|construction program|civil(?:\s*\/|,)?\s*structural|architectural(?:\s*\/|,)?\s*mechanical|mechanical(?:\s*\/|,)?\s*electrical|facility delivery|completed facility|data cent(?:er|re) projects?)\b/i,
+  plant_equipment:/\bplant\s*(?:&|and)\s*equipment solutions?\b|\bmajor equipment(?: deliveries?)?\b|\bprocess[- ]line deliveries\b|\b(?:eps|epc) projects?\b|\bplant engineering\b|\bindustrial equipment\b|\bcomplete plant solutions?\b/i,
+}
 
 const PRIMARY_PHYSICAL_DELIVERY_OBJECT_PATTERNS=[
   /\b(?:deliver|delivery of|customer acceptance of|handover of)\b.{0,100}\b(?:wildlife monitoring systems?|bird monitoring systems?|monitoring systems?|sensor systems?|hardware(?: and software)? integrated systems?|industrial equipment|plant equipment|production equipment|manufacturing lines?|physical products?|facilit(?:y|ies)|buildings?|data cent(?:er|re) projects?|industrial projects?)\b/i,
@@ -92,10 +95,14 @@ function matchedPatterns(value,patterns){
 function primaryDeliveryObjectDecision(text){
   const enterprise=matchedPatterns(text,PRIMARY_ENTERPRISE_DELIVERY_OBJECT_PATTERNS)
   const physical=matchedPatterns(text,PRIMARY_PHYSICAL_DELIVERY_OBJECT_PATTERNS)
-  if(physical>=2 && enterprise===0){
-    return {pass:false,enterprise,physical,reason:'Primary delivery object is physical / field / industrial rather than enterprise IT'}
+  const hardNonIt=matchedCategories(text,HARD_NON_IT_DELIVERY_OBJECT_CATEGORIES)
+  if(hardNonIt.length>0 && enterprise===0){
+    return {pass:false,enterprise,physical,hardNonIt,reason:'Primary delivery object is construction / facility / plant / equipment rather than enterprise IT'}
   }
-  return {pass:true,enterprise,physical,reason:null}
+  if(physical>=2 && enterprise===0){
+    return {pass:false,enterprise,physical,hardNonIt,reason:'Primary delivery object is physical / field / industrial rather than enterprise IT'}
+  }
+  return {pass:true,enterprise,physical,hardNonIt,reason:null}
 }
 
 const DELIVERY_CATEGORIES={
