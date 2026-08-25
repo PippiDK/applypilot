@@ -28,7 +28,7 @@ const NON_TARGET_TITLE_RULES=[
 
 const TARGET_TITLE_RULES=[
   /\bproject manager\b/i,
-  /\bprojektleder\b/i,
+  /\bprojektledere?\b/i,
   /\bproject lead\b/i,
   /\bdelivery manager\b/i,
   /\bdelivery lead\b/i,
@@ -187,13 +187,7 @@ export function roleGate(job={}){
     if(nonEnterpriseDomains.length>=2 && enterpriseAnchors.length===0){
       return {pass:false,reason:'Project title is anchored in a non-enterprise physical/scientific/industrial delivery domain rather than enterprise IT',titleKind:'target',techSignals:tech.length,deliverySignals:delivery.length}
     }
-    if(tech.length<1){
-      return {pass:false,reason:'Target title lacks verified enterprise IT / software / digital technology scope in the JD',titleKind:'target',techSignals:tech.length,deliverySignals:delivery.length}
-    }
-    if(delivery.length<2){
-      return {pass:false,reason:'Target title lacks enough project/delivery ownership evidence in the JD',titleKind:'target',techSignals:tech.length,deliverySignals:delivery.length}
-    }
-    return {pass:true,reason:'Target project/delivery title with verified technology delivery scope',titleKind:'target',techSignals:tech.length,deliverySignals:delivery.length}
+    return {pass:true,reason:tech.length>0?'Target project/delivery title with verified technology delivery scope':'Target project/delivery title is deferred to evaluation; domain and evidence strength are handled by scoring/hard exclusions',titleKind:'target',techSignals:tech.length,deliverySignals:delivery.length}
   }
 
   if(tech.length<2 || delivery.length<3 || !hasLifecycleOrOwnership){
