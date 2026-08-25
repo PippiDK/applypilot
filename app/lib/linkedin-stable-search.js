@@ -39,9 +39,9 @@ export async function searchLinkedInStable({freshnessDays=7,resume,fetcher,now=n
   const discoveryPlan=buildDiscoveryPlan(DISCOVERY_QUERIES,freshnessDays)
   const diagnostics={searchRequests:0,searchFailures:0,searchRows:0,detailRequests:0,detailFailures:0,incompleteDetails:0}
 
-  const searchResults=await mapLimit(discoveryPlan,5,async ({query,seconds})=>{
+  const searchResults=await mapLimit(discoveryPlan,5,async ({query,seconds,start})=>{
     diagnostics.searchRequests++
-    const qs=new URLSearchParams({keywords:query,location:'Denmark',f_TPR:`r${seconds}`,sortBy:'DD',start:'0'})
+    const qs=new URLSearchParams({keywords:query,location:'Denmark',f_TPR:`r${seconds}`,sortBy:'DD',start:String(start)})
     const html=await stableFetcher(`${LINKEDIN_SEARCH}?${qs}`)
     return parseSearchHtml(html)
   })
