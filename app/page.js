@@ -4,6 +4,7 @@ import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveRe
 import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'
 import {requestJobAnalysis} from './lib/jd-analysis-client.js'
 import {requestExpertiseMatch} from './lib/expertise-match-client.js'
+import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'
 import {evaluateJobConditions} from './lib/job-conditions.js'
 import SearchAudit from './components/search-audit.js'
 
@@ -70,12 +71,8 @@ export default function Home(){
   useEffect(()=>{
     if(!active||!resumeLoaded){ setExpertiseState({loading:false,error:'',analysis:null,jobKey:''}); return }
     const runKey=active.job.sourceJobId||`${active.job.title}|${active.job.company}`
-    let stale=false
-    setExpertiseState({loading:true,error:'',analysis:null,jobKey:runKey})
-    requestExpertiseMatch({job:active.job,cvText:cvData.cvText})
-      .then(analysis=>{if(!stale)setExpertiseState({loading:false,error:'',analysis,jobKey:runKey})})
-      .catch(error=>{if(!stale)setExpertiseState({loading:false,error:error.message||'Expertise Match analysis failed safely. Please try again.',analysis:null,jobKey:runKey})})
-    return ()=>{stale=true}
+    const cached=readExpertiseMatchCache({storage:localStorage,jobId:active.job.sourceJobId,sourceVersion:cvData?.sourceVersion})
+    setExpertiseState({loading:false,error:'',analysis:cached,jobKey:runKey})
   },[jobKey,resumeLoaded,cvData?.sourceVersion])
 
   async function parseCv(file){
@@ -142,6 +139,25 @@ export default function Home(){
     setProfileStep(1)
   }
 
+  async function runExpertiseMatch(){
+    if(!active||!resumeLoaded) return
+    const runKey=active.job.sourceJobId||`${active.job.title}|${active.job.company}`
+    const cacheArgs={storage:localStorage,jobId:active.job.sourceJobId,sourceVersion:cvData?.sourceVersion}
+    const cached=readExpertiseMatchCache(cacheArgs)
+    if(cached){
+      setExpertiseState({loading:false,error:'',analysis:cached,jobKey:runKey})
+      return
+    }
+    setExpertiseState({loading:true,error:'',analysis:null,jobKey:runKey})
+    try{
+      const analysis=await requestExpertiseMatch({job:active.job,cvText:cvData.cvText})
+      writeExpertiseMatchCache({...cacheArgs,analysis})
+      setExpertiseState({loading:false,error:'',analysis,jobKey:runKey})
+    }catch(error){
+      setExpertiseState({loading:false,error:error.message||'Expertise Match analysis failed safely. Please try again.',analysis:null,jobKey:runKey})
+    }
+  }
+
   async function runJobAnalysis(){
     if(!active||!resumeLoaded) return
     const runKey=active.job.sourceJobId||`${active.job.title}|${active.job.company}`
@@ -204,6 +220,7 @@ export default function Home(){
             <div className="expertiseHeroHead"><div><p className="eyebrow">EXPERTISE MATCH</p><p className="expertiseIntro">Full JD ↔ Source CV professional expertise only</p></div><div className="expertiseScore">{expertiseState.loading&&expertiseState.jobKey===jobKey?'…':expertise?`${expertise.expertiseMatch}%`:'N/A'}</div></div>
             {expertiseState.loading&&expertiseState.jobKey===jobKey&&<div className="expertiseLoading">Analysing professional requirements and Source CV evidence…</div>}
             {expertiseState.error&&expertiseState.jobKey===jobKey&&<div className="errorBox"><b>Expertise Match analysis failed safely</b><span>{expertiseState.error}</span></div>}
+            {!expertise&&!expertiseState.loading&&<button className="primary" onClick={runExpertiseMatch}>Run Expertise Match</button>}
             {expertise&&<>
               <div className="expertiseSection"><h3>Why you fit</h3>{expertise.whyYouFit.length?expertise.whyYouFit.map((item,index)=><p key={index}>✓ {item}</p>):<p className="muted">No direct professional match evidence returned.</p>}</div>
               <div className="expertiseSection"><h3>Expertise gaps</h3>{expertise.expertiseGaps.length?expertise.expertiseGaps.map((item,index)=><p key={index}>⚠ {item}</p>):<p>✓ No material expertise gap detected in the analysed requirements.</p>}</div>
