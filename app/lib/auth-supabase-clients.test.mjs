@@ -42,3 +42,21 @@ test('server cookie adapter safely tolerates read-only cookie stores', async()=>
   const cookieStore={getAll:()=>[],set:()=>{throw new Error('read only')}}
   assert.doesNotThrow(()=>createServerCookieAdapter(cookieStore).setAll([{name:'a',value:'1',options:{}}]))
 })
+
+test('Supabase public config uses static NEXT_PUBLIC env references for client bundling', async()=>{
+  const source=await read('./supabase/config.js')
+  assert.match(source,/process\.env\.NEXT_PUBLIC_SUPABASE_URL/)
+  assert.match(source,/process\.env\.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY/)
+  assert.doesNotMatch(source,/env\s*=\s*process\.env/)
+})
+
+test('Supabase config keeps explicit env injection for server-side tests and callers', async()=>{
+  const {getSupabaseConfig}=await import('./supabase/config.js')
+  assert.deepEqual(getSupabaseConfig({
+    NEXT_PUBLIC_SUPABASE_URL:' https://example.supabase.co ',
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:' test-key '
+  }),{
+    url:'https://example.supabase.co',
+    publishableKey:'test-key'
+  })
+})
