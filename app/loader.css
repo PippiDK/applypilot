@@ -49,3 +49,47 @@
   .jdLoading::before,
   .jdLoading::after{animation-duration:2.8s}
 }
+
+/* LinkedIn search — reuse the same double mint orbit while the search button is disabled. */
+main:has(.controls .primary:disabled) .list .empty{
+  position:relative;
+  padding:72px 16px 24px;
+  text-align:center;
+}
+
+main:has(.controls .primary:disabled) .list .empty::before,
+main:has(.controls .primary:disabled) .list .empty::after{
+  content:'';
+  position:absolute;
+  border-radius:50%;
+  pointer-events:none;
+}
+
+main:has(.controls .primary:disabled) .list .empty::before{
+  width:44px;
+  height:44px;
+  top:10px;
+  left:calc(50% - 22px);
+  border:2px solid rgba(126,226,184,.16);
+  border-top-color:#7ee2b8;
+  border-right-color:rgba(126,226,184,.62);
+  box-shadow:0 0 18px rgba(126,226,184,.16);
+  animation:orbitSpin 1.05s linear infinite;
+}
+
+main:has(.controls .primary:disabled) .list .empty::after{
+  width:26px;
+  height:26px;
+  top:19px;
+  left:calc(50% - 13px);
+  border:1.5px solid rgba(126,226,184,.12);
+  border-left-color:#7ee2b8;
+  border-bottom-color:rgba(126,226,184,.48);
+  box-shadow:inset 0 0 10px rgba(126,226,184,.08);
+  animation:orbitSpinReverse .72s linear infinite;
+}
+
+@media (prefers-reduced-motion:reduce){
+  main:has(.controls .primary:disabled) .list .empty::before,
+  main:has(.controls .primary:disabled) .list .empty::after{animation-duration:2.8s}
+}
