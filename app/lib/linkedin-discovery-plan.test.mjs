@@ -4,25 +4,22 @@ import { readFile } from 'node:fs/promises'
 
 const stableSearchUrl=new URL('./linkedin-stable-search.js',import.meta.url)
 
-test('14-day discovery plan is a structural superset of the 7-day plan including deep-page offsets',async()=>{
-  const {buildDiscoveryPlan}=await import('./linkedin-discovery-plan.js')
-  const queries=['Delivery Manager','Technical Project Manager']
-  const seven=buildDiscoveryPlan(queries,7)
-  const fourteen=buildDiscoveryPlan(queries,14)
-  const keys=items=>new Set(items.map(item=>`${item.days}|${item.start}|${item.query}`))
-  const fourteenKeys=keys(fourteen)
-  for(const key of keys(seven)) assert.ok(fourteenKeys.has(key),`14-day plan missing ${key}`)
-  assert.deepEqual([...new Set(seven.map(item=>item.days))],[1,3,7])
-  assert.deepEqual([...new Set(fourteen.map(item=>item.days))],[1,3,7,14])
-  assert.deepEqual([...new Set(seven.filter(item=>item.days===7).map(item=>item.start))],[0,25])
-  assert.deepEqual([...new Set(fourteen.filter(item=>item.days===14).map(item=>item.start))],[0,25])
+test('14-day discovery strategy contains repeated 7-day collection plus a 14-day extension',async()=>{
+  const {buildDiscoveryPasses}=await import('./linkedin-discovery-plan.js')
+  const passes=buildDiscoveryPasses(14)
+  const recent=passes.filter(item=>item.group==='7d')
+  const extension=passes.filter(item=>item.group==='14d')
+
+  assert.equal(recent.length,2)
+  assert.deepEqual(recent.map(item=>item.days),[7,7])
+  assert.equal(extension.length,1)
+  assert.equal(extension[0].days,14)
 })
 
-test('stable search uses cumulative windows and the discovery-plan page offset',async()=>{
+test('stable search uses repeated discovery passes and unions job IDs before detail fetches',async()=>{
   const source=await readFile(stableSearchUrl,'utf8')
-  assert.match(source,/buildDiscoveryPlan/)
-  assert.match(source,/const discoveryPlan\s*=\s*buildDiscoveryPlan\(DISCOVERY_QUERIES,freshnessDays\)/)
-  assert.match(source,/mapLimit\(discoveryPlan,5,async \(\{query,seconds,start\}\)=>/)
-  assert.match(source,/start:String\(start\)/)
-  assert.doesNotMatch(source,/start:'0'/)
+  assert.match(source,/buildDiscoveryPasses/)
+  assert.match(source,/collectDiscoveryPasses/)
+  assert.match(source,/const rows=discovery\.rows/)
+  assert.match(source,/const unique=\[\.\.\.byId\.values\(\)\]/)
 })

@@ -6,7 +6,8 @@ import {
   evaluateJob,
 } from './linkedin-search.js'
 import { createLinkedInStableFetcher } from './linkedin-stable-fetcher.js'
-import { buildDiscoveryPlan } from './linkedin-discovery-plan.js'
+import { buildDiscoveryPasses } from './linkedin-discovery-plan.js'
+import { collectDiscoveryPasses } from './linkedin-discovery-stabilizer.js'
 
 const LINKEDIN_SEARCH='https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search'
 const LINKEDIN_JOB_DETAIL='https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/'
@@ -36,27 +37,29 @@ export async function searchLinkedInStable({freshnessDays=7,resume,fetcher,now=n
   if(sourceCv.length<100) throw new Error('Source CV text is required for LinkedIn evaluation.')
 
   const stableFetcher=fetcher||createLinkedInStableFetcher()
-  const discoveryPlan=buildDiscoveryPlan(DISCOVERY_QUERIES,freshnessDays)
-  const diagnostics={searchRequests:0,searchFailures:0,searchRows:0,detailRequests:0,detailFailures:0,incompleteDetails:0}
-
-  const searchResults=await mapLimit(discoveryPlan,5,async ({query,seconds,start})=>{
-    diagnostics.searchRequests++
-    const qs=new URLSearchParams({keywords:query,location:'Denmark',f_TPR:`r${seconds}`,sortBy:'DD',start:String(start)})
-    const html=await stableFetcher(`${LINKEDIN_SEARCH}?${qs}`)
-    return parseSearchHtml(html)
+  const discoveryPasses=buildDiscoveryPasses(freshnessDays)
+  const discovery=await collectDiscoveryPasses({
+    queries:DISCOVERY_QUERIES,
+    passes:discoveryPasses,
+    fetchPage:async ({query,seconds,start})=>{
+      const qs=new URLSearchParams({keywords:query,location:'Denmark',f_TPR:`r${seconds}`,sortBy:'DD',start:String(start)})
+      const html=await stableFetcher(`${LINKEDIN_SEARCH}?${qs}`)
+      return parseSearchHtml(html)
+    },
   })
-
-  const errors=[]
-  const rows=[]
-  for(const result of searchResults){
-    if(result.status==='fulfilled'){
-      rows.push(...result.value)
-      diagnostics.searchRows+=result.value.length
-    }else{
-      diagnostics.searchFailures++
-      errors.push(String(result.reason?.message||result.reason))
-    }
+  const diagnostics={
+    searchRequests:discovery.searchRequests,
+    searchFailures:discovery.searchFailures,
+    searchRows:discovery.searchRows,
+    discoveryPasses:discovery.passStats,
+    discoveryGroups:discovery.groups,
+    detailRequests:0,
+    detailFailures:0,
+    incompleteDetails:0,
   }
+
+  const errors=[...discovery.errors]
+  const rows=discovery.rows
 
   if(diagnostics.searchFailures===diagnostics.searchRequests){
     throw new Error(`LinkedIn public search unavailable: ${errors[0]||'all search requests failed'}`)
