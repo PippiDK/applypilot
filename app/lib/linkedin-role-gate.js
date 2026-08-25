@@ -70,6 +70,34 @@ const NON_ENTERPRISE_DOMAIN_CATEGORIES={
   industrial_delivery:/\b(?:manufacturing line|plant equipment|mechanical|electrical equipment|industrial equipment|fabrication|procurement of equipment)\b/i,
 }
 
+
+const PRIMARY_ENTERPRISE_DELIVERY_OBJECT_PATTERNS=[
+  /\b(?:deliver|delivery of|implement|implementation of|migrate|migration of|replace|moderni[sz]e|transform|roll out|rollout|deploy|upgrade)\b.{0,90}\b(?:enterprise software|software platform|enterprise applications?|business applications?|business systems?|it systems?|technology platform|data platform|cloud platform|digital platform|it infrastructure|cloud infrastructure|network infrastructure|cloud services?|workplace platforms?)\b/i,
+  /\b(?:enterprise software|software platform|enterprise applications?|business applications?|business systems?|it systems?|technology platform|data platform|cloud platform|digital platform|it infrastructure|cloud infrastructure|network infrastructure|cloud services?|workplace platforms?)\b.{0,90}\b(?:delivery|implementation|migration|transformation|rollout|deployment|cutover|go[- ]live|project|programme|program)\b/i,
+  /\b(?:group it|corporate it|enterprise it|information technology)\b.{0,120}\b(?:deliver|delivery|implementation|migration|platform|applications?|systems?|infrastructure|services?)\b/i,
+]
+
+const PRIMARY_PHYSICAL_DELIVERY_OBJECT_PATTERNS=[
+  /\b(?:deliver|delivery of|customer acceptance of|handover of)\b.{0,100}\b(?:wildlife monitoring systems?|bird monitoring systems?|monitoring systems?|sensor systems?|hardware(?: and software)? integrated systems?|industrial equipment|plant equipment|production equipment|manufacturing lines?|physical products?|facilit(?:y|ies)|buildings?|data cent(?:er|re) projects?|industrial projects?)\b/i,
+  /\b(?:hardware suppliers?|installation contractors?|commissioning personnel|field installation|site installation|factory acceptance testing|fat\s*\/?\s*sat|commissioning and handover|installation and commissioning)\b/i,
+  /\b(?:built environment|building permitting|construction programme|construction program|civil,? structural|architectural,? mechanical|mechanical,? electrical|contractors? and site teams?)\b/i,
+  /\b(?:offshore wind|offshore energy|marine systems?|oil\s*&\s*gas|industrial automation)\b.{0,120}\b(?:delivery|projects?|installation|commissioning|systems?)\b|\b(?:delivery|projects?|installation|commissioning|systems?)\b.{0,120}\b(?:offshore wind|offshore energy|marine systems?|oil\s*&\s*gas|industrial automation)\b/i,
+]
+
+function matchedPatterns(value,patterns){
+  const text=norm(value)
+  return patterns.filter(rx=>rx.test(text)).length
+}
+
+function primaryDeliveryObjectDecision(text){
+  const enterprise=matchedPatterns(text,PRIMARY_ENTERPRISE_DELIVERY_OBJECT_PATTERNS)
+  const physical=matchedPatterns(text,PRIMARY_PHYSICAL_DELIVERY_OBJECT_PATTERNS)
+  if(physical>=2 && enterprise===0){
+    return {pass:false,enterprise,physical,reason:'Primary delivery object is physical / field / industrial rather than enterprise IT'}
+  }
+  return {pass:true,enterprise,physical,reason:null}
+}
+
 const DELIVERY_CATEGORIES={
   ownership:/\bend[- ]to[- ]end\b|\bown(?:s|ed|ing)?\b.{0,45}\b(?:delivery|project|programme|program|scope|timeline|budget|implementation|migration)\b|\bresponsible for\b.{0,55}\b(?:delivery|project|programme|program|implementation)\b/i,
   scope_plan:/\b(?:scope|timeline|timelines|milestone|milestones|project plan|delivery plan|schedule|schedules)\b/i,
@@ -110,7 +138,12 @@ export function roleGate(job={}){
   const delivery=matchedCategories(text,DELIVERY_CATEGORIES)
   const enterpriseAnchors=matchedCategories(text,ENTERPRISE_IT_ANCHORS)
   const nonEnterpriseDomains=matchedCategories(text,NON_ENTERPRISE_DOMAIN_CATEGORIES)
+  const primaryObject=primaryDeliveryObjectDecision(text)
   const hasLifecycleOrOwnership=delivery.includes('lifecycle')||delivery.includes('ownership')
+
+  if(!primaryObject.pass){
+    return {pass:false,reason:primaryObject.reason,titleKind:titleDecision.kind,techSignals:tech.length,deliverySignals:delivery.length,primaryEnterpriseSignals:primaryObject.enterprise,primaryPhysicalSignals:primaryObject.physical}
+  }
 
   if(titleDecision.kind==='target'){
     if(nonEnterpriseDomains.length>=2 && enterpriseAnchors.length===0){
