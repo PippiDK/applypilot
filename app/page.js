@@ -5,6 +5,7 @@ import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normaliz
 import {requestJobAnalysis} from './lib/jd-analysis-client.js'
 import {requestExpertiseMatch} from './lib/expertise-match-client.js'
 import {evaluateJobConditions} from './lib/job-conditions.js'
+import SearchAudit from './components/search-audit.js'
 
 const WINDOWS=[1,3,7,14]
 
@@ -17,7 +18,7 @@ export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(7)
   const [jobs,setJobs]=useState([])
   const [selected,setSelected]=useState(null)
-  const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null})
+  const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
   const [cvData,setCvData]=useState(null)
   const [cvState,setCvState]=useState({loading:false,error:''})
   const [profile,setProfile]=useState(DEFAULT_PROFILE)
@@ -106,17 +107,17 @@ export default function Home(){
 
   async function search(){
     if(!resumeLoaded){
-      setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null})
+      setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[]})
       return
     }
-    setJobs([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null})
+    setJobs([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
     try{
       const res=await fetch('/api/linkedin-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,cvText:cvData.cvText})})
       const data=await res.json()
       if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
       setJobs(Array.isArray(data.jobs)?data.jobs:[])
-      setState({loading:false,error:'',coverage:data.coverage||null,stats:data.stats||null,fetchedAt:data.fetchedAt||null})
-    }catch(error){ setState({loading:false,error:error.message||'LinkedIn search failed',coverage:null,stats:null,fetchedAt:null}) }
+      setState({loading:false,error:'',coverage:data.coverage||null,stats:data.stats||null,fetchedAt:data.fetchedAt||null,audit:Array.isArray(data.audit)?data.audit:[]})
+    }catch(error){ setState({loading:false,error:error.message||'LinkedIn search failed',coverage:null,stats:null,fetchedAt:null,audit:[]}) }
   }
 
   function startProfile(){
@@ -179,6 +180,7 @@ export default function Home(){
 
     {state.error&&<div className="errorBox"><b>{state.error==='Please Upload Your CV'?'Please Upload Your CV':'LinkedIn search failed'}</b>{state.error!=='Please Upload Your CV'&&<span>{state.error}</span>}</div>}
     {state.stats&&<div className="searchMeta"><span><b>{state.stats.discovered}</b> jobs discovered</span><span><b>{state.stats.fullJdVerified}</b> full JDs read</span><span><b>{state.stats.evaluated}</b> worthwhile after evaluation</span><span>Coverage: <b>{state.coverage?.status}</b></span></div>}
+    <SearchAudit audit={state.audit}/>
     {state.coverage?.detail&&<div className="warningBox">Partial source access: {state.coverage.detail}</div>}
 
     <section className="grid">

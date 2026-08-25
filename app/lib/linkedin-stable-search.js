@@ -9,6 +9,7 @@ import { createLinkedInStableFetcher } from './linkedin-stable-fetcher.js'
 import { buildDiscoveryPasses } from './linkedin-discovery-plan.js'
 import { collectDiscoveryPasses } from './linkedin-discovery-stabilizer.js'
 import { classifyRoleTitle, roleGate } from './linkedin-role-gate.js'
+import {createAuditRecord,updateAuditRecord,auditList} from './linkedin-search-audit.js'
 
 const LINKEDIN_SEARCH='https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search'
 const LINKEDIN_JOB_DETAIL='https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/'
@@ -71,13 +72,16 @@ export async function searchLinkedInStable({freshnessDays=7,resume,fetcher,now=n
   const byId=new Map()
   for(const row of rows) if(!byId.has(row.jobId)) byId.set(row.jobId,row)
   const unique=[...byId.values()].sort((a,b)=>(safeDate(b.publishedAt)?.getTime()||0)-(safeDate(a.publishedAt)?.getTime()||0))
+  const auditById=new Map(unique.map(row=>[String(row.jobId),createAuditRecord(row)]))
 
   const detailCandidates=unique.filter(row=>{
     const decision=classifyRoleTitle(row.title)
     if(decision.kind==='exclude'){
       diagnostics.roleGateRejectedBeforeDetail++
+      updateAuditRecord(auditById,row.jobId,{stage:'PRE_DETAIL_TITLE_REJECT',decision:'REJECT',reason:decision.reason})
       return false
     }
+    updateAuditRecord(auditById,row.jobId,{stage:'DETAIL_QUEUED',decision:'PENDING',reason:decision.reason})
     return true
   })
 
@@ -88,13 +92,22 @@ export async function searchLinkedInStable({freshnessDays=7,resume,fetcher,now=n
   })
 
   const jobs=[]
-  for(const detail of details){
+  for(let index=0;index<details.length;index++){
+    const detail=details[index]
+    const row=detailCandidates[index]
     if(detail.status==='fulfilled'){
-      if(detail.value) jobs.push(detail.value)
-      else diagnostics.incompleteDetails++
+      if(detail.value){
+        jobs.push(detail.value)
+        updateAuditRecord(auditById,row.jobId,{stage:'DETAIL_READ',decision:'PENDING',reason:'Full JD read successfully',title:detail.value.title,company:detail.value.company})
+      }else{
+        diagnostics.incompleteDetails++
+        updateAuditRecord(auditById,row.jobId,{stage:'DETAIL_INCOMPLETE',decision:'REJECT',reason:'LinkedIn detail page did not contain a usable full JD'})
+      }
     }else{
       diagnostics.detailFailures++
-      errors.push(String(detail.reason?.message||detail.reason))
+      const message=String(detail.reason?.message||detail.reason)
+      errors.push(message)
+      updateAuditRecord(auditById,row.jobId,{stage:'DETAIL_FAILED',decision:'REJECT',reason:message})
     }
   }
 
@@ -105,15 +118,31 @@ export async function searchLinkedInStable({freshnessDays=7,resume,fetcher,now=n
   const evaluated=[]
   for(const job of jobs){
     const published=safeDate(job.publishedAt)
-    if(published && (now.getTime()-published.getTime())>Number(freshnessDays||7)*86400000+21600000) continue
+    if(published && (now.getTime()-published.getTime())>Number(freshnessDays||7)*86400000+21600000){
+      updateAuditRecord(auditById,job.sourceJobId,{stage:'FRESHNESS_REJECT',decision:'REJECT',reason:`Published outside requested ${freshnessDays}-day window`})
+      continue
+    }
     const roleDecision=roleGate(job)
     if(!roleDecision.pass){
       diagnostics.roleGateRejectedAfterDetail++
+      updateAuditRecord(auditById,job.sourceJobId,{stage:'ROLE_GATE_REJECT',decision:'REJECT',reason:roleDecision.reason})
       continue
     }
-    if(!discoveryCandidate(job)) continue
+    if(!discoveryCandidate(job)){
+      updateAuditRecord(auditById,job.sourceJobId,{stage:'DISCOVERY_CANDIDATE_REJECT',decision:'REJECT',reason:'JD did not meet the existing discovery-candidate title/technology/delivery evidence rule'})
+      continue
+    }
     const evaluation=evaluateJob(job,sourceCv)
-    if(evaluation.hardExclusion||evaluation.verdict==='Poor fit') continue
+    const score=Math.round(Number(evaluation.score||0)*10)
+    if(evaluation.hardExclusion){
+      updateAuditRecord(auditById,job.sourceJobId,{stage:'HARD_EXCLUSION',decision:'REJECT',reason:evaluation.gaps?.[0]||'Existing hard exclusion',score})
+      continue
+    }
+    if(evaluation.verdict==='Poor fit'){
+      updateAuditRecord(auditById,job.sourceJobId,{stage:'BELOW_60',decision:'REJECT',reason:`Existing evaluation verdict is Poor fit (${score}%)`,score})
+      continue
+    }
+    updateAuditRecord(auditById,job.sourceJobId,{stage:'KEPT',decision:'KEEP',reason:evaluation.verdict,score})
     evaluated.push({job,evaluation})
   }
 
@@ -125,5 +154,6 @@ export async function searchLinkedInStable({freshnessDays=7,resume,fetcher,now=n
     coverage:{source:'LinkedIn Jobs',status:coverage,detail:errors[0]||null},
     stats:{discovered:unique.length,fullJdVerified:jobs.length,evaluated:evaluated.length,returned:evaluated.length},
     diagnostics,
+    audit:auditList(auditById),
   }
 }
