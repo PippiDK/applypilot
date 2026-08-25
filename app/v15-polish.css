@@ -1,0 +1,19 @@
+/* V15 cosmetic polish only — no search, scoring, audit, auth, or cache logic */
+.expertiseHero:has(.primary) .expertiseScore{
+  font-size:0;
+  color:#8d97a5;
+  font-weight:700;
+  white-space:nowrap;
+}
+.expertiseHero:has(.primary) .expertiseScore::after{
+  content:'Not analysed';
+  font-size:15px;
+  letter-spacing:0;
+}
+footer{
+  font-size:0;
+}
+footer::after{
+  content:'ApplyPilot · Search less. Apply better.';
+  font-size:12px;
+}
