@@ -1,3 +1,4 @@
+import { classifyRoleTitle } from './linkedin-role-gate.js'
 const LINKEDIN_SEARCH = 'https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search'
 const LINKEDIN_JOB_DETAIL = 'https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/'
 const LINKEDIN_JOB = 'https://www.linkedin.com/jobs/view/'
@@ -288,7 +289,7 @@ function hardExclusion(job){
   if(/\bno (meaningful )?ownership\b/i.test(text)||/\bwithout (meaningful )?ownership\b/i.test(text)) return 'Role is coordination-only with no meaningful delivery ownership'
   if(bau>=2&&resp<=2) return 'Role is primarily BAU / support / service operations'
   if(coord>=2&&resp<=2) return 'Role is primarily coordination/facilitation without delivery ownership'
-  if(resp===0) return 'No meaningful delivery ownership is evidenced in the JD'
+  if(resp===0&&classifyRoleTitle(job.title).kind!=='target') return 'No meaningful delivery ownership is evidenced in the JD'
   return null
 }
 
