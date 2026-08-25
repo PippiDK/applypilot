@@ -8,6 +8,7 @@ import {
 import { createLinkedInStableFetcher } from './linkedin-stable-fetcher.js'
 import { buildDiscoveryPasses } from './linkedin-discovery-plan.js'
 import { collectDiscoveryPasses } from './linkedin-discovery-stabilizer.js'
+import { classifyRoleTitle, roleGate } from './linkedin-role-gate.js'
 
 const LINKEDIN_SEARCH='https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search'
 const LINKEDIN_JOB_DETAIL='https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/'
@@ -56,6 +57,8 @@ export async function searchLinkedInStable({freshnessDays=7,resume,fetcher,now=n
     detailRequests:0,
     detailFailures:0,
     incompleteDetails:0,
+    roleGateRejectedBeforeDetail:0,
+    roleGateRejectedAfterDetail:0,
   }
 
   const errors=[...discovery.errors]
@@ -69,7 +72,16 @@ export async function searchLinkedInStable({freshnessDays=7,resume,fetcher,now=n
   for(const row of rows) if(!byId.has(row.jobId)) byId.set(row.jobId,row)
   const unique=[...byId.values()].sort((a,b)=>(safeDate(b.publishedAt)?.getTime()||0)-(safeDate(a.publishedAt)?.getTime()||0))
 
-  const details=await mapLimit(unique,8,async row=>{
+  const detailCandidates=unique.filter(row=>{
+    const decision=classifyRoleTitle(row.title)
+    if(decision.kind==='exclude'){
+      diagnostics.roleGateRejectedBeforeDetail++
+      return false
+    }
+    return true
+  })
+
+  const details=await mapLimit(detailCandidates,8,async row=>{
     diagnostics.detailRequests++
     const html=await stableFetcher(`${LINKEDIN_JOB_DETAIL}${row.jobId}`)
     return parseDetailHtml(row,html,now)
@@ -86,7 +98,7 @@ export async function searchLinkedInStable({freshnessDays=7,resume,fetcher,now=n
     }
   }
 
-  if(unique.length>0 && jobs.length===0 && diagnostics.detailFailures+diagnostics.incompleteDetails===unique.length){
+  if(detailCandidates.length>0 && jobs.length===0 && diagnostics.detailFailures+diagnostics.incompleteDetails===detailCandidates.length){
     throw new Error(`LinkedIn job details unavailable: ${errors.at(-1)||'no full JD could be read'}`)
   }
 
@@ -94,6 +106,11 @@ export async function searchLinkedInStable({freshnessDays=7,resume,fetcher,now=n
   for(const job of jobs){
     const published=safeDate(job.publishedAt)
     if(published && (now.getTime()-published.getTime())>Number(freshnessDays||7)*86400000+21600000) continue
+    const roleDecision=roleGate(job)
+    if(!roleDecision.pass){
+      diagnostics.roleGateRejectedAfterDetail++
+      continue
+    }
     if(!discoveryCandidate(job)) continue
     const evaluation=evaluateJob(job,sourceCv)
     if(evaluation.hardExclusion||evaluation.verdict==='Poor fit') continue
