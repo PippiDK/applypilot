@@ -6,6 +6,7 @@ import {
   evaluateJob,
 } from './linkedin-search.js'
 import { createLinkedInStableFetcher } from './linkedin-stable-fetcher.js'
+import { buildDiscoveryPlan } from './linkedin-discovery-plan.js'
 
 const LINKEDIN_SEARCH='https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search'
 const LINKEDIN_JOB_DETAIL='https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/'
@@ -35,10 +36,10 @@ export async function searchLinkedInStable({freshnessDays=7,resume,fetcher,now=n
   if(sourceCv.length<100) throw new Error('Source CV text is required for LinkedIn evaluation.')
 
   const stableFetcher=fetcher||createLinkedInStableFetcher()
-  const seconds=Math.max(86400,Number(freshnessDays||7)*86400)
+  const discoveryPlan=buildDiscoveryPlan(DISCOVERY_QUERIES,freshnessDays)
   const diagnostics={searchRequests:0,searchFailures:0,searchRows:0,detailRequests:0,detailFailures:0,incompleteDetails:0}
 
-  const searchResults=await mapLimit(DISCOVERY_QUERIES,5,async query=>{
+  const searchResults=await mapLimit(discoveryPlan,5,async ({query,seconds})=>{
     diagnostics.searchRequests++
     const qs=new URLSearchParams({keywords:query,location:'Denmark',f_TPR:`r${seconds}`,sortBy:'DD',start:'0'})
     const html=await stableFetcher(`${LINKEDIN_SEARCH}?${qs}`)
