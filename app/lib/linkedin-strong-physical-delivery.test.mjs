@@ -61,3 +61,69 @@ test('IT infrastructure PM stays eligible even when the programme includes physi
   })
   assert.equal(result.pass,true)
 })
+
+test('engineering people-lead titles are rejected before JD evidence can rescue them',()=>{
+  for(const title of ['Team Lead (Engineering)','Engineering Team Lead','Engineering Lead']){
+    const result=roleGate({
+      title,
+      description:`
+        Lead a software engineering team delivering cloud platforms and enterprise applications.
+        Own roadmap, implementation, risks, dependencies, release readiness and stakeholder governance.
+        Coordinate cross-functional delivery across product, software and business teams.
+      `,
+    })
+    assert.equal(result.pass,false,`${title} must be excluded`)
+    assert.match(result.reason,/engineering|profession|people/i)
+  }
+})
+
+test('Arup-style built-environment cluster is rejected even without old exact hard-gate phrases',()=>{
+  const result=roleGate({
+    title:'Project Manager',
+    description:`
+      Manage complex data centre campus programmes from feasibility through commissioning and handover.
+      Coordinate design disciplines across civil and structural consultants plus mechanical and electrical packages.
+      Manage external contractors, site activities, permitting, scope, milestones, budget, risks and client reporting.
+      Teams use project software and digital document-control tools, but the role is accountable for the physical facility programme.
+    `,
+  })
+  assert.equal(result.pass,false)
+  assert.match(result.reason,/built|construction|facility|physical|delivery object/i)
+})
+
+test('engineering team-lead punctuation variants are also rejected before JD',()=>{
+  for(const title of ['Team Lead - Engineering','Team Lead – Engineering','Team Lead: Engineering']){
+    const result=roleGate({
+      title,
+      description:'Own enterprise software and cloud platform delivery, implementation, risks, dependencies, releases and stakeholder governance.',
+    })
+    assert.equal(result.pass,false,`${title} must be excluded`)
+    assert.match(result.reason,/engineering|profession|people/i)
+  }
+})
+
+test('strong enterprise IT delivery object overrides incidental built-environment cluster',()=>{
+  const result=roleGate({
+    title:'IT Infrastructure Project Manager',
+    description:`
+      Lead migration of enterprise IT infrastructure and cloud services across a new corporate facility programme.
+      Deliver network infrastructure, identity services and workplace platforms with Group IT from implementation through cutover and go-live.
+      Construction contractors, site teams, electrical works and commissioning are dependencies managed with the facilities organisation.
+      Own scope, milestones, budget, risks, dependencies and executive stakeholder governance for the technology migration.
+    `,
+  })
+  assert.equal(result.pass,true)
+})
+
+test('built-environment disciplines count as independent cluster signals',()=>{
+  const result=roleGate({
+    title:'Project Manager',
+    description:`
+      Coordinate civil consultants, structural engineers, mechanical packages and electrical packages across the programme.
+      Own scope, milestones, risks, client reporting and handover.
+      Project software is used for coordination, but the managed object is the physical works.
+    `,
+  })
+  assert.equal(result.pass,false)
+  assert.match(result.reason,/built|construction|facility|physical|delivery object/i)
+})

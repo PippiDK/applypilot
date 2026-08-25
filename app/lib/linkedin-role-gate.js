@@ -7,6 +7,7 @@ function norm(value=''){
 }
 
 const DOMAIN_NON_TARGET_TITLE_RULES=[
+  {reason:'Engineering people-lead role is a different profession',rx:/\bteam lead\s*(?:(?:[-:])\s*|\(\s*)?engineering\b\s*\)?|\bengineering\s+(?:team lead|lead)\b/i},
   {reason:'Director-level roles are outside the target hands-on delivery level',rx:/\bdirector\b/i},
   {reason:'People-management-first role is outside the target hands-on delivery family',rx:/\bpeople\s*(?:&|and)\s*project manager\b|\bpeople manager\b/i},
   {reason:'ERP-specialist project management is outside the target general IT delivery family',rx:/\b(?:microsoft\s+)?d365\b.{0,60}\bproject manager\b|\bdynamics 365\b.{0,60}\bproject manager\b|\bsap\b.{0,80}\bproject manager\b|\bs\/?4hana\b.{0,80}\bproject manager\b/i},
@@ -80,6 +81,31 @@ const HARD_NON_IT_DELIVERY_OBJECT_CATEGORIES={
   plant_equipment:/\bplant\s*(?:&|and)\s*equipment solutions?\b|\bmajor equipment(?: deliveries?)?\b|\bprocess[- ]line deliveries\b|\b(?:eps|epc) projects?\b|\bplant engineering\b|\bindustrial equipment\b|\bcomplete plant solutions?\b/i,
 }
 
+const BUILT_ENVIRONMENT_CLUSTER_CATEGORIES={
+  construction:/\bconstruction\b|\bbuilt environment\b/i,
+  facility_building:/\bfacilit(?:y|ies)\b|\bbuildings?\b/i,
+  design_disciplines:/\bdesign disciplines?\b|\bmultidisciplinary design\b|\bdesign consultants?\b/i,
+  civil:/\bcivil\b/i,
+  structural:/\bstructural\b/i,
+  mechanical:/\bmechanical\b|\bmep\b/i,
+  electrical:/\belectrical\b/i,
+  contractors:/\bcontractors?\b|\bsubcontractors?\b/i,
+  site:/\bsite (?:selection|activities|works?|management|teams?|coordination)\b|\bon[- ]site\b/i,
+  commissioning:/\bcommissioning\b/i,
+  permitting:/\bpermitting\b|\bpermits?\b/i,
+}
+
+const BUILT_ENVIRONMENT_CORE_CATEGORIES=new Set([
+  'construction',
+  'facility_building',
+  'design_disciplines',
+  'civil',
+  'structural',
+  'contractors',
+  'site',
+  'permitting',
+])
+
 const PRIMARY_PHYSICAL_DELIVERY_OBJECT_PATTERNS=[
   /\b(?:deliver|delivery of|customer acceptance of|handover of)\b.{0,100}\b(?:wildlife monitoring systems?|bird monitoring systems?|monitoring systems?|sensor systems?|hardware(?: and software)? integrated systems?|industrial equipment|plant equipment|production equipment|manufacturing lines?|physical products?|facilit(?:y|ies)|buildings?|data cent(?:er|re) projects?|industrial projects?)\b/i,
   /\b(?:hardware suppliers?|installation contractors?|commissioning personnel|field installation|site installation|factory acceptance testing|fat\s*\/?\s*sat|commissioning and handover|installation and commissioning)\b/i,
@@ -96,13 +122,18 @@ function primaryDeliveryObjectDecision(text){
   const enterprise=matchedPatterns(text,PRIMARY_ENTERPRISE_DELIVERY_OBJECT_PATTERNS)
   const physical=matchedPatterns(text,PRIMARY_PHYSICAL_DELIVERY_OBJECT_PATTERNS)
   const hardNonIt=matchedCategories(text,HARD_NON_IT_DELIVERY_OBJECT_CATEGORIES)
+  const builtEnvironment=matchedCategories(text,BUILT_ENVIRONMENT_CLUSTER_CATEGORIES)
+  const hasBuiltEnvironmentCore=builtEnvironment.some(name=>BUILT_ENVIRONMENT_CORE_CATEGORIES.has(name))
   if(hardNonIt.length>0 && enterprise===0){
-    return {pass:false,enterprise,physical,hardNonIt,reason:'Primary delivery object is construction / facility / plant / equipment rather than enterprise IT'}
+    return {pass:false,enterprise,physical,hardNonIt,builtEnvironment,reason:'Primary delivery object is construction / facility / plant / equipment rather than enterprise IT'}
+  }
+  if(builtEnvironment.length>=4 && hasBuiltEnvironmentCore && enterprise===0){
+    return {pass:false,enterprise,physical,hardNonIt,builtEnvironment,reason:'Built-environment delivery cluster indicates construction / facility delivery rather than enterprise IT'}
   }
   if(physical>=2 && enterprise===0){
-    return {pass:false,enterprise,physical,hardNonIt,reason:'Primary delivery object is physical / field / industrial rather than enterprise IT'}
+    return {pass:false,enterprise,physical,hardNonIt,builtEnvironment,reason:'Primary delivery object is physical / field / industrial rather than enterprise IT'}
   }
-  return {pass:true,enterprise,physical,hardNonIt,reason:null}
+  return {pass:true,enterprise,physical,hardNonIt,builtEnvironment,reason:null}
 }
 
 const DELIVERY_CATEGORIES={
