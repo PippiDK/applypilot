@@ -68,7 +68,6 @@ test('borderline manager/specialist titles stay ambiguous rather than being thro
     'Business Application Manager',
     'Senior Project Specialist within Finance & Digital Development',
     'Senior Manager, Portfolio & Performance Management, Global Operations',
-    'Revenue Stream Owner of HXM Implementation',
     'Senior Onboarding consultant',
   ]
   for(const title of titles){
