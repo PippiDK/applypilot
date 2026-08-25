@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'
 import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'
 import {requestJobAnalysis} from './lib/jd-analysis-client.js'
+import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'
 import {requestExpertiseMatch} from './lib/expertise-match-client.js'
 import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'
 import {evaluateJobConditions} from './lib/job-conditions.js'
@@ -161,10 +162,17 @@ export default function Home(){
   async function runJobAnalysis(){
     if(!active||!resumeLoaded) return
     const runKey=active.job.sourceJobId||`${active.job.title}|${active.job.company}`
+    const cacheArgs={storage:localStorage,jobId:active.job.sourceJobId,sourceVersion:cvData?.sourceVersion}
     setReviewOpen(true)
+    const cached=readJobAnalysisCache(cacheArgs)
+    if(cached){
+      setJdAnalysisState({loading:false,error:'',analysis:cached.analysis,token:cached.token||'',jobKey:runKey})
+      return
+    }
     setJdAnalysisState({loading:true,error:'',analysis:null,token:'',jobKey:runKey})
     try{
       const result=await requestJobAnalysis({sourceVersion:cvData.sourceVersion,job:active.job})
+      writeJobAnalysisCache({...cacheArgs,analysis:result.analysis,token:result.token||''})
       setJdAnalysisState({loading:false,error:'',analysis:result.analysis,token:result.token||'',jobKey:runKey})
     }catch(error){
       setJdAnalysisState({loading:false,error:error.message||'Job analysis failed safely. Please try again.',analysis:null,token:'',jobKey:runKey})
@@ -265,21 +273,20 @@ export default function Home(){
       <div className="jdPretest"><p className="eyebrow">JD ANALYSIS PRETEST · OPENAI</p>
         {jdAnalysisState.jobKey!==jobKey?<div className="muted">Select Review CV changes to analyse this vacancy.</div>:jdAnalysisState.loading?<div className="jdLoading">Reading job description with OpenAI…</div>:jdAnalysisState.error?<div className="errorBox"><b>JD analysis failed safely</b><span>{jdAnalysisState.error}</span></div>:jdAnalysisState.analysis?<>
           <div className="jdGrid"><div><small>Role mission</small><p>{jdAnalysisState.analysis.roleMission}</p></div><div><small>Candidate positioning</small><p>{jdAnalysisState.analysis.candidatePositioning}</p></div></div>
-          <div className="jdSection"><h3>Hiring priorities</h3>{jdAnalysisState.analysis.priorities.map(priority=><div className="jdPriority" key={priority.id}><div className="jdPriorityHead"><b>{priority.rank}. {priority.requirement}</b><span>{priority.kind.replace('_',' ')}</span></div><p>{priority.why}</p><small>JD evidence</small>{priority.jdEvidence.map((evidence,index)=><blockquote key={index}>{evidence}</blockquote>)}</div>)}</div>
-          <div className="jdSection"><h3>Must-haves</h3>{jdAnalysisState.analysis.mustHaves?.length?jdAnalysisState.analysis.mustHaves.map(mustHave=><div className="jdMustHave" key={mustHave.id}><p>✓ {mustHave.requirement}</p><small>JD evidence</small>{mustHave.jdEvidence.map((evidence,index)=><blockquote key={index}>{evidence}</blockquote>)}</div>):<p className="muted">No explicit candidate qualification gate was found in the JD.</p>}</div>
+          <div className="jdSection"><h3>Hiring priorities</h3>{jdAnalysisState.analysis.priorities.map(priority=><details className="jdPriority" key={priority.id}><summary><span>{priority.rank}. {priority.requirement}</span><b>{priority.kind.replace('_',' ')}</b></summary><p>{priority.why}</p><div className="jdEvidence"><small>View JD evidence</small>{priority.jdEvidence.map((evidence,index)=><blockquote key={index}>{evidence}</blockquote>)}</div></details>)}</div>
+          <div className="jdSection"><h3>Must-haves</h3>{jdAnalysisState.analysis.mustHaves?.length?jdAnalysisState.analysis.mustHaves.map(mustHave=><details className="jdMustHave" key={mustHave.id}><summary>✓ {mustHave.requirement}</summary><div className="jdEvidence"><small>View JD evidence</small>{mustHave.jdEvidence.map((evidence,index)=><blockquote key={index}>{evidence}</blockquote>)}</div></details>):<p className="muted">No explicit candidate qualification gate was found in the JD.</p>}</div>
         </>:null}
       </div>
-      <div className="reviewDashboard"><div><b>{proposedChanges.filter(change=>change.changed).length}</b><span>summary change proposed</span></div><div><b>0</b><span>bullets reordered · Step 2</span></div><div><b>{alignedTerms.length}</b><span>role terms already supported</span></div><div className="zeroClaims"><b>0</b><span>unsupported claims added</span></div></div>
-      <div className="truth compact"><b>Truth Guard active</b><span>Updated wording may only restate evidence already present in your Master CV. Internal evidence IDs are hidden from the user interface.</span></div>
-      <div className="reviewToolbar"><div><h3>Tailored Summary — Legacy Summary preview · not Task 3</h3><p>{reviewedCount} of {proposedChanges.length} reviewed</p></div>{proposedChanges.some(change=>change.changed)&&<button className="secondary" onClick={acceptAll}>Accept all safe changes</button>}</div>
+      <div className="muted">✓ Truth Guard active · 0 unsupported claims</div>
+      <div className="reviewToolbar"><div><h3>CV Summary update</h3></div>{proposedChanges.some(change=>change.changed)&&<button className="secondary" onClick={acceptAll}>Accept all safe changes</button>}</div>
       {proposedChanges.map((change,index)=>{const decision=decisions[`${jobKey}|${change.id}`];return <div className={'changeCard '+(decision?'decided':'')} key={change.id}>
         <div className="changeHead"><span>SUMMARY</span><b>{decision==='accepted'?'Accepted':decision==='original'?'Original kept':change.changed?'Review needed':'Already aligned'}</b></div>
         <div className="compareGrid"><div className="compareBox"><small>ORIGINAL</small><p>{change.original}</p></div><div className="compareArrow">→</div><div className="compareBox updatedBox"><small>UPDATED</small><p>{change.updated}</p></div></div>
-        <div className="changeWhy"><div><small>WHY CHANGED</small><p>{change.why}</p></div><div><small>SOURCE</small><p>Existing Master CV experience only · no new claim added</p></div></div>
+        <div className="changeWhy"><div><small>WHY CHANGED</small><p>{change.why}</p></div></div>
         <div className="evidenceActions"><button className={'secondary '+(decision==='original'?'chosen':'')} onClick={()=>setDecision(change.id,'original')}>Keep original</button><button className={'primary smallPrimary '+(decision==='accepted'?'chosenPrimary':'')} onClick={()=>setDecision(change.id,'accepted')} disabled={!change.changed}>{change.changed?'Accept change':'No change needed'}</button></div>
       </div>})}
       {!proposedChanges.length&&<div className="muted">No Summary change proposed.</div>}
-      <div className="reviewFooter"><span>Step 1 updates Summary only. Bullet reordering comes next in Step 2.</span><button className="secondary" onClick={()=>setReviewOpen(false)}>Close review</button></div>
+      <div className="reviewFooter"><button className="secondary" onClick={()=>setReviewOpen(false)}>Close review</button></div>
     </div></div>}
   </main>
 }
