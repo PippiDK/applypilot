@@ -27,12 +27,12 @@ export function createLinkedInStableFetcher({
   request=globalThis.fetch,
   sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),
   now=()=>Date.now(),
-  maxConcurrency=2,
-  minIntervalMs=250,
-  maxAttempts=5,
+  maxConcurrency=1,
+  minIntervalMs=1200,
+  maxAttempts=null,
   requestTimeoutMs=15000,
-  baseBackoffMs=1500,
-  maxBackoffMs=15000,
+  baseBackoffMs=10000,
+  maxBackoffMs=45000,
   totalBudgetMs=270000,
 }={}){
   if(typeof request!=='function') throw new Error('A fetch implementation is required')
@@ -40,7 +40,11 @@ export function createLinkedInStableFetcher({
   const startedAt=now()
   const deadline=startedAt+Math.max(1000,Number(totalBudgetMs)||270000)
   const concurrency=Math.max(1,Math.floor(Number(maxConcurrency)||1))
-  const attempts=Math.max(1,Math.floor(Number(maxAttempts)||1))
+  const configuredAttempts=Number(maxAttempts)
+  const attemptLimit=Number.isFinite(configuredAttempts)&&configuredAttempts>0
+    ?Math.max(1,Math.floor(configuredAttempts))
+    :Infinity
+
   let active=0
   const waiters=[]
   let lastStartedAt=startedAt-Math.max(0,Number(minIntervalMs)||0)
@@ -48,15 +52,21 @@ export function createLinkedInStableFetcher({
   let pacing=Promise.resolve()
 
   async function acquire(){
-    if(active<concurrency){ active++; return }
+    if(active<concurrency && waiters.length===0){
+      active++
+      return
+    }
     await new Promise(resolve=>waiters.push(resolve))
-    active++
+    // A released slot is handed directly to this waiter; active stays unchanged.
   }
 
   function release(){
-    active--
     const next=waiters.shift()
-    if(next) next()
+    if(next){
+      next()
+      return
+    }
+    active=Math.max(0,active-1)
   }
 
   async function paceStart(){
@@ -68,25 +78,35 @@ export function createLinkedInStableFetcher({
       const spacing=Math.max(0,Number(minIntervalMs)||0)
       const target=Math.max(blockedUntil,lastStartedAt+spacing)
       const wait=Math.max(0,target-now())
+      if(now()+wait>=deadline) throw new Error('LinkedIn retry budget exhausted before full source coverage was completed')
       if(wait) await sleep(wait)
+      if(now()>=deadline) throw new Error('LinkedIn retry budget exhausted before full source coverage was completed')
       lastStartedAt=now()
     } finally {
       unlock()
     }
   }
 
+  function backoffFor(attempt,status,retryAfter){
+    const base=Math.max(1,Number(baseBackoffMs)||10000)
+    const cap=Math.max(base,Number(maxBackoffMs)||45000)
+    const exponent=Math.min(Math.max(0,attempt-1),6)
+    const exponential=Math.min(cap,base*(2**exponent))
+    return Math.max(retryAfter??0,exponential)
+  }
+
   return async function stableFetchHtml(url){
     let lastError
-    for(let attempt=1;attempt<=attempts;attempt++){
-      const before=now()
-      if(before>=deadline) throw new Error('LinkedIn retry budget exhausted before full source coverage was completed')
+
+    for(let attempt=1;attempt<=attemptLimit;attempt++){
+      if(now()>=deadline) throw new Error('LinkedIn retry budget exhausted before full source coverage was completed')
 
       await acquire()
       let response
       try{
         await paceStart()
         const remaining=Math.max(1,deadline-now())
-        const timeout=Math.max(1000,Math.min(Number(requestTimeoutMs)||15000,remaining))
+        const timeout=Math.max(1,Math.min(Number(requestTimeoutMs)||15000,remaining))
         response=await request(url,{
           headers:DEFAULT_HEADERS,
           redirect:'follow',
@@ -99,25 +119,24 @@ export function createLinkedInStableFetcher({
         release()
       }
 
-      if(response){
-        if(response.ok){
-          const text=await response.text()
-          return validateHtml(text,response.headers?.get?.('content-type')||'')
-        }
-
-        lastError=new Error(`LinkedIn HTTP ${response.status}`)
-        if(!RETRYABLE_STATUS.has(Number(response.status))) throw lastError
-
-        const retryAfter=retryAfterMs(response,now())
-        const exponential=Math.min(Number(maxBackoffMs)||15000,(Number(baseBackoffMs)||1500)*(2**(attempt-1)))
-        const delay=Math.max(retryAfter??0,exponential)
-        blockedUntil=Math.max(blockedUntil,now()+delay)
-      }else if(attempt<attempts){
-        const exponential=Math.min(Number(maxBackoffMs)||15000,(Number(baseBackoffMs)||1500)*(2**(attempt-1)))
-        blockedUntil=Math.max(blockedUntil,now()+exponential)
+      if(response?.ok){
+        const text=await response.text()
+        return validateHtml(text,response.headers?.get?.('content-type')||'')
       }
 
-      if(attempt===attempts) break
+      let status=null
+      let retryAfter=null
+      if(response){
+        status=Number(response.status)
+        lastError=new Error(`LinkedIn HTTP ${response.status}`)
+        if(!RETRYABLE_STATUS.has(status)) throw lastError
+        retryAfter=retryAfterMs(response,now())
+      }
+
+      if(attempt===attemptLimit) break
+
+      const delay=backoffFor(attempt,status,retryAfter)
+      blockedUntil=Math.max(blockedUntil,now()+delay)
       if(blockedUntil>=deadline) throw new Error('LinkedIn retry budget exhausted before full source coverage was completed')
     }
 
