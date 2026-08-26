@@ -1,4 +1,5 @@
 'use client'
+import styles from './search-profile-roles-step.module.css'
 
 const cleanLines=value=>String(value??'').split(/\n|,/).map(item=>item.trim()).filter(Boolean)
 const rolesText=roles=>(Array.isArray(roles)?roles:[]).join('\n')
@@ -14,9 +15,9 @@ export default function SearchProfileRolesStep({primaryRoles=[],adjacentRoles=[]
     {ready&&<div className="successBox"><b>✓ Generated from CV 1{source==='cache'?' · Cached':''}</b><span>You can edit every role before saving.</span></div>}
     {error&&<div className="errorBox"><b>Search Profile generation failed safely</b><span>{error}</span><button className="secondary" type="button" onClick={onRetry}>Retry</button></div>}
 
-    <div className="roleProposalGrid">
-      <label className="roleProposalField"><small>PRIMARY ROLES</small><span>Direct targets based on your strongest recent positioning.</span><textarea value={rolesText(primaryRoles)} onChange={event=>onPrimaryChange(cleanLines(event.target.value))} rows="4" disabled={loading}/></label>
-      <label className="roleProposalField"><small>ADJACENT ROLES</small><span>Credible nearby roles with transferable fit.</span><textarea value={rolesText(adjacentRoles)} onChange={event=>onAdjacentChange(cleanLines(event.target.value))} rows="4" disabled={loading}/></label>
+    <div className={styles.grid}>
+      <label className={styles.field}><small>PRIMARY ROLES</small><span>Direct targets based on your strongest recent positioning.</span><textarea value={rolesText(primaryRoles)} onChange={event=>onPrimaryChange(cleanLines(event.target.value))} rows="4" disabled={loading}/></label>
+      <label className={styles.field}><small>ADJACENT ROLES</small><span>Credible nearby roles with transferable fit.</span><textarea value={rolesText(adjacentRoles)} onChange={event=>onAdjacentChange(cleanLines(event.target.value))} rows="4" disabled={loading}/></label>
     </div>
   </div>
 }
