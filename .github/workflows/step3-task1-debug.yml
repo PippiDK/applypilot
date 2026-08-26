@@ -1,0 +1,20 @@
+name: Step 3 Task 1 Debug
+
+on:
+  push:
+    branches:
+      - feature/cv-library-3-slots
+
+jobs:
+  task1:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package.json
+      - run: npm install --no-audit --no-fund
+      - name: Shadow discovery unit only
+        run: node --test app/lib/linkedin-shadow-discovery.test.mjs
