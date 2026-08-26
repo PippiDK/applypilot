@@ -29,7 +29,7 @@ const FINTECH_TERMS = ['fintech','banking','bank','trading','post-trade','paymen
 
 
 const RESPONSIBILITY_CATEGORIES = {
-  end_to_end: [/end[- ]to[- ]end.{0,80}(deliver|delivery|project|programme|program|execution|ownership)/i, /\b(full lifecycle|full life cycle)\b/i, /\b(own|owns|owned|take|takes|taking)\b.{0,35}\b(full|end[- ]to[- ]end)?\s*(delivery|lifecycle|project|programme|program)\b/i, /\blead and deliver\b/i, /\blead delivery\b/i],
+  end_to_end: [/\bend[- ]to[- ]end\b.{0,80}\b(deliver|delivery|project|programme|program|execution|ownership)\b/i, /\b(full lifecycle|full life cycle)\b/i, /\b(own|owns|owned|take|takes|taking)\b.{0,35}\b(full|end[- ]to[- ]end)?\s*(delivery|lifecycle|project|programme|program)\b/i, /\blead and deliver\b/i, /\blead delivery\b/i],
   scope_schedule: [/\b(scope|timeline|timelines|schedule|schedules|milestone|milestones)\b/i, /\b(on time|within scope|delivery plan|project plan|integrated plan)\b/i],
   risk_dependencies: [/\brisks?\b/i, /\bdependencies\b/i, /\braid\b/i, /\bissues?\b.{0,25}\bdependencies\b/i],
   budget_financial: [/\bbudget(s|ing)?\b/i, /\bfinancial (management|tracking|control|performance|forecast|forecasting)\b/i, /\bcapex\b|\bopex\b|\bcost control\b|\bforecasting\b/i],
@@ -343,19 +343,6 @@ function careerScore(job){
   const people=[/\bmanage a team of project managers\b/,/\bmanaging a team of project managers\b/,/\bhiring and retaining\b/,/\bperformance management\b/,/\bmanaging aspirations\b/,/\bresource utilization\b/].filter(rx=>rx.test(body)).length
   if(people>=2){score-=2;gaps.push('Role carries substantial people-management responsibility relative to hands-on delivery')}
   if(/\b(only for selected|selected high-stakes|direct .* accountability only for selected)\b/.test(body)&&/\bportfolio\b/.test(body)){score-=.7;gaps.push('Direct project ownership appears limited to selected initiatives')}
-  const low=job.salaryMinDkkMonth, high=job.salaryMaxDkkMonth
-  if(low==null&&high==null) gaps.push('Compensation: Insufficient data')
-  else if(job.employmentType==='contract'){
-    const guaranteed=low??high??0; if(guaranteed>=80000){score+=2;notes.push('Contract compensation has a clear premium')} else {score-=2;gaps.push('Contract compensation premium is not evidenced')}
-  } else {
-    const guaranteed=low??high??0
-    if(low!=null&&low>=80000){score+=2;notes.push('Salary floor is at/above preferred level')}
-    else if(low!=null&&low>=75000){score+=1;notes.push('Salary floor is within acceptable range')}
-    else if(low!=null&&high!=null&&low<75000&&high>=75000) gaps.push('Salary range overlaps the acceptable level but starts below it')
-    else if(guaranteed&&guaranteed<60000){score-=4;gaps.push('Compensation is a strong negative')}
-    else if(guaranteed&&guaranteed<70000){score-=2;gaps.push('Compensation is below preferred range')}
-    else gaps.push('Compensation needs verification')
-  }
   return [round1(clamp(score,0,10)),notes,gaps]
 }
 
