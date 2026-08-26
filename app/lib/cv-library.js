@@ -67,3 +67,10 @@ export function upsertCvSlot(library,slot,value){
   next.cvs[target-1]=record
   return next
 }
+
+export function removeCvSlot(library,slot){
+  const target=validSlot(slot)
+  const next=normalizeCvLibrary(library)
+  next.cvs[target-1]=null
+  return next
+}
