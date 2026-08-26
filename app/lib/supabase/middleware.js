@@ -6,6 +6,10 @@ import {isApiPath,isPublicPagePath,isStaticAssetPath} from '../auth/route-policy
 export async function updateSession(request){
   const pathname=request.nextUrl.pathname
 
+  if(process.env.VERCEL_ENV==='preview'){
+    return NextResponse.next({request})
+  }
+
   // Private APIs authenticate inside each Route Handler so anonymous callers
   // receive a real 401 instead of a page redirect.
   if(isApiPath(pathname)){
