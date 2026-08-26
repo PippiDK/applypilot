@@ -22,3 +22,11 @@ footer::after{
   min-width:190px;
   padding:12px 18px;
 }
+
+/* V16 main vacancy facts — salary intentionally removed */
+.conditionGrid{
+  grid-template-columns:repeat(3,1fr);
+}
+.conditionGrid > .conditionCard:nth-child(2){
+  display:none;
+}
