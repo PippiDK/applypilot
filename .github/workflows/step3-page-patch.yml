@@ -23,29 +23,25 @@ jobs:
           from pathlib import Path
           path=Path('app/page.js')
           text=path.read_text()
-          replacements=[]
-          replacements.append((
-          "import {fitLabel} from './lib/fit-label.js'\nimport SearchAudit from './components/search-audit.js'",
-          "import {fitLabel} from './lib/fit-label.js'\nimport {compareShadowToLegacy} from './lib/shadow-search-compare.js'\nimport SearchAudit from './components/search-audit.js'\nimport ShadowSearchAudit from './components/shadow-search-audit.js'"
-          ))
-          replacements.append((
-          "  const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})\n  const [cvData,setCvData]=useState(null)",
-          "  const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})\n  const [shadowState,setShadowState]=useState({status:'idle',error:'',stats:null,coverage:null,comparison:null})\n  const [cvData,setCvData]=useState(null)"
-          ))
-          old_search="""  async function search(){
-            if(!resumeLoaded){
-              setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[]})
-              return
-            }
-            setJobs([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
-            try{
-              const res=await fetch('/api/linkedin-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,cvText:cvData.cvText})})
-              const data=await res.json()
-              if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
-              setJobs(Array.isArray(data.jobs)?data.jobs:[])
-              setState({loading:false,error:'',coverage:data.coverage||null,stats:data.stats||null,fetchedAt:data.fetchedAt||null,audit:Array.isArray(data.audit)?data.audit:[]})
-            }catch(error){ setState({loading:false,error:error.message||'LinkedIn search failed',coverage:null,stats:null,fetchedAt:null,audit:[]}) }
-          }"""
+
+          def one(old,new):
+            global text
+            count=text.count(old)
+            if count!=1:
+              raise SystemExit(f'Expected exactly one patch target, found {count}: {old[:100]!r}')
+            text=text.replace(old,new,1)
+
+          one(
+            "import {fitLabel} from './lib/fit-label.js'\nimport SearchAudit from './components/search-audit.js'",
+            "import {fitLabel} from './lib/fit-label.js'\nimport {compareShadowToLegacy} from './lib/shadow-search-compare.js'\nimport SearchAudit from './components/search-audit.js'\nimport ShadowSearchAudit from './components/shadow-search-audit.js'"
+          )
+          one(
+            "  const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})\n  const [cvData,setCvData]=useState(null)",
+            "  const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})\n  const [shadowState,setShadowState]=useState({status:'idle',error:'',stats:null,coverage:null,comparison:null})\n  const [cvData,setCvData]=useState(null)"
+          )
+
+          start=text.index("  async function search(){")
+          end=text.index("\n\n  function startProfile(){",start)
           new_search="""  async function search(){
             if(!resumeLoaded){
               setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[]})
@@ -91,16 +87,12 @@ jobs:
               })
             }catch(error){ setState({loading:false,error:error.message||'LinkedIn search failed',coverage:null,stats:null,fetchedAt:null,audit:[]}) }
           }"""
-          replacements.append((old_search,new_search))
-          replacements.append((
-          "    <SearchAudit audit={state.audit}/>\n    {state.coverage?.detail&&",
-          "    <SearchAudit audit={state.audit}/>\n    <ShadowSearchAudit shadowState={shadowState}/>\n    {state.coverage?.detail&&"
-          ))
-          for old,new in replacements:
-            count=text.count(old)
-            if count!=1:
-              raise SystemExit(f'Expected exactly one patch target, found {count}: {old[:80]!r}')
-            text=text.replace(old,new,1)
+          text=text[:start]+new_search+text[end:]
+
+          one(
+            "    <SearchAudit audit={state.audit}/>\n    {state.coverage?.detail&&",
+            "    <SearchAudit audit={state.audit}/>\n    <ShadowSearchAudit shadowState={shadowState}/>\n    {state.coverage?.detail&&"
+          )
           path.write_text(text)
           PY
       - name: Commit page wiring
