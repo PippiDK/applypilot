@@ -1,4 +1,4 @@
-name: maintenance-tdd-red
+name: maintenance-tdd
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - feature/cv-library-3-slots
 
 jobs:
-  targeted-red:
+  targeted-green:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,5 +15,5 @@ jobs:
           node-version: 20
       - name: Install dependencies
         run: npm install
-      - name: Best CV cache contract (expected RED before cleanup)
+      - name: Best CV cache contract
         run: node --test app/lib/best-cv-cache.test.mjs
