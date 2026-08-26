@@ -1,0 +1,47 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+
+const page=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+const css=fs.readFileSync(new URL('../globals.css',import.meta.url),'utf8')
+let statusHelper=''
+try{ statusHelper=fs.readFileSync(new URL('./job-statuses.js',import.meta.url),'utf8') }catch{}
+
+test('manual job statuses are local informational metadata with three explicit states',()=>{
+  assert.match(statusHelper,/JOB_STATUS_STORAGE_KEY/)
+  assert.match(statusHelper,/applied/)
+  assert.match(statusHelper,/considering/)
+  assert.match(statusHelper,/ignore/)
+  assert.match(page,/JOB_STATUS_OPTIONS/)
+  assert.match(page,/readJobStatuses/)
+  assert.match(page,/writeJobStatus/)
+  assert.match(page,/jobStatuses/)
+  assert.match(page,/jobStatusSelect/)
+  assert.match(css,/\.jobStatusSelect/)
+  assert.match(css,/\.status-applied/)
+  assert.match(css,/\.status-considering/)
+  assert.match(css,/\.status-ignore/)
+})
+
+test('manual job statuses never enter Search and never filter Live matches',()=>{
+  const searchStart=page.indexOf('async function search(){')
+  const searchEnd=page.indexOf('\n  function startProfile()',searchStart)
+  assert.ok(searchStart>=0&&searchEnd>searchStart,'search() block must be found')
+  const searchBlock=page.slice(searchStart,searchEnd)
+  assert.doesNotMatch(searchBlock,/jobStatuses|JOB_STATUS/)
+  assert.match(page,/\{jobs\.map\(/)
+  assert.doesNotMatch(page,/jobs\.filter\([^\n]*jobStatuses|jobStatuses[^\n]*jobs\.filter/)
+})
+
+test('Area, Employment type and Work model render directly under the vacancy header before Best CV',()=>{
+  const header=page.indexOf('panelTop expertiseHeader')
+  const conditions=page.indexOf('<div className="conditionGrid">')
+  const best=page.indexOf('<BestCvPanel')
+  assert.ok(header>=0,'vacancy header is missing')
+  assert.ok(conditions>header,'condition cards must render below the vacancy header')
+  assert.ok(best>conditions,'condition cards must render before Best CV')
+  const conditionBlock=page.slice(conditions,best)
+  assert.match(conditionBlock,/>Area</)
+  assert.match(conditionBlock,/>Employment type</)
+  assert.match(conditionBlock,/>Work model</)
+})
