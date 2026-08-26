@@ -1,0 +1,22 @@
+name: Step 2 Targeted Final
+
+on:
+  push:
+    branches:
+      - feature/cv-library-3-slots
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package.json
+      - run: npm install --no-audit --no-fund
+      - name: Step 1 plus Step 2 regression suite
+        run: node --test app/lib/search-profile-library.test.mjs app/lib/search-profile-cache.test.mjs app/lib/multi-cv-search-profile-contract.test.mjs app/lib/union-search-plan.test.mjs app/lib/union-search-plan-ui-contract.test.mjs app/lib/union-search-plan-wiring.test.mjs
+      - name: Production build
+        run: npm run build
