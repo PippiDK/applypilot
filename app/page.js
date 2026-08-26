@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'
 import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'
-import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'
+import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'
 import {requestSearchProfileRoles} from './lib/search-profile-client.js'
 import {readSearchProfileCache,writeSearchProfileCache} from './lib/search-profile-cache.js'
 import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'
@@ -136,6 +136,27 @@ export default function Home(){
     }
   }
 
+  function removeCv(slot){
+    const nextLibrary=removeCvSlot(cvLibrary,slot)
+    localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(nextLibrary))
+    setCvLibrary(nextLibrary)
+    setCvState({loadingSlot:null,error:''})
+    if(slot!==1) return
+
+    localStorage.removeItem(SOURCE_CV_STORAGE_KEY)
+    localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
+    setCvData(null)
+    setProfileRoleState({status:'idle',error:'',source:''})
+    setDecisions({})
+    setReviewOpen(false)
+    setProfile(current=>{
+      const next={...current,cvName:'',factBank:[],skills:[],cvParsedAt:''}
+      if(current.savedAt) localStorage.setItem('applypilot-profile',JSON.stringify(next))
+      return next
+    })
+    setDraft(current=>({...current,cvName:'',factBank:[],skills:[],cvParsedAt:''}))
+  }
+
   async function search(){
     if(!resumeLoaded){
       setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[]})
@@ -267,7 +288,7 @@ export default function Home(){
     setJdAnalysisState({loading:true,error:'',analysis:null,token:'',jobKey:runKey})
     try{
       const result=await requestJobAnalysis({sourceVersion:cvData.sourceVersion,job:active.job})
-      writeJobAnalysisCache({...cacheArgs,analysis:result.analysis,token:result.token||''})
+      writeJobAnalysisCache({...cacheArgs,analysis:result.analysis,token:result.token||'',jobKey:runKey})
       setJdAnalysisState({loading:false,error:'',analysis:result.analysis,token:result.token||'',jobKey:runKey})
     }catch(error){
       setJdAnalysisState({loading:false,error:error.message||'Job analysis failed safely. Please try again.',analysis:null,token:'',jobKey:runKey})
@@ -355,7 +376,7 @@ export default function Home(){
     {profileOpen&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget)closeProfile()}}><div className="modal profileModal">
       <div className="modalHead"><div><p className="eyebrow">BUILD YOUR SEARCH AGENT</p><h2>Search profile</h2></div><button className="close" onClick={closeProfile}>×</button></div>
       <div className="progress"><span style={{width:`${profileStep/5*100}%`}}></span></div><div className="stepMeta"><span>Step {profileStep} of 5</span><span>{profileCompletion}% profile data</span></div>
-      {profileStep===1&&<CvLibraryStep library={cvLibrary} loadingSlot={cvState.loadingSlot} error={cvState.error} primarySkills={draft.skills} onUpload={parseCv}/>} 
+      {profileStep===1&&<CvLibraryStep library={cvLibrary} loadingSlot={cvState.loadingSlot} error={cvState.error} primarySkills={draft.skills} onUpload={parseCv} onRemove={removeCv}/>} 
       {profileStep===2&&<SearchProfileRolesStep primaryRoles={draftPrimaryRoles} adjacentRoles={draftAdjacentRoles} status={profileRoleState.status} error={profileRoleState.error} source={profileRoleState.source} onPrimaryChange={roles=>updateDraftRoles('primaryRoles',roles)} onAdjacentChange={roles=>updateDraftRoles('adjacentRoles',roles)} onRetry={()=>buildProfileRoles({force:true})}/>} 
       {profileStep===3&&<SearchProfileLocationStep locations={draftLocations} workModels={draftWorkModels} onToggleLocation={value=>togglePreference('locations',value)} onToggleWorkModel={value=>togglePreference('workModels',value)}/>} 
       {profileStep===4&&<div className="wizard"><h3>What should ApplyPilot exclude?</h3><p>Save hard no-go roles, industries, languages or working conditions in your Search Profile.</p><textarea value={draft.exclusions} onChange={event=>setDraft(current=>({...current,exclusions:event.target.value}))} rows="6"/></div>}
