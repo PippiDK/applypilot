@@ -1,0 +1,79 @@
+name: cosmetic-ui-apply-v2
+
+on:
+  push:
+    branches:
+      - feature/cv-library-3-slots
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ github.actor == 'PippiDK' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/cv-library-3-slots
+      - name: Apply approved cosmetic UI patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          page_path=Path('app/page.js')
+          page=page_path.read_text()
+
+          anchor="  const cvReadyCount=readyCvs.length\n"
+          insert=(
+            "  const cvReadyCount=readyCvs.length\n"
+            "  const savedUnionSearchPlan=profile?.unionSearchPlan\n"
+            "  const profileSearchPlanSummary=profileReady&&Array.isArray(savedUnionSearchPlan?.directions)&&savedUnionSearchPlan.directions.length\n"
+            "    ? `${savedUnionSearchPlan.directions.length} search directions · ${Number(savedUnionSearchPlan.primaryCount)||0} primary · ${Number(savedUnionSearchPlan.adjacentCount)||0} adjacent`\n"
+            "    : 'Search profile not configured'\n"
+          )
+          assert page.count(anchor)==1, 'cvReadyCount anchor mismatch'
+          page=page.replace(anchor,insert,1)
+
+          old_strip="    <div className=\"profileStrip\"><span>{profileReady?profile.roles.split(',').slice(0,2).join(' · '):'Senior IT Project / Delivery · Denmark'}</span><span>JD responsibilities 40% · experience/domain 25% · geography 20% · career level 15%</span><button className=\"profileEditButton\" onClick={startProfile}>{profileReady?'Edit profile':'Search profile'}</button><button className=\"cvButton\" onClick={startProfile}>{cvReadyCount?`✓ CVs ${cvReadyCount}/${MAX_CVS}`:'Upload CVs'}</button></div>"
+          new_strip="    <div className=\"profileStrip\"><span className=\"profileSearchSummary\">{profileSearchPlanSummary}</span><button className=\"profileEditButton\" onClick={startProfile}>{profileReady?'Edit profile':'Search profile'}</button><button className=\"cvButton\" onClick={startProfile}>{cvReadyCount?`✓ CVs ${cvReadyCount}/${MAX_CVS}`:'Upload CVs'}</button></div>"
+          assert page.count(old_strip)==1, 'profile strip anchor mismatch'
+          page=page.replace(old_strip,new_strip,1)
+
+          old_audits="    <SearchAudit audit={state.audit}/>\n    <ShadowSearchAudit shadowState={shadowState}/>\n"
+          assert page.count(old_audits)==1, 'top audit block anchor mismatch'
+          page=page.replace(old_audits,'',1)
+
+          bottom_anchor="      </div>\n    </section>\n\n    <footer>Milestone: LinkedIn public search only · no CVR · no Jobnet · no additional sources</footer>"
+          bottom_replacement=(
+            "      </div>\n"
+            "    </section>\n\n"
+            "    {(state.audit.length>0||(shadowState.status!=='idle'&&shadowState.status!=='skipped'))&&<section className=\"auditLog\">\n"
+            "      <div className=\"auditLogTitle\">AUDIT LOG</div>\n"
+            "      <SearchAudit audit={state.audit}/>\n"
+            "      <ShadowSearchAudit shadowState={shadowState}/>\n"
+            "    </section>}\n\n"
+            "    <footer>Milestone: LinkedIn public search only · no CVR · no Jobnet · no additional sources</footer>"
+          )
+          assert page.count(bottom_anchor)==1, 'bottom audit placement anchor mismatch'
+          page=page.replace(bottom_anchor,bottom_replacement,1)
+
+          label='<div className="reviewRow"><span>CV</span><b>'
+          assert page.count(label)==1, 'Step 5 CV label anchor mismatch'
+          page=page.replace(label,'<div className="reviewRow"><span>Primary Search CV</span><b>',1)
+          page_path.write_text(page)
+
+          css_path=Path('app/globals.css')
+          css=css_path.read_text()
+          marker='/* cosmetic UI · search plan summary + audit log */'
+          assert marker not in css, 'cosmetic CSS already present'
+          css += '''\n\n/* cosmetic UI · search plan summary + audit log */\n.profileSearchSummary{color:#a9b7b2;font-weight:750}\n.auditLog{margin-top:26px;padding:13px 16px;border:1px solid #223238;border-radius:12px;background:#0d1215;color:#7d9695;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;font-size:11px}\n.auditLogTitle{margin-bottom:5px;color:#6f918f;font-size:10px;font-weight:800;letter-spacing:.16em}\n.auditLog .searchAudit,.auditLog .audit{border-top:1px solid #1c3032;padding:8px 0}\n.auditLog summary{color:#839f9d}\n.auditLog summary strong{color:#8bb7b0}\n.auditLog table{color:#839492}\n.auditLog .muted{color:#627a79}\n'''
+          css_path.write_text(css)
+          PY
+      - name: Commit product changes
+        run: |
+          git config user.name "PippiDK"
+          git config user.email "133820767+PippiDK@users.noreply.github.com"
+          git add app/page.js app/globals.css
+          git diff --cached --check
+          git commit -m "ui: clarify search profile and audit presentation"
+          git push origin HEAD:feature/cv-library-3-slots
