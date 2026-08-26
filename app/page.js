@@ -16,6 +16,7 @@ import SearchAudit from './components/search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
 import SearchProfileRolesStep from './components/search-profile-roles-step.js'
 import SearchProfileLocationStep from './components/search-profile-location-step.js'
+import BestCvPanel from './components/best-cv-panel.js'
 
 const WINDOWS=[1,3,7,14]
 const EMPTY_SEARCH_PROFILE={...DEFAULT_PROFILE,exclusions:''}
@@ -350,6 +351,8 @@ export default function Home(){
       <div className="panel">
         {active?(()=>{const {job}=active; const expertise=expertiseState.jobKey===jobKey?expertiseState.analysis:null; return <>
           <div className="panelTop expertiseHeader"><div><h2>{job.title}</h2><p>{job.company} · {job.location}</p><small className="sourceLine">Source: LinkedIn · {dateText(job.publishedAt)}</small></div></div>
+
+          <BestCvPanel job={job} cvLibrary={cvLibrary}/>
 
           <div className="expertiseHero">
             <div className="expertiseHeroHead"><div><p className="eyebrow">EXPERTISE MATCH</p><p className="expertiseIntro">Full JD ↔ Source CV professional expertise only</p></div><div className="expertiseScore">{expertiseState.loading&&expertiseState.jobKey===jobKey?'…':expertise?`${expertise.expertiseMatch}%`:'N/A'}</div></div>
