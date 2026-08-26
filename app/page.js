@@ -4,7 +4,8 @@ import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveRe
 import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'
 import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'
 import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'
-import {readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'
+import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'
+import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'
 import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'
 import {requestJobAnalysis} from './lib/jd-analysis-client.js'
 import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'
@@ -20,6 +21,7 @@ import BestCvPanel from './components/best-cv-panel.js'
 
 const WINDOWS=[1,3,7,14]
 const EMPTY_SEARCH_PROFILE={...DEFAULT_PROFILE,exclusions:''}
+const EMPTY_ROLE_STATE={status:'idle',error:'',source:'',totalCount:0,analysedCount:0,failedCvs:[]}
 
 function dateText(value){ if(!value) return 'Date unavailable'; const d=new Date(value); if(!Number.isFinite(d.getTime())) return 'Date unavailable'; const days=Math.max(0,Math.floor((Date.now()-d.getTime())/86400000)); return days===0?'Today':days===1?'1 day ago':`${days} days ago` }
 function salary(job){ if(job.salaryMinDkkMonth==null&&job.salaryMaxDkkMonth==null) return 'Insufficient data'; if(job.salaryMinDkkMonth!=null&&job.salaryMaxDkkMonth!=null) return `${job.salaryMinDkkMonth.toLocaleString('en-DK')}–${job.salaryMaxDkkMonth.toLocaleString('en-DK')} DKK/month`; return `${(job.salaryMinDkkMonth??job.salaryMaxDkkMonth).toLocaleString('en-DK')} DKK/month` }
@@ -42,7 +44,7 @@ export default function Home(){
   const [draft,setDraft]=useState(EMPTY_SEARCH_PROFILE)
   const [profileOpen,setProfileOpen]=useState(false)
   const [profileStep,setProfileStep]=useState(1)
-  const [profileRoleState,setProfileRoleState]=useState({status:'idle',error:'',source:''})
+  const [profileRoleState,setProfileRoleState]=useState(EMPTY_ROLE_STATE)
   const [profileSaveState,setProfileSaveState]=useState({loading:false,error:''})
   const [reviewOpen,setReviewOpen]=useState(false)
   const [jdAnalysisState,setJdAnalysisState]=useState({loading:false,error:'',analysis:null,token:'',jobKey:''})
@@ -78,7 +80,11 @@ export default function Home(){
 
   const profileReady=Boolean(profile.savedAt)
   const resumeLoaded=isSourceCvReady(cvData)
-  const cvReadyCount=readyCvCount(cvLibrary)
+  const readyCvs=useMemo(()=>Array.isArray(cvLibrary?.cvs)?cvLibrary.cvs.filter(isSourceCvReady):[],[cvLibrary])
+  const cvReadyCount=readyCvs.length
+  const rolesLibraryFingerprint=searchProfileLibraryFingerprint(readyCvs,SEARCH_PROFILE_BUILDER_VERSION)
+  const draftCvRoleProfiles=Array.isArray(draft.cvRoleProfiles)?draft.cvRoleProfiles:[]
+  const analysedRoleProfileCount=draftCvRoleProfiles.filter(roleProfile=>readyCvs.some(cv=>cv.id===roleProfile.cvId&&cv.sourceVersion===roleProfile.sourceVersion)).length
   const draftPrimaryRoles=roleList(draft.primaryRoles).length?roleList(draft.primaryRoles):(profileReady?legacyRoles(draft.roles):[])
   const draftAdjacentRoles=roleList(draft.adjacentRoles)
   const draftPreferences=normalizeSearchPreferences(draft)
@@ -117,13 +123,13 @@ export default function Home(){
       const nextLibrary=upsertCvSlot(cvLibrary,slot,saved)
       localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(nextLibrary))
       setCvLibrary(nextLibrary)
+      setProfileRoleState(EMPTY_ROLE_STATE)
 
       if(slot===1){
         const primaryCv=getPrimaryCv(nextLibrary)
         localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(primaryCv))
         localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
         setCvData(primaryCv)
-        setProfileRoleState({status:'idle',error:'',source:''})
         setDecisions({})
         setReviewOpen(false)
         setProfile(current=>{
@@ -144,12 +150,12 @@ export default function Home(){
     localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(nextLibrary))
     setCvLibrary(nextLibrary)
     setCvState({loadingSlot:null,error:''})
+    setProfileRoleState(EMPTY_ROLE_STATE)
     if(slot!==1) return
 
     localStorage.removeItem(SOURCE_CV_STORAGE_KEY)
     localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
     setCvData(null)
-    setProfileRoleState({status:'idle',error:'',source:''})
     setDecisions({})
     setReviewOpen(false)
     setProfile(current=>{
@@ -180,7 +186,7 @@ export default function Home(){
     const preferences=normalizeSearchPreferences(base)
     setDraft({...base,...preferences,geography:legacyGeographyFromPreferences(preferences.locations,preferences.workModels)})
     setProfileStep(1)
-    setProfileRoleState({status:'idle',error:'',source:''})
+    setProfileRoleState(EMPTY_ROLE_STATE)
     setProfileSaveState({loading:false,error:''})
     setProfileOpen(true)
     setCvState({loadingSlot:null,error:''})
@@ -188,35 +194,58 @@ export default function Home(){
 
   function closeProfile(){setProfileOpen(false)}
 
-  function applyProfileRoles(roles,source='ai'){
-    const primaryRoles=roleList(roles?.primaryRoles)
-    const adjacentRoles=roleList(roles?.adjacentRoles)
-    setDraft(current=>({...current,primaryRoles,adjacentRoles,roles:combinedRoles(primaryRoles,adjacentRoles),rolesSourceVersion:cvData?.sourceVersion||current.rolesSourceVersion||''}))
-    setProfileRoleState({status:'ready',error:'',source})
+  function applyProfileRoleLibrary({profiles=[],combined={},source='ai',failedCvs=[],totalCount=readyCvs.length,fingerprint=rolesLibraryFingerprint}={}){
+    const primaryRoles=roleList(combined.primaryRoles)
+    const adjacentRoles=roleList(combined.adjacentRoles)
+    const roleSources=Array.isArray(combined.roleSources)?combined.roleSources:[]
+    const status=failedCvs.length?'partial':'ready'
+    const error=failedCvs.length?`Could not analyse ${failedCvs.map(cv=>`CV ${cv.slot} (${cv.fileName})`).join(' · ')}. Successful CV role directions are preserved.`:''
+    setDraft(current=>({...current,primaryRoles,adjacentRoles,roles:combinedRoles(primaryRoles,adjacentRoles),rolesSourceVersion:cvData?.sourceVersion||current.rolesSourceVersion||'',cvRoleProfiles:profiles,roleSources,rolesLibraryFingerprint:fingerprint,rolesBuilderVersion:SEARCH_PROFILE_BUILDER_VERSION}))
+    setProfileRoleState({status,error,source,totalCount,analysedCount:profiles.length,failedCvs})
   }
 
-  async function buildProfileRoles({force=false}={}){
-    if(!resumeLoaded||!cvData?.sourceVersion) return
-    const sourceVersion=cvData.sourceVersion
-    if(!force&&profile.savedAt&&profile.rolesSourceVersion===sourceVersion&&roleList(profile.primaryRoles).length){
-      applyProfileRoles({primaryRoles:profile.primaryRoles,adjacentRoles:profile.adjacentRoles},'saved')
+  async function buildProfileRoles({forceCvIds=[]}={}){
+    if(!readyCvs.length) return
+    const forceSet=new Set(Array.isArray(forceCvIds)?forceCvIds:[])
+    const savedProfiles=Array.isArray(profile.cvRoleProfiles)?profile.cvRoleProfiles:[]
+    const savedProfilesCurrent=savedProfiles.length===readyCvs.length&&readyCvs.every(cv=>savedProfiles.some(roleProfile=>roleProfile.cvId===cv.id&&roleProfile.sourceVersion===cv.sourceVersion))
+
+    if(!forceSet.size&&profile.savedAt&&profile.rolesLibraryFingerprint===rolesLibraryFingerprint&&savedProfilesCurrent&&roleList(profile.primaryRoles).length){
+      const roleSources=Array.isArray(profile.roleSources)?profile.roleSources:combineCvRoleProfiles(savedProfiles).roleSources
+      applyProfileRoleLibrary({profiles:savedProfiles,combined:{primaryRoles:profile.primaryRoles,adjacentRoles:profile.adjacentRoles,roleSources},source:'saved'})
       return
     }
-    if(!force){
-      const cached=readSearchProfileCache({storage:localStorage,sourceVersion})
-      if(cached){
-        applyProfileRoles(cached,'cache')
-        return
+
+    setProfileRoleState({status:'loading',error:'',source:'',totalCount:readyCvs.length,analysedCount:0,failedCvs:[]})
+    const profiles=[]
+    const failedCvs=[]
+    let aiCount=0
+    let cacheCount=0
+
+    for(const cv of readyCvs){
+      try{
+        let roles=forceSet.has(cv.id)?null:readSearchProfileCache({storage:localStorage,sourceVersion:cv.sourceVersion})
+        if(roles){
+          cacheCount++
+        }else{
+          roles=await requestSearchProfileRoles({cvText:cv.cvText})
+          writeSearchProfileCache({storage:localStorage,sourceVersion:cv.sourceVersion,roles})
+          aiCount++
+        }
+        profiles.push(buildCvRoleProfile(cv,roles))
+      }catch(error){
+        failedCvs.push({cvId:cv.id,slot:cv.slot,fileName:cv.fileName,error:error.message||'Search Profile generation failed safely.'})
       }
     }
-    setProfileRoleState({status:'loading',error:'',source:''})
-    try{
-      const roles=await requestSearchProfileRoles({cvText:cvData.cvText})
-      writeSearchProfileCache({storage:localStorage,sourceVersion,roles})
-      applyProfileRoles(roles,'ai')
-    }catch(error){
-      setProfileRoleState({status:'error',error:error.message||'Search Profile generation failed safely. Please try again.',source:''})
+
+    if(!profiles.length){
+      setProfileRoleState({status:'error',error:failedCvs.map(cv=>`CV ${cv.slot}: ${cv.error}`).join(' · ')||'Search Profile generation failed safely. Please try again.',source:'',totalCount:readyCvs.length,analysedCount:0,failedCvs})
+      return
     }
+
+    const combined=combineCvRoleProfiles(profiles)
+    const source=aiCount&&cacheCount?'mixed':aiCount?'ai':'cache'
+    applyProfileRoleLibrary({profiles,combined,source,failedCvs})
   }
 
   function updateDraftRoles(field,roles){
@@ -256,7 +285,7 @@ export default function Home(){
       const geography=legacyGeographyFromPreferences(locations,workModels)
       const compiledExclusions=await resolveSearchProfileExclusions({storage:localStorage,exclusionsText:draft.exclusions,savedProfile:profile,parse:requestSearchProfileExclusions})
       const exclusions=String(draft.exclusions??'').replace(/\s+/g,' ').trim()
-      const saved={...resumeToProfile(draft,cvData),primaryRoles,adjacentRoles,roles:combinedRoles(primaryRoles,adjacentRoles),rolesSourceVersion:cvData?.sourceVersion||draft.rolesSourceVersion||'',locations,workModels,geography,exclusions,exclusionRules:compiledExclusions.rules,exclusionsFingerprint:compiledExclusions.fingerprint,exclusionsParserVersion:compiledExclusions.parserVersion,exclusionsParsedAt:exclusions?new Date().toISOString():'',savedAt:new Date().toISOString()}
+      const saved={...resumeToProfile(draft,cvData),primaryRoles,adjacentRoles,roles:combinedRoles(primaryRoles,adjacentRoles),rolesSourceVersion:cvData?.sourceVersion||draft.rolesSourceVersion||'',cvRoleProfiles:Array.isArray(draft.cvRoleProfiles)?draft.cvRoleProfiles:[],roleSources:Array.isArray(draft.roleSources)?draft.roleSources:[],rolesLibraryFingerprint:draft.rolesLibraryFingerprint||rolesLibraryFingerprint,rolesBuilderVersion:SEARCH_PROFILE_BUILDER_VERSION,locations,workModels,geography,exclusions,exclusionRules:compiledExclusions.rules,exclusionsFingerprint:compiledExclusions.fingerprint,exclusionsParserVersion:compiledExclusions.parserVersion,exclusionsParsedAt:exclusions?new Date().toISOString():'',savedAt:new Date().toISOString()}
       localStorage.setItem('applypilot-profile',JSON.stringify(saved))
       setProfile(saved)
       setDraft(saved)
@@ -392,10 +421,10 @@ export default function Home(){
       <div className="modalHead"><div><p className="eyebrow">BUILD YOUR SEARCH AGENT</p><h2>Search profile</h2></div><button className="close" onClick={closeProfile} disabled={profileSaveState.loading}>×</button></div>
       <div className="progress"><span style={{width:`${profileStep/5*100}%`}}></span></div><div className="stepMeta"><span>Step {profileStep} of 5</span><span>{profileCompletion}% profile data</span></div>
       {profileStep===1&&<CvLibraryStep library={cvLibrary} loadingSlot={cvState.loadingSlot} error={cvState.error} primarySkills={draft.skills} onUpload={parseCv} onRemove={removeCv}/>} 
-      {profileStep===2&&<SearchProfileRolesStep primaryRoles={draftPrimaryRoles} adjacentRoles={draftAdjacentRoles} status={profileRoleState.status} error={profileRoleState.error} source={profileRoleState.source} onPrimaryChange={roles=>updateDraftRoles('primaryRoles',roles)} onAdjacentChange={roles=>updateDraftRoles('adjacentRoles',roles)} onRetry={()=>buildProfileRoles({force:true})}/>} 
+      {profileStep===2&&<SearchProfileRolesStep primaryRoles={draftPrimaryRoles} adjacentRoles={draftAdjacentRoles} status={profileRoleState.status} error={profileRoleState.error} source={profileRoleState.source} totalCount={profileRoleState.totalCount||cvReadyCount} analysedCount={profileRoleState.analysedCount} failedCvs={profileRoleState.failedCvs} onPrimaryChange={roles=>updateDraftRoles('primaryRoles',roles)} onAdjacentChange={roles=>updateDraftRoles('adjacentRoles',roles)} onRetry={()=>buildProfileRoles({forceCvIds:(profileRoleState.failedCvs||[]).map(cv=>cv.cvId)})}/>} 
       {profileStep===3&&<SearchProfileLocationStep locations={draftLocations} workModels={draftWorkModels} onToggleLocation={value=>togglePreference('locations',value)} onToggleWorkModel={value=>togglePreference('workModels',value)}/>} 
       {profileStep===4&&<div className="wizard"><h3>What should ApplyPilot exclude?</h3><p>Optional. Write any hard no-go roles, industries, languages or working conditions. ApplyPilot interprets this text only when you save the profile.</p><textarea value={draft.exclusions} onChange={event=>setDraft(current=>({...current,exclusions:event.target.value}))} rows="6"/></div>}
-      {profileStep===5&&<div className="wizard review"><h3>Confirm your search profile</h3><p>This saves your Search Profile for the next product step. The current LinkedIn search engine remains unchanged in this milestone.</p><div className="reviewRow"><span>CV</span><b>{resumeLoaded?cvData.fileName:cvData?.fileName?'Re-upload required':'Not uploaded yet'}</b></div><div className="reviewRow"><span>CV preparation</span><b>{resumeLoaded?'Ready — complete Source CV prepared':'CV not ready'}</b></div><div className="reviewRow"><span>Target roles</span><b>{draft.roles||'Not set'}</b></div><div className="reviewRow"><span>Where</span><b>{draftLocations.length?draftLocations.join(' · '):'Not set'}</b></div><div className="reviewRow"><span>Work model</span><b>{draftWorkModels.length?workModelText(draftWorkModels):'Not set'}</b></div><div className="reviewRow"><span>Exclude</span><b>{draft.exclusions||'None'}</b></div>{profileSaveState.error&&<div className="errorBox"><b>Search Profile save failed</b><span>{profileSaveState.error}</span></div>}<div className="truth"><b>Truth rule</b><span>ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.</span></div></div>}
+      {profileStep===5&&<div className="wizard review"><h3>Confirm your search profile</h3><p>This saves your Search Profile for the next product step. The current LinkedIn search engine remains unchanged in this milestone.</p><div className="reviewRow"><span>CV</span><b>{resumeLoaded?cvData.fileName:cvData?.fileName?'Re-upload required':'Not uploaded yet'}</b></div><div className="reviewRow"><span>CV preparation</span><b>{resumeLoaded?'Ready — complete Source CV prepared':'CV not ready'}</b></div><div className="reviewRow"><span>Role profiles</span><b>{cvReadyCount?`${analysedRoleProfileCount}/${cvReadyCount} CVs analysed`:'Not generated'}</b></div><div className="reviewRow"><span>Target roles</span><b>{draft.roles||'Not set'}</b></div><div className="reviewRow"><span>Where</span><b>{draftLocations.length?draftLocations.join(' · '):'Not set'}</b></div><div className="reviewRow"><span>Work model</span><b>{draftWorkModels.length?workModelText(draftWorkModels):'Not set'}</b></div><div className="reviewRow"><span>Exclude</span><b>{draft.exclusions||'None'}</b></div>{profileSaveState.error&&<div className="errorBox"><b>Search Profile save failed</b><span>{profileSaveState.error}</span></div>}<div className="truth"><b>Truth rule</b><span>ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.</span></div></div>}
       <div className="modalActions"><button className="secondary" disabled={profileSaveState.loading} onClick={()=>profileStep===1?closeProfile():setProfileStep(step=>step-1)}>{profileStep===1?'Cancel':'Back'}</button>{profileStep<5?<button className="primary" disabled={(profileStep===1&&(Boolean(cvState.loadingSlot)||cvReadyCount===0))||(profileStep===2&&profileRoleState.status==='loading')} onClick={nextProfileStep}>Continue</button>:<button className="primary" disabled={profileSaveState.loading} onClick={saveProfile}>{profileSaveState.loading?'Saving profile…':'Save profile'}</button>}</div>
     </div></div>}
 
