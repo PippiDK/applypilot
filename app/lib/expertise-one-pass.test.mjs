@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {evaluateExpertiseOnePass} from './expertise-one-pass.js'
+import {EXPERTISE_ONE_PASS_INSTRUCTIONS,evaluateExpertiseOnePass} from './expertise-one-pass.js'
 
 const job={
   title:'Integration Programme Manager',
@@ -23,6 +23,14 @@ test('evaluates JD and Source CV in one AI call and returns deterministic-score 
   assert.equal(captured.input.sourceCv,cv)
   assert.equal(out.requirements.length,2)
   assert.equal(out.evaluations[1].status,'MATCHED')
+})
+
+test('prompt requires atomic split of generic delivery from specialist campaign or production context',()=>{
+  assert.match(EXPERTISE_ONE_PASS_INSTRUCTIONS,/atomic/i)
+  assert.match(EXPERTISE_ONE_PASS_INSTRUCTIONS,/end-to-end delivery/i)
+  assert.match(EXPERTISE_ONE_PASS_INSTRUCTIONS,/campaign/i)
+  assert.match(EXPERTISE_ONE_PASS_INSTRUCTIONS,/production/i)
+  assert.match(EXPERTISE_ONE_PASS_INSTRUCTIONS,/separate/i)
 })
 
 test('rejects invented CV evidence',async()=>{
