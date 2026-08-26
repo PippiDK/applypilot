@@ -12,3 +12,14 @@
 
 /* Right panel — Expertise Match primary hierarchy */
 .expertiseHeader{display:block}.expertiseHeader h2{font-size:28px;margin:0 0 8px}.expertiseHeader p{margin:0 0 14px;color:#aab3bf}.expertiseHero{margin:22px 0 14px;padding:22px;border:1px solid #285e4a;background:#101915;border-radius:16px}.expertiseHeroHead{display:flex;justify-content:space-between;gap:20px;align-items:flex-start}.expertiseIntro{margin:0;color:#809087;font-size:11px}.expertiseScore{font-size:52px;line-height:1;font-weight:900;color:#7ee2b8;white-space:nowrap}.expertiseLoading{padding:18px 0;color:#aab5ae}.expertiseSection{padding:18px 0;border-top:1px solid #24362f}.expertiseSection h3{margin:0 0 10px;font-size:15px}.expertiseSection p{margin:8px 0;color:#c3ccc7;line-height:1.45}.expertiseBreakdown{display:grid;grid-template-columns:1fr 1fr;gap:9px}.expertiseBreakdown>div{display:flex;justify-content:space-between;gap:10px;align-items:center;background:#151d19;border:1px solid #263a32;border-radius:10px;padding:11px 12px}.expertiseBreakdown span{font-size:11px;color:#8e9a94}.expertiseBreakdown b{color:#dce6e1;font-size:13px}.conditionGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 14px}.conditionCard{min-width:0;background:#151a20;border:1px solid #29313a;border-radius:11px;padding:12px}.conditionCard small{display:block;color:#778491;font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800}.conditionCard b{display:block;color:#dbe2e8;font-size:18px;margin:5px 0}.conditionCard span{display:block;color:#8d98a4;font-size:10px;line-height:1.35;overflow-wrap:anywhere}@media(max-width:900px){.conditionGrid{grid-template-columns:1fr 1fr}}@media(max-width:620px){.expertiseHeroHead{flex-direction:column}.expertiseScore{font-size:42px}.expertiseBreakdown{grid-template-columns:1fr}.conditionGrid{grid-template-columns:1fr 1fr}}
+
+
+/* Manual vacancy status — informational only; never filters or scores jobs */
+.jobWrap{position:relative;margin:10px 0}
+.jobWrap .job{margin:0;padding-bottom:48px}
+.jobStatusSelect{position:absolute;left:90px;bottom:12px;z-index:2;max-width:170px;border-radius:999px;padding:5px 24px 5px 9px;background:#12171c;border:1px solid #343d48;color:#8994a1;font-size:9px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;outline:none}
+.jobStatusSelect.status-none{border-color:#343d48;color:#8994a1;background:#12171c}
+.jobStatusSelect.status-applied{border-color:#285e4a;color:#7ee2b8;background:#132019}
+.jobStatusSelect.status-considering{border-color:#65552d;color:#e7c56a;background:#211d12}
+.jobStatusSelect.status-ignore{border-color:#743d41;color:#ef9da2;background:#281819}
+@media(max-width:780px){.jobStatusSelect{left:90px}}
