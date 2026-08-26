@@ -33,7 +33,9 @@ Requirement extraction:
 - importance=critical only for explicit must-have/minimum/required expertise central to the role; core for major day-to-day capability; supporting for preferred/secondary capability.
 - minimumYears=0 unless the JD explicitly states a minimum duration for that exact capability.
 - Preserve an explicit OR as one requirement: satisfying any accepted branch fully satisfies that requirement.
-- For a material AND compound, use PARTIAL when only some essential components are evidenced.
+- Atomicity is mandatory: each item must represent one professionally judgeable capability. If a JD phrase combines a generic capability that can be evidenced independently with a specialist domain/context qualifier, separate them into distinct requirements before judging evidence.
+- Example: for "end-to-end campaign and production delivery", if the Source CV evidences end-to-end programme/project delivery but not campaign or creative-production context, extract and judge "end-to-end delivery" separately from the campaign/production specialist context. Do not downgrade the generic end-to-end delivery capability to TRANSFERABLE solely because the specialist context differs.
+- Use PARTIAL for a material AND compound only when the components are genuinely inseparable as one capability; otherwise split independently material components first.
 - When a sentence combines a broad transferable capability with a specialist domain qualifier, separate them when they are independently material. Example: cross-functional leadership can be evidenced even if AI-domain leadership is not.
 
 Evidence judgement:
