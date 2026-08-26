@@ -10,6 +10,7 @@ test('right panel uses dedicated Expertise Match analysis and keeps the agreed v
   assert.match(page,/evaluateJobConditions/)
   assert.match(page,/EXPERTISE MATCH/)
   assert.match(page,/Why you fit/)
+  assert.match(page,/Transferable strengths/)
   assert.match(page,/Expertise gaps/)
   assert.match(page,/Expertise breakdown/)
   assert.match(page,/Source: LinkedIn/)
