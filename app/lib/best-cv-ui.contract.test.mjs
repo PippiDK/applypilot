@@ -23,14 +23,14 @@ test('Best CV component is manual, cached and has no Best CV percentage',()=>{
   assert.doesNotMatch(component,/bestCv[^\n]{0,80}%/i)
 })
 
-test('Best CV result renders one existing CV, advice, ranking and explicit use action',()=>{
+test('Best CV result is recommendation-only with advice, ranking and no selection action',()=>{
   assert.match(component,/recommendedCvId/)
   assert.match(component,/USE AS IS/)
   assert.match(component,/UPDATE RECOMMENDED/)
   assert.match(component,/updateFocus/)
   assert.match(component,/rankedCvIds/)
-  assert.match(component,/Use this CV/)
-  assert.match(component,/Selected for this job/)
+  assert.doesNotMatch(component,/Use this CV|Selected for this job/)
+  assert.doesNotMatch(component,/readBestCvSelection|writeBestCvSelection|selectedCvId|useRecommendedCv/)
 })
 
 test('Best CV component cannot call Expertise Match or LinkedIn Search',()=>{
