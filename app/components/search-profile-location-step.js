@@ -1,4 +1,5 @@
 'use client'
+import styles from './search-profile-location-step.module.css'
 
 const LOCATION_LABELS=[['Denmark','Denmark'],['EU/EMEA','EU / EMEA'],['Worldwide','Worldwide']]
 const WORK_MODEL_LABELS=[['hybrid','Hybrid'],['onsite','On-site'],['remote','Remote']]
@@ -8,7 +9,7 @@ export default function SearchProfileLocationStep({locations=[],workModels=[],on
     <h3>Where can you work?</h3>
     <p>Choose where you want ApplyPilot to search and which work models you accept.</p>
 
-    <div className="preferenceGroup">
+    <div className={styles.group}>
       <small>WHERE</small>
       <div className="choiceGrid">
         {LOCATION_LABELS.map(([value,label])=>{
@@ -18,7 +19,7 @@ export default function SearchProfileLocationStep({locations=[],workModels=[],on
       </div>
     </div>
 
-    <div className="preferenceGroup">
+    <div className={styles.group}>
       <small>WORK MODEL</small>
       <div className="choiceGrid">
         {WORK_MODEL_LABELS.map(([value,label])=>{
