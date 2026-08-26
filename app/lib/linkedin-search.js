@@ -29,7 +29,7 @@ const FINTECH_TERMS = ['fintech','banking','bank','trading','post-trade','paymen
 
 
 const RESPONSIBILITY_CATEGORIES = {
-  end_to_end: [/\bend[- ]to[- ]end\b.{0,80}\b(deliver|delivery|project|programme|program|execution|ownership)\b/i, /\b(full lifecycle|full life cycle)\b/i, /\b(own|owns|owned|take|takes|taking)\b.{0,35}\b(full|end[- ]to[- ]end)?\s*(delivery|lifecycle|project|programme|program)\b/i, /\blead and deliver\b/i, /\blead delivery\b/i],
+  end_to_end: [/end[- ]to[- ]end\b.{0,80}\b(deliver|delivery|project|programme|program|execution|ownership)\b/i, /\b(full lifecycle|full life cycle)\b/i, /\b(own|owns|owned|take|takes|taking)\b.{0,35}\b(full|end[- ]to[- ]end)?\s*(delivery|lifecycle|project|programme|program)\b/i, /\blead and deliver\b/i, /\blead delivery\b/i],
   scope_schedule: [/\b(scope|timeline|timelines|schedule|schedules|milestone|milestones)\b/i, /\b(on time|within scope|delivery plan|project plan|integrated plan)\b/i],
   risk_dependencies: [/\brisks?\b/i, /\bdependencies\b/i, /\braid\b/i, /\bissues?\b.{0,25}\bdependencies\b/i],
   budget_financial: [/\bbudget(s|ing)?\b/i, /\bfinancial (management|tracking|control|performance|forecast|forecasting)\b/i, /\bcapex\b|\bopex\b|\bcost control\b|\bforecasting\b/i],
