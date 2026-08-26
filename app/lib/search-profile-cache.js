@@ -1,5 +1,7 @@
 import {SEARCH_PROFILE_BUILDER_VERSION,SEARCH_PROFILE_EXCLUSIONS_VERSION} from './search-profile-ai.js'
 
+export {SEARCH_PROFILE_BUILDER_VERSION}
+
 const PREFIX='applypilot-search-profile'
 const EXCLUSIONS_PREFIX='applypilot-search-profile-exclusions'
 const text=value=>String(value??'').trim()
