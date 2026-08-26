@@ -14,7 +14,9 @@ import {requestExpertiseMatch} from './lib/expertise-match-client.js'
 import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'
 import {evaluateJobConditions} from './lib/job-conditions.js'
 import {fitLabel} from './lib/fit-label.js'
+import {compareShadowToLegacy} from './lib/shadow-search-compare.js'
 import SearchAudit from './components/search-audit.js'
+import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
 import SearchProfileRolesStep from './components/search-profile-roles-step.js'
 import SearchProfileLocationStep from './components/search-profile-location-step.js'
@@ -39,6 +41,7 @@ export default function Home(){
   const [jobs,setJobs]=useState([])
   const [selected,setSelected]=useState(null)
   const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
+  const [shadowState,setShadowState]=useState({status:'idle',error:'',stats:null,coverage:null,comparison:null})
   const [cvData,setCvData]=useState(null)
   const [cvLibrary,setCvLibrary]=useState(()=>createCvLibrary())
   const [cvState,setCvState]=useState({loadingSlot:null,error:''})
@@ -170,19 +173,50 @@ export default function Home(){
   }
 
   async function search(){
-    if(!resumeLoaded){
-      setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[]})
-      return
-    }
-    setJobs([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
-    try{
-      const res=await fetch('/api/linkedin-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,cvText:cvData.cvText})})
-      const data=await res.json()
-      if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
-      setJobs(Array.isArray(data.jobs)?data.jobs:[])
-      setState({loading:false,error:'',coverage:data.coverage||null,stats:data.stats||null,fetchedAt:data.fetchedAt||null,audit:Array.isArray(data.audit)?data.audit:[]})
-    }catch(error){ setState({loading:false,error:error.message||'LinkedIn search failed',coverage:null,stats:null,fetchedAt:null,audit:[]}) }
+  if(!resumeLoaded){
+    setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[]})
+    return
   }
+  setJobs([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
+  setShadowState({status:'idle',error:'',stats:null,coverage:null,comparison:null})
+  const shadowPlan=profile?.unionSearchPlan
+  const shadowPromise=Array.isArray(shadowPlan?.directions)&&shadowPlan.directions.length
+    ? fetch('/api/linkedin-shadow-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,unionSearchPlan:profile.unionSearchPlan})})
+        .then(async shadowRes=>{
+          const shadowData=await shadowRes.json()
+          if(!shadowRes.ok) throw new Error(shadowData.error||'LinkedIn shadow search failed')
+          return shadowData
+        })
+        .catch(error=>({__shadowError:error.message||'LinkedIn shadow search failed'}))
+    : Promise.resolve(null)
+  try{
+    const res=await fetch('/api/linkedin-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,cvText:cvData.cvText})})
+    const data=await res.json()
+    if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
+    setJobs(Array.isArray(data.jobs)?data.jobs:[])
+    setState({loading:false,error:'',coverage:data.coverage||null,stats:data.stats||null,fetchedAt:data.fetchedAt||null,audit:Array.isArray(data.audit)?data.audit:[]})
+    void shadowPromise.then(shadow=>{
+      if(!shadow){
+        setShadowState({status:'skipped',error:'',stats:null,coverage:null,comparison:null})
+        return
+      }
+      if(shadow.__shadowError){
+        setShadowState({status:'error',error:shadow.__shadowError,stats:null,coverage:null,comparison:null})
+        return
+      }
+      setShadowState({
+        status:'ready',
+        error:'',
+        stats:shadow.stats||null,
+        coverage:shadow.coverage||null,
+        comparison:compareShadowToLegacy({
+          candidates:Array.isArray(shadow.candidates)?shadow.candidates:[],
+          legacyAudit:Array.isArray(data.audit)?data.audit:[]
+        })
+      })
+    })
+  }catch(error){ setState({loading:false,error:error.message||'LinkedIn search failed',coverage:null,stats:null,fetchedAt:null,audit:[]}) }
+}
 
   function startProfile(){
     const base=resumeToProfile(profile,cvData)
@@ -365,6 +399,7 @@ export default function Home(){
     {state.error&&<div className="errorBox"><b>{state.error==='Please Upload Your CV'?'Please Upload Your CV':'LinkedIn search failed'}</b>{state.error!=='Please Upload Your CV'&&<span>{state.error}</span>}</div>}
     {state.stats&&<div className="searchMeta"><span><b>{state.stats.discovered}</b> jobs discovered</span><span><b>{state.stats.fullJdVerified}</b> full JDs read</span><span><b>{state.stats.evaluated}</b> worthwhile after evaluation</span><span>Coverage: <b>{state.coverage?.status}</b></span></div>}
     <SearchAudit audit={state.audit}/>
+    <ShadowSearchAudit shadowState={shadowState}/>
     {state.coverage?.detail&&<div className="warningBox">Partial source access: {state.coverage.detail}</div>}
 
     <section className="grid">
