@@ -17,10 +17,13 @@ test('Area is scored only against explicit preferred locations',()=>{
   assert.equal(moon.area.score,0)
 })
 
-test('Salary is informational/preference-based and missing salary returns N/A rather than zero',()=>{
-  const result=evaluateJobConditions(job,{salary:'75000'})
-  assert.equal(result.salary.score,50)
-  assert.match(result.salary.value,/70\.583–103\.758 DKK\/month/)
+test('Salary remains factual information and never depends on a profile floor',()=>{
+  const withFloor=evaluateJobConditions(job,{salary:'75000'})
+  const withoutFloor=evaluateJobConditions(job,{})
+  assert.equal(withFloor.salary.score,null)
+  assert.equal(withoutFloor.salary.score,null)
+  assert.equal(withFloor.salary.value,withoutFloor.salary.value)
+  assert.match(withFloor.salary.value,/70\.583–103\.758 DKK\/month/)
   const missing=evaluateJobConditions({...job,salaryMinDkkMonth:null,salaryMaxDkkMonth:null},{salary:'75000'})
   assert.equal(missing.salary.score,null)
   assert.equal(missing.salary.value,'Not stated')
