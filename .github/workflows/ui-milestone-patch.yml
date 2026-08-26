@@ -1,0 +1,137 @@
+name: UI Milestone Patch
+
+on:
+  push:
+    branches:
+      - feature/cv-library-3-slots
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, 'wire manual job statuses and header facts') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/cv-library-3-slots
+          fetch-depth: 0
+      - name: Apply bounded UI patch
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          page_path=Path('app/page.js')
+          page=page_path.read_text()
+
+          def replace_once(text, old, new, label):
+              count=text.count(old)
+              if count!=1:
+                  raise SystemExit(f'{label}: expected 1 occurrence, found {count}')
+              return text.replace(old,new,1)
+
+          page=replace_once(
+              page,
+              "import {compareShadowToLegacy} from './lib/shadow-search-compare.js'\n",
+              "import {compareShadowToLegacy} from './lib/shadow-search-compare.js'\nimport {JOB_STATUS_OPTIONS,readJobStatuses,writeJobStatus} from './lib/job-statuses.js'\n",
+              'job statuses import'
+          )
+
+          page=replace_once(
+              page,
+              "  const [selected,setSelected]=useState(null)\n  const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})\n",
+              "  const [selected,setSelected]=useState(null)\n  const [jobStatuses,setJobStatuses]=useState({})\n  const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})\n",
+              'job statuses state'
+          )
+
+          page=replace_once(
+              page,
+              "  },[])\n\n  const profileReady=Boolean(profile.savedAt)\n",
+              "  },[])\n\n  useEffect(()=>{\n    setJobStatuses(readJobStatuses(localStorage))\n  },[])\n\n  const profileReady=Boolean(profile.savedAt)\n",
+              'job statuses hydration'
+          )
+
+          page=replace_once(
+              page,
+              "  async function search(){\n",
+              "  function changeJobStatus(jobId,status){\n    setJobStatuses(current=>writeJobStatus({storage:localStorage,statuses:current,jobId,status}))\n  }\n\n  async function search(){\n",
+              'manual status change handler'
+          )
+
+          old_list="""        {jobs.map(item=>{const {job,evaluation}=item; const score=Math.round(evaluation.score*10); return <button key={job.sourceJobId} onClick={()=>setSelected(item)} className={'job '+(active?.job.sourceJobId===job.sourceJobId?'active':'')}>
+          <span className="score">{fitLabel(score)}</span>
+          <span><b>{job.title}</b><small>{job.company} · {job.location}</small><small className="sourceLine">LinkedIn · {dateText(job.publishedAt)}</small></span>
+          <span>→</span>
+        </button>})}
+"""
+          new_list="""        {jobs.map(item=>{const {job,evaluation}=item; const score=Math.round(evaluation.score*10); const manualStatus=jobStatuses[job.sourceJobId]||''; return <div className="jobWrap" key={job.sourceJobId}>
+          <button onClick={()=>setSelected(item)} className={'job '+(active?.job.sourceJobId===job.sourceJobId?'active':'')}>
+            <span className="score">{fitLabel(score)}</span>
+            <span><b>{job.title}</b><small>{job.company} · {job.location}</small><small className="sourceLine">LinkedIn · {dateText(job.publishedAt)}</small></span>
+            <span>→</span>
+          </button>
+          <select aria-label={`Status for ${job.title}`} className={`jobStatusSelect status-${manualStatus||'none'}`} value={manualStatus} onChange={event=>changeJobStatus(job.sourceJobId,event.target.value)}>
+            {JOB_STATUS_OPTIONS.map(option=><option key={option.value||'none'} value={option.value}>{option.label}</option>)}
+          </select>
+        </div>})}
+"""
+          page=replace_once(page,old_list,new_list,'Live matches status controls')
+
+          condition_block="""          <div className="conditionGrid">
+            <div className="conditionCard"><small>Area</small><b>{conditionScore(jobConditions?.area.score)}</b><span>{jobConditions?.area.value||'Not stated'}</span></div>
+            <div className="conditionCard"><small>Salary</small><b>{conditionScore(jobConditions?.salary.score)}</b><span>{jobConditions?.salary.value||'Not stated'}</span></div>
+            <div className="conditionCard"><small>Employment type</small><b>{conditionScore(jobConditions?.employmentType.score)}</b><span>{jobConditions?.employmentType.value||'Not stated'}</span></div>
+            <div className="conditionCard"><small>Work model</small><b>{conditionScore(jobConditions?.workModel.score)}</b><span>{jobConditions?.workModel.value||'Not stated'}</span></div>
+          </div>
+"""
+          count=page.count(condition_block)
+          if count!=1:
+              raise SystemExit(f'condition grid: expected 1 occurrence, found {count}')
+          page=page.replace(condition_block,'',1)
+
+          header_line="""          <div className="panelTop expertiseHeader"><div><h2>{job.title}</h2><p>{job.company} · {job.location}</p><small className="sourceLine">Source: LinkedIn · {dateText(job.publishedAt)}</small></div></div>
+
+          <BestCvPanel job={job} cvLibrary={cvLibrary}/>
+"""
+          header_with_facts="""          <div className="panelTop expertiseHeader"><div><h2>{job.title}</h2><p>{job.company} · {job.location}</p><small className="sourceLine">Source: LinkedIn · {dateText(job.publishedAt)}</small></div></div>
+
+          <div className="conditionGrid">
+            <div className="conditionCard"><small>Area</small><b>{conditionScore(jobConditions?.area.score)}</b><span>{jobConditions?.area.value||'Not stated'}</span></div>
+            <div className="conditionCard"><small>Salary</small><b>{conditionScore(jobConditions?.salary.score)}</b><span>{jobConditions?.salary.value||'Not stated'}</span></div>
+            <div className="conditionCard"><small>Employment type</small><b>{conditionScore(jobConditions?.employmentType.score)}</b><span>{jobConditions?.employmentType.value||'Not stated'}</span></div>
+            <div className="conditionCard"><small>Work model</small><b>{conditionScore(jobConditions?.workModel.score)}</b><span>{jobConditions?.workModel.value||'Not stated'}</span></div>
+          </div>
+
+          <BestCvPanel job={job} cvLibrary={cvLibrary}/>
+"""
+          page=replace_once(page,header_line,header_with_facts,'header factual cards')
+          page_path.write_text(page)
+
+          css_path=Path('app/globals.css')
+          css=css_path.read_text()
+          marker='/* Manual vacancy status — informational only; never filters or scores jobs */'
+          if marker in css:
+              raise SystemExit('manual status CSS already present')
+          css += """
+
+/* Manual vacancy status — informational only; never filters or scores jobs */
+.jobWrap{position:relative;margin:10px 0}
+.jobWrap .job{margin:0;padding-bottom:48px}
+.jobStatusSelect{position:absolute;left:90px;bottom:12px;z-index:2;max-width:170px;border-radius:999px;padding:5px 24px 5px 9px;background:#12171c;border:1px solid #343d48;color:#8994a1;font-size:9px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;outline:none}
+.jobStatusSelect.status-none{border-color:#343d48;color:#8994a1;background:#12171c}
+.jobStatusSelect.status-applied{border-color:#285e4a;color:#7ee2b8;background:#132019}
+.jobStatusSelect.status-considering{border-color:#65552d;color:#e7c56a;background:#211d12}
+.jobStatusSelect.status-ignore{border-color:#743d41;color:#ef9da2;background:#281819}
+@media(max-width:780px){.jobStatusSelect{left:90px}}
+"""
+          css_path.write_text(css)
+          PY
+
+          git diff --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app/page.js app/globals.css
+          git commit -m "feat: wire manual job statuses and header facts"
+          git push origin feature/cv-library-3-slots
