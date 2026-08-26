@@ -2,8 +2,8 @@ import {EXPERTISE_CATEGORIES,EXPERTISE_IMPORTANCE} from './expertise-requirement
 import {EXPERTISE_EVALUATION_STATUSES} from './expertise-evaluator.js'
 
 const IMPORTANCE_WEIGHT={critical:3,core:2,supporting:1}
-const STATUS_CREDIT={MATCHED:1,TRANSFERABLE:.75,PARTIAL:.4,NOT_EVIDENCED:0}
-const GAP_STATUS_RANK={NOT_EVIDENCED:0,PARTIAL:1}
+const STATUS_CREDIT={MATCHED:1,TRANSFERABLE:.25,PARTIAL:.4,NOT_EVIDENCED:0}
+const GAP_STATUS_RANK={NOT_EVIDENCED:0,PARTIAL:1,TRANSFERABLE:2}
 
 function scoreFor(items=[]){
   const possible=items.reduce((sum,item)=>sum+(IMPORTANCE_WEIGHT[item.importance]||0),0)
@@ -36,8 +36,9 @@ export function evaluateExpertiseFromJudgements(requirements=[],evaluations=[]){
   const breakdown={}
   for(const category of EXPERTISE_CATEGORIES){
     const items=evaluated.filter(item=>item.category===category)
+    const materialItems=items.filter(item=>item.importance==='critical'||item.importance==='core')
     breakdown[category]={
-      score:scoreFor(items),
+      score:scoreFor(materialItems),
       matched:items.filter(x=>x.status==='MATCHED').length,
       transferable:items.filter(x=>x.status==='TRANSFERABLE').length,
       partial:items.filter(x=>x.status==='PARTIAL').length,
@@ -50,16 +51,14 @@ export function evaluateExpertiseFromJudgements(requirements=[],evaluations=[]){
   const fit=[...evaluated]
     .filter(x=>x.status==='MATCHED')
     .sort((a,b)=>importanceRank(a.importance)-importanceRank(b.importance))
-  const transferable=[...evaluated]
-    .filter(x=>x.status==='TRANSFERABLE')
-    .sort((a,b)=>importanceRank(a.importance)-importanceRank(b.importance))
   const gaps=[...evaluated]
-    .filter(x=>x.status==='PARTIAL'||x.status==='NOT_EVIDENCED')
+    .filter(x=>x.status==='TRANSFERABLE'||x.status==='PARTIAL'||x.status==='NOT_EVIDENCED')
     .sort((a,b)=>importanceRank(a.importance)-importanceRank(b.importance)||(GAP_STATUS_RANK[a.status]??9)-(GAP_STATUS_RANK[b.status]??9))
 
   const whyYouFit=fit.slice(0,5).map(item=>item.capability)
-  const transferableStrengths=transferable.slice(0,5).map(item=>item.capability)
+  const transferableStrengths=[]
   const expertiseGaps=gaps.slice(0,5).map(item=>{
+    if(item.status==='TRANSFERABLE') return `${item.capability} — specialist context not evidenced in Source CV`
     if(item.status==='PARTIAL') return `${item.capability} — partially evidenced in Source CV`
     return `${item.capability} — not evidenced in Source CV`
   })
