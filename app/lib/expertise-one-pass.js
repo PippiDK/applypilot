@@ -30,21 +30,24 @@ Never invent experience, qualifications, dates, tools, industries, achievements,
 Requirement extraction:
 - Return only material professional requirements; ignore marketing, benefits, culture slogans, and generic personality language.
 - Use at most 18 requirements and exactly one category per requirement: delivery_execution, domain_functional_expertise, technical_platform_capabilities, leadership_stakeholder_scope, required_experience_qualifications.
+- technical_platform_capabilities is only for explicit technical tools, systems, platforms, integrations, engineering, architecture, or similarly technical capabilities. Do not place generic project delivery, stakeholder work, campaign/production work, or general business-process experience there.
+- required_experience_qualifications is only for explicit candidate qualification gates such as required years, degree, certification, language, eligibility/work authorization, or explicitly required prior experience. Do not place ordinary role responsibilities there.
 - importance=critical only for explicit must-have/minimum/required expertise central to the role; core for major day-to-day capability; supporting for preferred/secondary capability.
 - minimumYears=0 unless the JD explicitly states a minimum duration for that exact capability.
 - Preserve an explicit OR as one requirement: satisfying any accepted branch fully satisfies that requirement.
 - Atomicity is mandatory: each item must represent one professionally judgeable capability. If a JD phrase combines a generic capability that can be evidenced independently with a specialist domain/context qualifier, separate them into distinct requirements before judging evidence.
 - Example: for "end-to-end campaign and production delivery", if the Source CV evidences end-to-end programme/project delivery but not campaign or creative-production context, extract and judge "end-to-end delivery" separately from the campaign/production specialist context. Do not downgrade the generic end-to-end delivery capability to TRANSFERABLE solely because the specialist context differs.
+- Payroll example: if a JD combines payroll or employee-lifecycle context with broad transformation leadership, extract generic transformation delivery and cross-functional leadership separately from payroll / employee-lifecycle domain expertise. Never turn generic transformation delivery into a claim of payroll expertise.
 - Use PARTIAL for a material AND compound only when the components are genuinely inseparable as one capability; otherwise split independently material components first.
 - When a sentence combines a broad transferable capability with a specialist domain qualifier, separate them when they are independently material. Example: cross-functional leadership can be evidenced even if AI-domain leadership is not.
 
 Evidence judgement:
 MATCHED = direct Source CV evidence or a normal professional semantic equivalent. Different wording is not a penalty. Full lifecycle delivery through go-live can directly evidence end-to-end programme delivery.
-TRANSFERABLE = the underlying capability is strongly evidenced but a material specialist context/domain differs. Do not use this when an explicit OR branch is already directly satisfied.
+TRANSFERABLE = the underlying generic capability is strongly evidenced but a material specialist context/domain differs. TRANSFERABLE is a conservative gap signal, never a claim that the candidate has the specialist context. Do not use this when an explicit OR branch is already directly satisfied.
 PARTIAL = only part of the requirement is evidenced, or an explicit required duration is not supported.
 NOT_EVIDENCED = no meaningful Source CV evidence exists.
 Do not erase generic delivery, governance, leadership, stakeholder, or programme-management evidence merely because a specialist AI/M&A/industry qualifier is absent.
-Do not over-credit specialist expertise: generic project leadership is not direct AI product management, Responsible AI, M&A integration, or another named specialty.
+Do not over-credit specialist expertise: generic project leadership is not direct AI product management, Responsible AI, M&A integration, payroll expertise, creative production expertise, or another named specialty.
 Treat broad education categories semantically: finance/accounting is business education when the JD accepts business or related disciplines.
 
 Grounding rules:
