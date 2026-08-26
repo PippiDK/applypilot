@@ -34,6 +34,24 @@ Current gap to resolve deliberately:
 
 ## PLANNED
 
+### Multi-source sourcing — Jobindex first
+
+Add Jobindex as the first second sourcing engine after the core personalization/persistence loop is stable.
+
+Architecture rule:
+- each source owns only its own discovery/detail parsing adapter;
+- LinkedIn, Jobindex and future sources normalize into one canonical Job model;
+- common role gates, Full JD evaluation, scoring, Live Matches and Audit Log remain source-agnostic;
+- a parser/HTML change in one source must not break the other source or the common evaluation core.
+
+Jobindex implementation direction:
+- build a dedicated Jobindex discovery + detail/JD adapter;
+- preserve a stable Jobindex `sourceJobId`, posting metadata, application URL and source provenance where available;
+- use Persistent Job Memory so a republished/re-surfaced listing with the same stable identity is `SEEN` / `UPDATED`, not a false `NEW` vacancy;
+- deduplicate the same vacancy found on LinkedIn and Jobindex using stable source identities plus a canonical vacancy fingerprint, not title/company text alone;
+- expose per-source coverage/parser-health diagnostics so Audit can distinguish source failure from common evaluation decisions;
+- after Jobindex is proven stable, evaluate whether IT-Jobbank can reuse the same adapter family.
+
 ### Vacancy filtering and sorting — after UX evidence
 
 Do not add controls just because they are conventional. Observe real usage first.
