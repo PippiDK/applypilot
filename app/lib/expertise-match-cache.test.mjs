@@ -15,8 +15,8 @@ test('cache key is scoped by LinkedIn job id and CV source version',()=>{
   assert.notEqual(expertiseMatchCacheKey('4407027317','cv-v1'),expertiseMatchCacheKey('9999999999','cv-v1'))
 })
 
-test('Expertise Match presentation fix uses a fresh v2 cache namespace',()=>{
-  assert.match(expertiseMatchCacheKey('4407027317','cv-v1'),/^applypilot-expertise-match:v2:/)
+test('Bug 6 uses a fresh v3 cache namespace',()=>{
+  assert.match(expertiseMatchCacheKey('4407027317','cv-v1'),/^applypilot-expertise-match:v3:/)
 })
 
 test('saved Expertise Match is reused for the same job id and CV source version',()=>{
