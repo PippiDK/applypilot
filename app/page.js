@@ -288,7 +288,7 @@ export default function Home(){
     setJdAnalysisState({loading:true,error:'',analysis:null,token:'',jobKey:runKey})
     try{
       const result=await requestJobAnalysis({sourceVersion:cvData.sourceVersion,job:active.job})
-      writeJobAnalysisCache({...cacheArgs,analysis:result.analysis,token:result.token||'',jobKey:runKey})
+      writeJobAnalysisCache({...cacheArgs,analysis:result.analysis,token:result.token||''})
       setJdAnalysisState({loading:false,error:'',analysis:result.analysis,token:result.token||'',jobKey:runKey})
     }catch(error){
       setJdAnalysisState({loading:false,error:error.message||'Job analysis failed safely. Please try again.',analysis:null,token:'',jobKey:runKey})
