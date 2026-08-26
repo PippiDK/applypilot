@@ -5,6 +5,7 @@ import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normaliz
 import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'
 import {requestSearchProfileRoles} from './lib/search-profile-client.js'
 import {readSearchProfileCache,writeSearchProfileCache} from './lib/search-profile-cache.js'
+import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'
 import {requestJobAnalysis} from './lib/jd-analysis-client.js'
 import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'
 import {requestExpertiseMatch} from './lib/expertise-match-client.js'
@@ -14,6 +15,7 @@ import {fitLabel} from './lib/fit-label.js'
 import SearchAudit from './components/search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
 import SearchProfileRolesStep from './components/search-profile-roles-step.js'
+import SearchProfileLocationStep from './components/search-profile-location-step.js'
 
 const WINDOWS=[1,3,7,14]
 
@@ -24,6 +26,7 @@ function acceptedWorkModels(geography=[]){ const joined=(geography||[]).join(' '
 function roleList(value){return Array.isArray(value)?value.map(item=>String(item??'').trim()).filter(Boolean):[]}
 function legacyRoles(value=''){return String(value??'').split(',').map(item=>item.trim()).filter(Boolean)}
 function combinedRoles(primary=[],adjacent=[]){return [...roleList(primary),...roleList(adjacent)].join(', ')}
+function workModelText(values=[]){return values.map(value=>value==='onsite'?'On-site':value==='hybrid'?'Hybrid':'Remote').join(' · ')}
 
 export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(7)
@@ -55,7 +58,8 @@ export default function Home(){
       const primaryCv=getPrimaryCv(library)
       const savedProfileRaw=localStorage.getItem('applypilot-profile')
       const savedProfile=mergeProfile(savedProfileRaw?JSON.parse(savedProfileRaw):{})
-      const hydrated=resumeToProfile(savedProfile,primaryCv)
+      const preferences=normalizeSearchPreferences(savedProfile)
+      const hydrated={...resumeToProfile(savedProfile,primaryCv),...preferences,geography:legacyGeographyFromPreferences(preferences.locations,preferences.workModels)}
 
       setCvLibrary(library)
       if(readyCvCount(library)>0) localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(library))
@@ -74,6 +78,9 @@ export default function Home(){
   const cvReadyCount=readyCvCount(cvLibrary)
   const draftPrimaryRoles=roleList(draft.primaryRoles).length?roleList(draft.primaryRoles):(profileReady?legacyRoles(draft.roles):[])
   const draftAdjacentRoles=roleList(draft.adjacentRoles)
+  const draftPreferences=normalizeSearchPreferences(draft)
+  const draftLocations=draftPreferences.locations
+  const draftWorkModels=draftPreferences.workModels
   const pack=applicationPackState(resumeLoaded?cvData:null)
   const reviewFacts=useMemo(()=>Array.isArray(cvData?.facts)?cvData.facts.filter(f=>f&&f.verified!==false):[],[cvData])
   const proposedChanges=useMemo(()=>resumeLoaded&&active?buildReviewChanges(cvData,active):[],[cvData,active,resumeLoaded])
@@ -83,9 +90,9 @@ export default function Home(){
   const jobConditions=useMemo(()=>active?evaluateJobConditions(active.job,conditionProfile):null,[active,conditionProfile])
   const reviewedCount=proposedChanges.filter(change=>decisions[`${jobKey}|${change.id}`]).length
   const profileCompletion=useMemo(()=>{
-    const fields=[resumeLoaded,draft.roles,draft.geography?.length,draft.salary,draft.exclusions]
+    const fields=[resumeLoaded,draft.roles,(draftLocations.length&&draftWorkModels.length),draft.salary,draft.exclusions]
     return Math.round(fields.filter(Boolean).length/fields.length*100)
-  },[draft,resumeLoaded])
+  },[draft,resumeLoaded,draftLocations.length,draftWorkModels.length])
 
   useEffect(()=>{
     if(!active||!resumeLoaded){ setExpertiseState({loading:false,error:'',analysis:null,jobKey:''}); return }
@@ -145,7 +152,9 @@ export default function Home(){
   }
 
   function startProfile(){
-    setDraft(resumeToProfile(profile,cvData))
+    const base=resumeToProfile(profile,cvData)
+    const preferences=normalizeSearchPreferences(base)
+    setDraft({...base,...preferences,geography:legacyGeographyFromPreferences(preferences.locations,preferences.workModels)})
     setProfileStep(1)
     setProfileRoleState({status:'idle',error:'',source:''})
     setProfileOpen(true)
@@ -202,14 +211,23 @@ export default function Home(){
     setProfileStep(step=>step+1)
   }
 
-  function toggleGeo(value){
-    setDraft(current=>({...current,geography:current.geography.includes(value)?current.geography.filter(item=>item!==value):[...current.geography,value]}))
+  function togglePreference(field,value){
+    setDraft(current=>{
+      const preferences=normalizeSearchPreferences(current)
+      const currentValues=preferences[field]
+      const nextValues=currentValues.includes(value)?currentValues.filter(item=>item!==value):[...currentValues,value]
+      const locations=field==='locations'?nextValues:preferences.locations
+      const workModels=field==='workModels'?nextValues:preferences.workModels
+      return {...current,locations,workModels,geography:legacyGeographyFromPreferences(locations,workModels)}
+    })
   }
 
   function saveProfile(){
     const primaryRoles=roleList(draft.primaryRoles).length?roleList(draft.primaryRoles):legacyRoles(draft.roles)
     const adjacentRoles=roleList(draft.adjacentRoles)
-    const saved={...resumeToProfile(draft,cvData),primaryRoles,adjacentRoles,roles:combinedRoles(primaryRoles,adjacentRoles),rolesSourceVersion:cvData?.sourceVersion||draft.rolesSourceVersion||'',savedAt:new Date().toISOString()}
+    const {locations,workModels}=normalizeSearchPreferences(draft)
+    const geography=legacyGeographyFromPreferences(locations,workModels)
+    const saved={...resumeToProfile(draft,cvData),primaryRoles,adjacentRoles,roles:combinedRoles(primaryRoles,adjacentRoles),rolesSourceVersion:cvData?.sourceVersion||draft.rolesSourceVersion||'',locations,workModels,geography,savedAt:new Date().toISOString()}
     localStorage.setItem('applypilot-profile',JSON.stringify(saved))
     setProfile(saved)
     setDraft(saved)
@@ -339,10 +357,10 @@ export default function Home(){
       <div className="progress"><span style={{width:`${profileStep/6*100}%`}}></span></div><div className="stepMeta"><span>Step {profileStep} of 6</span><span>{profileCompletion}% profile data</span></div>
       {profileStep===1&&<CvLibraryStep library={cvLibrary} loadingSlot={cvState.loadingSlot} error={cvState.error} primarySkills={draft.skills} onUpload={parseCv}/>} 
       {profileStep===2&&<SearchProfileRolesStep primaryRoles={draftPrimaryRoles} adjacentRoles={draftAdjacentRoles} status={profileRoleState.status} error={profileRoleState.error} source={profileRoleState.source} onPrimaryChange={roles=>updateDraftRoles('primaryRoles',roles)} onAdjacentChange={roles=>updateDraftRoles('adjacentRoles',roles)} onRetry={()=>buildProfileRoles({force:true})}/>} 
-      {profileStep===3&&<div className="wizard"><h3>Where can you work?</h3><p>Save the work models that belong in your Search Profile.</p><div className="choiceGrid">{['Denmark hybrid','Denmark onsite','Remote EU/EMEA','Remote worldwide'].map(value=><button key={value} onClick={()=>toggleGeo(value)} className={draft.geography.includes(value)?'choice selected':'choice'}>{draft.geography.includes(value)?'✓ ':''}{value}</button>)}</div></div>}
+      {profileStep===3&&<SearchProfileLocationStep locations={draftLocations} workModels={draftWorkModels} onToggleLocation={value=>togglePreference('locations',value)} onToggleWorkModel={value=>togglePreference('workModels',value)}/>} 
       {profileStep===4&&<div className="wizard"><h3>Minimum acceptable monthly salary</h3><p>Save your permanent-role salary floor in the Search Profile.</p><div className="salary"><input type="number" min="0" step="1000" value={draft.salary} onChange={event=>setDraft(current=>({...current,salary:event.target.value}))}/><span>DKK / month</span></div></div>}
       {profileStep===5&&<div className="wizard"><h3>What should ApplyPilot exclude?</h3><p>Save hard no-go roles, industries, languages or working conditions in your Search Profile.</p><textarea value={draft.exclusions} onChange={event=>setDraft(current=>({...current,exclusions:event.target.value}))} rows="6"/></div>}
-      {profileStep===6&&<div className="wizard review"><h3>Confirm your search profile</h3><p>This saves your Search Profile for the next product step. The current LinkedIn search engine remains unchanged in this milestone.</p><div className="reviewRow"><span>CV</span><b>{resumeLoaded?cvData.fileName:cvData?.fileName?'Re-upload required':'Not uploaded yet'}</b></div><div className="reviewRow"><span>CV preparation</span><b>{resumeLoaded?'Ready — complete Source CV prepared':'CV not ready'}</b></div><div className="reviewRow"><span>Target roles</span><b>{draft.roles||'Not set'}</b></div><div className="reviewRow"><span>Geography</span><b>{draft.geography.length?draft.geography.join(' · '):'Not set'}</b></div><div className="reviewRow"><span>Salary floor</span><b>{draft.salary?Number(draft.salary).toLocaleString('en-DK')+' DKK/month':'Not set'}</b></div><div className="reviewRow"><span>Exclude</span><b>{draft.exclusions||'None'}</b></div><div className="truth"><b>Truth rule</b><span>ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.</span></div></div>}
+      {profileStep===6&&<div className="wizard review"><h3>Confirm your search profile</h3><p>This saves your Search Profile for the next product step. The current LinkedIn search engine remains unchanged in this milestone.</p><div className="reviewRow"><span>CV</span><b>{resumeLoaded?cvData.fileName:cvData?.fileName?'Re-upload required':'Not uploaded yet'}</b></div><div className="reviewRow"><span>CV preparation</span><b>{resumeLoaded?'Ready — complete Source CV prepared':'CV not ready'}</b></div><div className="reviewRow"><span>Target roles</span><b>{draft.roles||'Not set'}</b></div><div className="reviewRow"><span>Where</span><b>{draftLocations.length?draftLocations.join(' · '):'Not set'}</b></div><div className="reviewRow"><span>Work model</span><b>{draftWorkModels.length?workModelText(draftWorkModels):'Not set'}</b></div><div className="reviewRow"><span>Salary floor</span><b>{draft.salary?Number(draft.salary).toLocaleString('en-DK')+' DKK/month':'Not set'}</b></div><div className="reviewRow"><span>Exclude</span><b>{draft.exclusions||'None'}</b></div><div className="truth"><b>Truth rule</b><span>ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.</span></div></div>}
       <div className="modalActions"><button className="secondary" onClick={()=>profileStep===1?closeProfile():setProfileStep(step=>step-1)}>{profileStep===1?'Cancel':'Back'}</button>{profileStep<6?<button className="primary" disabled={(profileStep===1&&(Boolean(cvState.loadingSlot)||cvReadyCount===0))||(profileStep===2&&profileRoleState.status==='loading')} onClick={nextProfileStep}>Continue</button>:<button className="primary" onClick={saveProfile}>Save profile</button>}</div>
     </div></div>}
 
