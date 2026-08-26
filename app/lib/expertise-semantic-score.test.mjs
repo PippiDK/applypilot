@@ -10,7 +10,7 @@ const req=(overrides={})=>({
 
 const judgement=(overrides={})=>({id:'r1',status:'MATCHED',cvEvidence:['Accountable for full lifecycle execution over 3.5 years.'],reason:'Semantically equivalent end-to-end delivery evidence.',...overrides})
 
-test('semantic MATCHED, TRANSFERABLE, PARTIAL and NOT_EVIDENCED receive deterministic credits',()=>{
+test('semantic MATCHED, TRANSFERABLE, PARTIAL and NOT_EVIDENCED receive conservative deterministic credits',()=>{
   const requirements=[
     req({id:'m',importance:'core'}),
     req({id:'t',capability:'M&A integration delivery',importance:'core'}),
@@ -24,10 +24,10 @@ test('semantic MATCHED, TRANSFERABLE, PARTIAL and NOT_EVIDENCED receive determin
     judgement({id:'n',status:'NOT_EVIDENCED',cvEvidence:[]})
   ]
   const result=evaluateExpertiseFromJudgements(requirements,evaluations)
-  assert.equal(result.expertiseMatch,54) // (1 + .75 + .4 + 0) / 4
+  assert.equal(result.expertiseMatch,41) // (1 + .25 + .4 + 0) / 4
 })
 
-test('TRANSFERABLE strengths are separate from direct fit and expertise gaps',()=>{
+test('TRANSFERABLE is a conservative expertise gap and never a visible strength',()=>{
   const requirements=[
     req({id:'m',capability:'End-to-end programme delivery'}),
     req({id:'t',capability:'Creative production context'}),
@@ -42,13 +42,13 @@ test('TRANSFERABLE strengths are separate from direct fit and expertise gaps',()
   ]
   const result=evaluateExpertiseFromJudgements(requirements,evaluations)
   assert.deepEqual(result.whyYouFit,['End-to-end programme delivery'])
-  assert.deepEqual(result.transferableStrengths,['Creative production context'])
+  assert.deepEqual(result.transferableStrengths,[])
+  assert.ok(result.expertiseGaps.some(x=>/Creative production context.*specialist context not evidenced/.test(x)))
   assert.ok(result.expertiseGaps.some(x=>/External shoot production management/.test(x)))
   assert.ok(result.expertiseGaps.some(x=>/Brand process expertise/.test(x)))
-  assert.ok(!result.expertiseGaps.some(x=>/Creative production context/.test(x)))
 })
 
-test('Annapurna-style evidence produces a high match while keeping transferable evidence out of gaps',()=>{
+test('Annapurna-style evidence stays high while specialist M&A context remains explicit as a gap',()=>{
   const requirements=[
     req({id:'delivery',capability:'End-to-end integration programme delivery',category:'delivery_execution',importance:'core'}),
     req({id:'cross',capability:'Cross-functional workstream leadership',category:'leadership_stakeholder_scope',importance:'core'}),
@@ -67,6 +67,6 @@ test('Annapurna-style evidence produces a high match while keeping transferable 
   assert.ok(result.expertiseMatch>=85,`unexpected ${result.expertiseMatch}%`)
   assert.equal(result.breakdown.delivery_execution.score,100)
   assert.equal(result.breakdown.leadership_stakeholder_scope.score,100)
-  assert.deepEqual(result.transferableStrengths,['Hands-on M&A integration planning and execution'])
-  assert.ok(!result.expertiseGaps.some(x=>/M&A integration planning/i.test(x)))
+  assert.deepEqual(result.transferableStrengths,[])
+  assert.ok(result.expertiseGaps.some(x=>/Hands-on M&A integration planning and execution.*specialist context not evidenced/i.test(x)))
 })
