@@ -23,3 +23,14 @@
 .jobStatusSelect.status-considering{border-color:#65552d;color:#e7c56a;background:#211d12}
 .jobStatusSelect.status-ignore{border-color:#743d41;color:#ef9da2;background:#281819}
 @media(max-width:780px){.jobStatusSelect{left:90px}}
+
+
+/* cosmetic UI · search plan summary + audit log */
+.profileSearchSummary{color:#a9b7b2;font-weight:750}
+.auditLog{margin-top:26px;padding:13px 16px;border:1px solid #223238;border-radius:12px;background:#0d1215;color:#7d9695;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;font-size:11px}
+.auditLogTitle{margin-bottom:5px;color:#6f918f;font-size:10px;font-weight:800;letter-spacing:.16em}
+.auditLog .searchAudit,.auditLog .audit{border-top:1px solid #1c3032;padding:8px 0}
+.auditLog summary{color:#839f9d}
+.auditLog summary strong{color:#8bb7b0}
+.auditLog table{color:#839492}
+.auditLog .muted{color:#627a79}
