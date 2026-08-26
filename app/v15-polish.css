@@ -17,3 +17,8 @@ footer::after{
   content:'ApplyPilot · Search less. Apply better.';
   font-size:12px;
 }
+.expertiseHero .primary{
+  width:fit-content;
+  min-width:190px;
+  padding:12px 18px;
+}
