@@ -1,0 +1,1139 @@
+npm test exit code: 1
+
+=== MATCHED FAILURE CONTEXT ===
+436-# company-search core tests passed
+437-# Subtest: /home/runner/work/applypilot/applypilot/app/lib/company-search.test.mjs
+438-ok 15 - /home/runner/work/applypilot/applypilot/app/lib/company-search.test.mjs
+439-  ---
+440-  duration_ms: 48.610041
+441-  ...
+442-# Subtest: CV remove uses ApplyPilot confirmation, keeps Search Profile open and preserves fixed slots
+443-ok 88 - CV remove uses ApplyPilot confirmation, keeps Search Profile open and preserves fixed slots
+444-  ---
+445-  duration_ms: 3.112653
+446-  ...
+447-# Subtest: Search Profile step 1 exposes three CV slots while CV 1 remains the Search source
+448:not ok 89 - Search Profile step 1 exposes three CV slots while CV 1 remains the Search source
+449-  ---
+450-  duration_ms: 4.609155
+451-  location: '/home/runner/work/applypilot/applypilot/app/lib/cv-library-ui-contract.test.mjs:5:1'
+452-  failureType: 'testCodeFailure'
+453-  error: |-
+454-    The input did not match the regular expression /readyCvCount\(cvLibrary\)/. Input:
+455-    
+456-    "'use client'\n" +
+457-      "import { useEffect, useMemo, useState } from 'react'\n" +
+458-      "import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'\n" +
+459-      "import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'\n" +
+460-      "import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'\n" +
+461-      "import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'\n" +
+462-      "import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'\n" +
+463-      "import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'\n" +
+464-      "import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'\n" +
+465-      "import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'\n" +
+466-      "import {requestJobAnalysis} from './lib/jd-analysis-client.js'\n" +
+467-      "import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'\n" +
+468-      "import {requestExpertiseMatch} from './lib/expertise-match-client.js'\n" +
+469-      "import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'\n" +
+470-      "import {evaluateJobConditions} from './lib/job-conditions.js'\n" +
+471-      "import {fitLabel} from './lib/fit-label.js'\n" +
+472-      "import SearchAudit from './components/search-audit.js'\n" +
+473-      "import CvLibraryStep from './components/cv-library-step.js'\n" +
+474-      "import SearchProfileRolesStep from './components/search-profile-roles-step.js'\n" +
+475-      "import SearchProfileLocationStep from './components/search-profile-location-step.js'\n" +
+476-      "import SearchPlanPreview from './components/search-plan-preview.js'\n" +
+--
+585-      '\n' +
+586-      '      if(slot===1){\n' +
+587-      '        const primaryCv=getPrimaryCv(nextLibrary)\n' +
+588-      '        localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(primaryCv))\n' +
+589-      '        localStorage.removeItem(LEGACY_CV_STORAGE_KEY)\n' +
+590-      '        setCvData(primaryCv)\n' +
+591-      '        setDecisions({})\n' +
+592-      '        setReviewOpen(false)\n' +
+593-      '        setProfile(current=>{\n' +
+594-      '          const next=resumeToProfile(current,primaryCv)\n' +
+595-      "          if(current.savedAt) localStorage.setItem('app"... 27331 more characters
+596-    
+597:  code: 'ERR_ASSERTION'
+598:  name: 'AssertionError'
+599-  expected:
+600-  actual: |-
+601-    'use client'
+602-    import { useEffect, useMemo, useState } from 'react'
+603-    import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'
+604-    import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'
+605-    import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'
+606-    import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'
+607-    import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'
+608-    import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'
+609-    import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'
+610-    import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'
+611-    import {requestJobAnalysis} from './lib/jd-analysis-client.js'
+612-    import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'
+613-    import {requestExpertiseMatch} from './lib/expertise-match-client.js'
+614-    import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'
+615-    import {evaluateJobConditions} from './lib/job-conditions.js'
+616-    import {fitLabel} from './lib/fit-label.js'
+617-    import SearchAudit from './components/search-audit.js'
+618-    import CvLibraryStep from './components/cv-library-step.js'
+619-    import SearchProfileRolesStep from './components/search-profile-roles-step.js'
+620-    import SearchProfileLocationStep from './components/search-profile-location-step.js'
+621-    import SearchPlanPreview from './components/search-plan-preview.js'
+622-    import BestCvPanel from './components/best-cv-panel.js'
+623-    
+624-    const WINDOWS=[1,3,7,14]
+625-    const EMPTY_SEARCH_PROFILE={...DEFAULT_PROFILE,exclusions:''}
+626-    const EMPTY_ROLE_STATE={status:'idle',error:'',source:'',totalCount:0,analysedCount:0,failedCvs:[]}
+--
+1410-  ...
+1411-# Subtest: Review CV changes runs the real JD Analyst before opening the preview review
+1412-ok 159 - Review CV changes runs the real JD Analyst before opening the preview review
+1413-  ---
+1414-  duration_ms: 1.889985
+1415-  ...
+1416-# Subtest: pretest review renders JD mission, priorities, must-haves and positioning
+1417-ok 160 - pretest review renders JD mission, priorities, must-haves and positioning
+1418-  ---
+1419-  duration_ms: 0.239158
+1420-  ...
+1421-# Subtest: pretest labels the old Summary mechanism as legacy so it is not mistaken for Task 3 output
+1422:not ok 161 - pretest labels the old Summary mechanism as legacy so it is not mistaken for Task 3 output
+1423-  ---
+1424-  duration_ms: 3.215756
+1425-  location: '/home/runner/work/applypilot/applypilot/app/lib/jd-analysis-ui.contract.test.mjs:21:1'
+1426-  failureType: 'testCodeFailure'
+1427-  error: |-
+1428-    The input did not match the regular expression /Legacy Summary preview · not Task 3/. Input:
+1429-    
+1430-    "'use client'\n" +
+1431-      "import { useEffect, useMemo, useState } from 'react'\n" +
+1432-      "import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'\n" +
+1433-      "import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'\n" +
+1434-      "import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'\n" +
+1435-      "import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'\n" +
+1436-      "import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'\n" +
+1437-      "import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'\n" +
+1438-      "import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'\n" +
+1439-      "import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'\n" +
+1440-      "import {requestJobAnalysis} from './lib/jd-analysis-client.js'\n" +
+1441-      "import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'\n" +
+1442-      "import {requestExpertiseMatch} from './lib/expertise-match-client.js'\n" +
+1443-      "import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'\n" +
+1444-      "import {evaluateJobConditions} from './lib/job-conditions.js'\n" +
+1445-      "import {fitLabel} from './lib/fit-label.js'\n" +
+1446-      "import SearchAudit from './components/search-audit.js'\n" +
+1447-      "import CvLibraryStep from './components/cv-library-step.js'\n" +
+1448-      "import SearchProfileRolesStep from './components/search-profile-roles-step.js'\n" +
+1449-      "import SearchProfileLocationStep from './components/search-profile-location-step.js'\n" +
+1450-      "import SearchPlanPreview from './components/search-plan-preview.js'\n" +
+--
+1559-      '\n' +
+1560-      '      if(slot===1){\n' +
+1561-      '        const primaryCv=getPrimaryCv(nextLibrary)\n' +
+1562-      '        localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(primaryCv))\n' +
+1563-      '        localStorage.removeItem(LEGACY_CV_STORAGE_KEY)\n' +
+1564-      '        setCvData(primaryCv)\n' +
+1565-      '        setDecisions({})\n' +
+1566-      '        setReviewOpen(false)\n' +
+1567-      '        setProfile(current=>{\n' +
+1568-      '          const next=resumeToProfile(current,primaryCv)\n' +
+1569-      "          if(current.savedAt) localStorage.setItem('app"... 27331 more characters
+1570-    
+1571:  code: 'ERR_ASSERTION'
+1572:  name: 'AssertionError'
+1573-  expected:
+1574-  actual: |-
+1575-    'use client'
+1576-    import { useEffect, useMemo, useState } from 'react'
+1577-    import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'
+1578-    import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'
+1579-    import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'
+1580-    import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'
+1581-    import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'
+1582-    import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'
+1583-    import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'
+1584-    import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'
+1585-    import {requestJobAnalysis} from './lib/jd-analysis-client.js'
+1586-    import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'
+1587-    import {requestExpertiseMatch} from './lib/expertise-match-client.js'
+1588-    import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'
+1589-    import {evaluateJobConditions} from './lib/job-conditions.js'
+1590-    import {fitLabel} from './lib/fit-label.js'
+1591-    import SearchAudit from './components/search-audit.js'
+1592-    import CvLibraryStep from './components/cv-library-step.js'
+1593-    import SearchProfileRolesStep from './components/search-profile-roles-step.js'
+1594-    import SearchProfileLocationStep from './components/search-profile-location-step.js'
+1595-    import SearchPlanPreview from './components/search-plan-preview.js'
+1596-    import BestCvPanel from './components/best-cv-panel.js'
+1597-    
+1598-    const WINDOWS=[1,3,7,14]
+1599-    const EMPTY_SEARCH_PROFILE={...DEFAULT_PROFILE,exclusions:''}
+1600-    const EMPTY_ROLE_STATE={status:'idle',error:'',source:'',totalCount:0,analysedCount:0,failedCvs:[]}
+--
+2548-  ...
+2549-# Subtest: live LinkedIn request uses freshness plus the active Source CV text, but not Search Profile data
+2550-ok 264 - live LinkedIn request uses freshness plus the active Source CV text, but not Search Profile data
+2551-  ---
+2552-  duration_ms: 0.864027
+2553-  ...
+2554-# Subtest: review helpers accept current live LinkedIn result shape
+2555-ok 265 - review helpers accept current live LinkedIn result shape
+2556-  ---
+2557-  duration_ms: 1.979233
+2558-  ...
+2559-# Subtest: merged UI restores Search Profile persistence without wiring it into LinkedIn search
+2560:not ok 266 - merged UI restores Search Profile persistence without wiring it into LinkedIn search
+2561-  ---
+2562-  duration_ms: 2.746167
+2563-  location: '/home/runner/work/applypilot/applypilot/app/lib/profile-review.test.mjs:77:1'
+2564-  failureType: 'testCodeFailure'
+2565-  error: |-
+2566-    The input did not match the regular expression /Step \{profileStep\} of 6/. Input:
+2567-    
+2568-    "'use client'\n" +
+2569-      "import { useEffect, useMemo, useState } from 'react'\n" +
+2570-      "import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'\n" +
+2571-      "import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'\n" +
+2572-      "import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'\n" +
+2573-      "import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'\n" +
+2574-      "import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'\n" +
+2575-      "import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'\n" +
+2576-      "import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'\n" +
+2577-      "import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'\n" +
+2578-      "import {requestJobAnalysis} from './lib/jd-analysis-client.js'\n" +
+2579-      "import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'\n" +
+2580-      "import {requestExpertiseMatch} from './lib/expertise-match-client.js'\n" +
+2581-      "import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'\n" +
+2582-      "import {evaluateJobConditions} from './lib/job-conditions.js'\n" +
+2583-      "import {fitLabel} from './lib/fit-label.js'\n" +
+2584-      "import SearchAudit from './components/search-audit.js'\n" +
+2585-      "import CvLibraryStep from './components/cv-library-step.js'\n" +
+2586-      "import SearchProfileRolesStep from './components/search-profile-roles-step.js'\n" +
+2587-      "import SearchProfileLocationStep from './components/search-profile-location-step.js'\n" +
+2588-      "import SearchPlanPreview from './components/search-plan-preview.js'\n" +
+--
+2697-      '\n' +
+2698-      '      if(slot===1){\n' +
+2699-      '        const primaryCv=getPrimaryCv(nextLibrary)\n' +
+2700-      '        localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(primaryCv))\n' +
+2701-      '        localStorage.removeItem(LEGACY_CV_STORAGE_KEY)\n' +
+2702-      '        setCvData(primaryCv)\n' +
+2703-      '        setDecisions({})\n' +
+2704-      '        setReviewOpen(false)\n' +
+2705-      '        setProfile(current=>{\n' +
+2706-      '          const next=resumeToProfile(current,primaryCv)\n' +
+2707-      "          if(current.savedAt) localStorage.setItem('app"... 27331 more characters
+2708-    
+2709:  code: 'ERR_ASSERTION'
+2710:  name: 'AssertionError'
+2711-  expected:
+2712-  actual: |-
+2713-    'use client'
+2714-    import { useEffect, useMemo, useState } from 'react'
+2715-    import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'
+2716-    import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'
+2717-    import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'
+2718-    import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'
+2719-    import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'
+2720-    import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'
+2721-    import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'
+2722-    import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'
+2723-    import {requestJobAnalysis} from './lib/jd-analysis-client.js'
+2724-    import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'
+2725-    import {requestExpertiseMatch} from './lib/expertise-match-client.js'
+2726-    import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'
+2727-    import {evaluateJobConditions} from './lib/job-conditions.js'
+2728-    import {fitLabel} from './lib/fit-label.js'
+2729-    import SearchAudit from './components/search-audit.js'
+2730-    import CvLibraryStep from './components/cv-library-step.js'
+2731-    import SearchProfileRolesStep from './components/search-profile-roles-step.js'
+2732-    import SearchProfileLocationStep from './components/search-profile-location-step.js'
+2733-    import SearchPlanPreview from './components/search-plan-preview.js'
+2734-    import BestCvPanel from './components/best-cv-panel.js'
+2735-    
+2736-    const WINDOWS=[1,3,7,14]
+2737-    const EMPTY_SEARCH_PROFILE={...DEFAULT_PROFILE,exclusions:''}
+2738-    const EMPTY_ROLE_STATE={status:'idle',error:'',source:'',totalCount:0,analysedCount:0,failedCvs:[]}
+--
+3166-    }
+3167-  operator: 'match'
+3168-  stack: |-
+3169-    TestContext.<anonymous> (file:///home/runner/work/applypilot/applypilot/app/lib/profile-review.test.mjs:82:10)
+3170-    Test.runInAsyncScope (node:async_hooks:206:9)
+3171-    Test.run (node:internal/test_runner/test:796:25)
+3172-    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+3173-    Test.postRun (node:internal/test_runner/test:889:19)
+3174-    Test.run (node:internal/test_runner/test:835:12)
+3175-    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+3176-  ...
+3177-# Subtest: merged UI restores Application Pack, CV Update Review and Truth Guard
+3178:not ok 267 - merged UI restores Application Pack, CV Update Review and Truth Guard
+3179-  ---
+3180-  duration_ms: 1.269775
+3181-  location: '/home/runner/work/applypilot/applypilot/app/lib/profile-review.test.mjs:86:1'
+3182-  failureType: 'testCodeFailure'
+3183-  error: |-
+3184-    The input did not match the regular expression /Existing Master CV experience only · no new claim added/. Input:
+3185-    
+3186-    "'use client'\n" +
+3187-      "import { useEffect, useMemo, useState } from 'react'\n" +
+3188-      "import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'\n" +
+3189-      "import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'\n" +
+3190-      "import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'\n" +
+3191-      "import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'\n" +
+3192-      "import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'\n" +
+3193-      "import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'\n" +
+3194-      "import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'\n" +
+3195-      "import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'\n" +
+3196-      "import {requestJobAnalysis} from './lib/jd-analysis-client.js'\n" +
+3197-      "import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'\n" +
+3198-      "import {requestExpertiseMatch} from './lib/expertise-match-client.js'\n" +
+3199-      "import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'\n" +
+3200-      "import {evaluateJobConditions} from './lib/job-conditions.js'\n" +
+3201-      "import {fitLabel} from './lib/fit-label.js'\n" +
+3202-      "import SearchAudit from './components/search-audit.js'\n" +
+3203-      "import CvLibraryStep from './components/cv-library-step.js'\n" +
+3204-      "import SearchProfileRolesStep from './components/search-profile-roles-step.js'\n" +
+3205-      "import SearchProfileLocationStep from './components/search-profile-location-step.js'\n" +
+3206-      "import SearchPlanPreview from './components/search-plan-preview.js'\n" +
+--
+3315-      '\n' +
+3316-      '      if(slot===1){\n' +
+3317-      '        const primaryCv=getPrimaryCv(nextLibrary)\n' +
+3318-      '        localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(primaryCv))\n' +
+3319-      '        localStorage.removeItem(LEGACY_CV_STORAGE_KEY)\n' +
+3320-      '        setCvData(primaryCv)\n' +
+3321-      '        setDecisions({})\n' +
+3322-      '        setReviewOpen(false)\n' +
+3323-      '        setProfile(current=>{\n' +
+3324-      '          const next=resumeToProfile(current,primaryCv)\n' +
+3325-      "          if(current.savedAt) localStorage.setItem('app"... 27331 more characters
+3326-    
+3327:  code: 'ERR_ASSERTION'
+3328:  name: 'AssertionError'
+3329-  expected:
+3330-  actual: |-
+3331-    'use client'
+3332-    import { useEffect, useMemo, useState } from 'react'
+3333-    import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'
+3334-    import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'
+3335-    import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'
+3336-    import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'
+3337-    import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'
+3338-    import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'
+3339-    import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'
+3340-    import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'
+3341-    import {requestJobAnalysis} from './lib/jd-analysis-client.js'
+3342-    import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'
+3343-    import {requestExpertiseMatch} from './lib/expertise-match-client.js'
+3344-    import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'
+3345-    import {evaluateJobConditions} from './lib/job-conditions.js'
+3346-    import {fitLabel} from './lib/fit-label.js'
+3347-    import SearchAudit from './components/search-audit.js'
+3348-    import CvLibraryStep from './components/cv-library-step.js'
+3349-    import SearchProfileRolesStep from './components/search-profile-roles-step.js'
+3350-    import SearchProfileLocationStep from './components/search-profile-location-step.js'
+3351-    import SearchPlanPreview from './components/search-plan-preview.js'
+3352-    import BestCvPanel from './components/best-cv-panel.js'
+3353-    
+3354-    const WINDOWS=[1,3,7,14]
+3355-    const EMPTY_SEARCH_PROFILE={...DEFAULT_PROFILE,exclusions:''}
+3356-    const EMPTY_ROLE_STATE={status:'idle',error:'',source:'',totalCount:0,analysedCount:0,failedCvs:[]}
+--
+3794-  ...
+3795-# Subtest: buildReviewChanges omits CV evidence when normalized original and updated text are the same
+3796-ok 268 - buildReviewChanges omits CV evidence when normalized original and updated text are the same
+3797-  ---
+3798-  duration_ms: 0.624408
+3799-  ...
+3800-# Subtest: CV review shows a neutral empty state when there are no actual wording changes
+3801-ok 269 - CV review shows a neutral empty state when there are no actual wording changes
+3802-  ---
+3803-  duration_ms: 0.493473
+3804-  ...
+3805-# Subtest: Source CV upload entry points keep the existing six-step Search Profile flow
+3806:not ok 270 - Source CV upload entry points keep the existing six-step Search Profile flow
+3807-  ---
+3808-  duration_ms: 1.519001
+3809-  location: '/home/runner/work/applypilot/applypilot/app/lib/profile-review.test.mjs:115:1'
+3810-  failureType: 'testCodeFailure'
+3811-  error: |-
+3812-    The input did not match the regular expression /Upload your CV/. Input:
+3813-    
+3814-    "'use client'\n" +
+3815-      "import { useEffect, useMemo, useState } from 'react'\n" +
+3816-      "import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'\n" +
+3817-      "import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'\n" +
+3818-      "import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'\n" +
+3819-      "import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'\n" +
+3820-      "import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'\n" +
+3821-      "import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'\n" +
+3822-      "import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'\n" +
+3823-      "import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'\n" +
+3824-      "import {requestJobAnalysis} from './lib/jd-analysis-client.js'\n" +
+3825-      "import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'\n" +
+3826-      "import {requestExpertiseMatch} from './lib/expertise-match-client.js'\n" +
+3827-      "import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'\n" +
+3828-      "import {evaluateJobConditions} from './lib/job-conditions.js'\n" +
+3829-      "import {fitLabel} from './lib/fit-label.js'\n" +
+3830-      "import SearchAudit from './components/search-audit.js'\n" +
+3831-      "import CvLibraryStep from './components/cv-library-step.js'\n" +
+3832-      "import SearchProfileRolesStep from './components/search-profile-roles-step.js'\n" +
+3833-      "import SearchProfileLocationStep from './components/search-profile-location-step.js'\n" +
+3834-      "import SearchPlanPreview from './components/search-plan-preview.js'\n" +
+--
+3943-      '\n' +
+3944-      '      if(slot===1){\n' +
+3945-      '        const primaryCv=getPrimaryCv(nextLibrary)\n' +
+3946-      '        localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(primaryCv))\n' +
+3947-      '        localStorage.removeItem(LEGACY_CV_STORAGE_KEY)\n' +
+3948-      '        setCvData(primaryCv)\n' +
+3949-      '        setDecisions({})\n' +
+3950-      '        setReviewOpen(false)\n' +
+3951-      '        setProfile(current=>{\n' +
+3952-      '          const next=resumeToProfile(current,primaryCv)\n' +
+3953-      "          if(current.savedAt) localStorage.setItem('app"... 27331 more characters
+3954-    
+3955:  code: 'ERR_ASSERTION'
+3956:  name: 'AssertionError'
+3957-  expected:
+3958-  actual: |-
+3959-    'use client'
+3960-    import { useEffect, useMemo, useState } from 'react'
+3961-    import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'
+3962-    import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'
+3963-    import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'
+3964-    import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'
+3965-    import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'
+3966-    import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'
+3967-    import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'
+3968-    import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'
+3969-    import {requestJobAnalysis} from './lib/jd-analysis-client.js'
+3970-    import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'
+3971-    import {requestExpertiseMatch} from './lib/expertise-match-client.js'
+3972-    import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'
+3973-    import {evaluateJobConditions} from './lib/job-conditions.js'
+3974-    import {fitLabel} from './lib/fit-label.js'
+3975-    import SearchAudit from './components/search-audit.js'
+3976-    import CvLibraryStep from './components/cv-library-step.js'
+3977-    import SearchProfileRolesStep from './components/search-profile-roles-step.js'
+3978-    import SearchProfileLocationStep from './components/search-profile-location-step.js'
+3979-    import SearchPlanPreview from './components/search-plan-preview.js'
+3980-    import BestCvPanel from './components/best-cv-panel.js'
+3981-    
+3982-    const WINDOWS=[1,3,7,14]
+3983-    const EMPTY_SEARCH_PROFILE={...DEFAULT_PROFILE,exclusions:''}
+3984-    const EMPTY_ROLE_STATE={status:'idle',error:'',source:'',totalCount:0,analysedCount:0,failedCvs:[]}
+--
+4437-  ...
+4438-# Subtest: Version 2 Step 1.1 de-emphasises less relevant Summary content instead of retaining every sentence
+4439-ok 274 - Version 2 Step 1.1 de-emphasises less relevant Summary content instead of retaining every sentence
+4440-  ---
+4441-  duration_ms: 1.470193
+4442-  ...
+4443-# Subtest: Version 2 Step 1 can read the Master CV summary from a complete saved preview
+4444-ok 275 - Version 2 Step 1 can read the Master CV summary from a complete saved preview
+4445-  ---
+4446-  duration_ms: 1.280603
+4447-  ...
+4448-# Subtest: Version 2 Step 1 UI reviews the Summary only and leaves bullet reordering for Step 2
+4449:not ok 276 - Version 2 Step 1 UI reviews the Summary only and leaves bullet reordering for Step 2
+4450-  ---
+4451-  duration_ms: 1.032171
+4452-  location: '/home/runner/work/applypilot/applypilot/app/lib/profile-review.test.mjs:220:1'
+4453-  failureType: 'testCodeFailure'
+4454-  error: |-
+4455-    The input did not match the regular expression /summary change proposed/. Input:
+4456-    
+4457-    "'use client'\n" +
+4458-      "import { useEffect, useMemo, useState } from 'react'\n" +
+4459-      "import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'\n" +
+4460-      "import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'\n" +
+4461-      "import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'\n" +
+4462-      "import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'\n" +
+4463-      "import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'\n" +
+4464-      "import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'\n" +
+4465-      "import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'\n" +
+4466-      "import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'\n" +
+4467-      "import {requestJobAnalysis} from './lib/jd-analysis-client.js'\n" +
+4468-      "import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'\n" +
+4469-      "import {requestExpertiseMatch} from './lib/expertise-match-client.js'\n" +
+4470-      "import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'\n" +
+4471-      "import {evaluateJobConditions} from './lib/job-conditions.js'\n" +
+4472-      "import {fitLabel} from './lib/fit-label.js'\n" +
+4473-      "import SearchAudit from './components/search-audit.js'\n" +
+4474-      "import CvLibraryStep from './components/cv-library-step.js'\n" +
+4475-      "import SearchProfileRolesStep from './components/search-profile-roles-step.js'\n" +
+4476-      "import SearchProfileLocationStep from './components/search-profile-location-step.js'\n" +
+4477-      "import SearchPlanPreview from './components/search-plan-preview.js'\n" +
+--
+4586-      '\n' +
+4587-      '      if(slot===1){\n' +
+4588-      '        const primaryCv=getPrimaryCv(nextLibrary)\n' +
+4589-      '        localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(primaryCv))\n' +
+4590-      '        localStorage.removeItem(LEGACY_CV_STORAGE_KEY)\n' +
+4591-      '        setCvData(primaryCv)\n' +
+4592-      '        setDecisions({})\n' +
+4593-      '        setReviewOpen(false)\n' +
+4594-      '        setProfile(current=>{\n' +
+4595-      '          const next=resumeToProfile(current,primaryCv)\n' +
+4596-      "          if(current.savedAt) localStorage.setItem('app"... 27331 more characters
+4597-    
+4598:  code: 'ERR_ASSERTION'
+4599:  name: 'AssertionError'
+4600-  expected:
+4601-  actual: |-
+4602-    'use client'
+4603-    import { useEffect, useMemo, useState } from 'react'
+4604-    import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'
+4605-    import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'
+4606-    import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'
+4607-    import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'
+4608-    import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'
+4609-    import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'
+4610-    import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'
+4611-    import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'
+4612-    import {requestJobAnalysis} from './lib/jd-analysis-client.js'
+4613-    import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'
+4614-    import {requestExpertiseMatch} from './lib/expertise-match-client.js'
+4615-    import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'
+4616-    import {evaluateJobConditions} from './lib/job-conditions.js'
+4617-    import {fitLabel} from './lib/fit-label.js'
+4618-    import SearchAudit from './components/search-audit.js'
+4619-    import CvLibraryStep from './components/cv-library-step.js'
+4620-    import SearchProfileRolesStep from './components/search-profile-roles-step.js'
+4621-    import SearchProfileLocationStep from './components/search-profile-location-step.js'
+4622-    import SearchPlanPreview from './components/search-plan-preview.js'
+4623-    import BestCvPanel from './components/best-cv-panel.js'
+4624-    
+4625-    const WINDOWS=[1,3,7,14]
+4626-    const EMPTY_SEARCH_PROFILE={...DEFAULT_PROFILE,exclusions:''}
+4627-    const EMPTY_ROLE_STATE={status:'idle',error:'',source:'',totalCount:0,analysedCount:0,failedCvs:[]}
+--
+5070-  ...
+5071-# Subtest: Version 2 Step 1 refuses a truncated legacy preview instead of tailoring a partial Summary
+5072-ok 278 - Version 2 Step 1 refuses a truncated legacy preview instead of tailoring a partial Summary
+5073-  ---
+5074-  duration_ms: 0.25796
+5075-  ...
+5076-# Subtest: parse-cv endpoint accepts resume uploads instead of being retired
+5077-ok 279 - parse-cv endpoint accepts resume uploads instead of being retired
+5078-  ---
+5079-  duration_ms: 1.653321
+5080-  ...
+5081-# Subtest: Feature 2 UI persists the complete active Source CV and supports legacy migration
+5082:not ok 280 - Feature 2 UI persists the complete active Source CV and supports legacy migration
+5083-  ---
+5084-  duration_ms: 3.266334
+5085-  location: '/home/runner/work/applypilot/applypilot/app/lib/resume-upload.contract.test.mjs:26:1'
+5086-  failureType: 'testCodeFailure'
+5087-  error: |-
+5088-    The input did not match the regular expression /accept="\.pdf,\.docx"/. Input:
+5089-    
+5090-    "'use client'\n" +
+5091-      "import { useEffect, useMemo, useState } from 'react'\n" +
+5092-      "import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'\n" +
+5093-      "import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'\n" +
+5094-      "import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'\n" +
+5095-      "import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'\n" +
+5096-      "import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'\n" +
+5097-      "import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'\n" +
+5098-      "import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'\n" +
+5099-      "import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'\n" +
+5100-      "import {requestJobAnalysis} from './lib/jd-analysis-client.js'\n" +
+5101-      "import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'\n" +
+5102-      "import {requestExpertiseMatch} from './lib/expertise-match-client.js'\n" +
+5103-      "import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'\n" +
+5104-      "import {evaluateJobConditions} from './lib/job-conditions.js'\n" +
+5105-      "import {fitLabel} from './lib/fit-label.js'\n" +
+5106-      "import SearchAudit from './components/search-audit.js'\n" +
+5107-      "import CvLibraryStep from './components/cv-library-step.js'\n" +
+5108-      "import SearchProfileRolesStep from './components/search-profile-roles-step.js'\n" +
+5109-      "import SearchProfileLocationStep from './components/search-profile-location-step.js'\n" +
+5110-      "import SearchPlanPreview from './components/search-plan-preview.js'\n" +
+--
+5219-      '\n' +
+5220-      '      if(slot===1){\n' +
+5221-      '        const primaryCv=getPrimaryCv(nextLibrary)\n' +
+5222-      '        localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(primaryCv))\n' +
+5223-      '        localStorage.removeItem(LEGACY_CV_STORAGE_KEY)\n' +
+5224-      '        setCvData(primaryCv)\n' +
+5225-      '        setDecisions({})\n' +
+5226-      '        setReviewOpen(false)\n' +
+5227-      '        setProfile(current=>{\n' +
+5228-      '          const next=resumeToProfile(current,primaryCv)\n' +
+5229-      "          if(current.savedAt) localStorage.setItem('app"... 27331 more characters
+5230-    
+5231:  code: 'ERR_ASSERTION'
+5232:  name: 'AssertionError'
+5233-  expected:
+5234-  actual: |-
+5235-    'use client'
+5236-    import { useEffect, useMemo, useState } from 'react'
+5237-    import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'
+5238-    import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'
+5239-    import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'
+5240-    import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'
+5241-    import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'
+5242-    import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'
+5243-    import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'
+5244-    import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'
+5245-    import {requestJobAnalysis} from './lib/jd-analysis-client.js'
+5246-    import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'
+5247-    import {requestExpertiseMatch} from './lib/expertise-match-client.js'
+5248-    import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'
+5249-    import {evaluateJobConditions} from './lib/job-conditions.js'
+5250-    import {fitLabel} from './lib/fit-label.js'
+5251-    import SearchAudit from './components/search-audit.js'
+5252-    import CvLibraryStep from './components/cv-library-step.js'
+5253-    import SearchProfileRolesStep from './components/search-profile-roles-step.js'
+5254-    import SearchProfileLocationStep from './components/search-profile-location-step.js'
+5255-    import SearchPlanPreview from './components/search-plan-preview.js'
+5256-    import BestCvPanel from './components/best-cv-panel.js'
+5257-    
+5258-    const WINDOWS=[1,3,7,14]
+5259-    const EMPTY_SEARCH_PROFILE={...DEFAULT_PROFILE,exclusions:''}
+5260-    const EMPTY_ROLE_STATE={status:'idle',error:'',source:'',totalCount:0,analysedCount:0,failedCvs:[]}
+--
+5858-  ...
+5859-# Subtest: builds a backward-compatible geography array for current consumers
+5860-ok 313 - builds a backward-compatible geography array for current consumers
+5861-  ---
+5862-  duration_ms: 0.319657
+5863-  ...
+5864-# Subtest: Search Profile role editor preserves spaces while typing and normalizes only on blur
+5865-ok 314 - Search Profile role editor preserves spaces while typing and normalizes only on blur
+5866-  ---
+5867-  duration_ms: 2.914126
+5868-  ...
+5869-# Subtest: Search Profile step 2 is generated from CV 1 but does not drive Search yet
+5870:not ok 315 - Search Profile step 2 is generated from CV 1 but does not drive Search yet
+5871-  ---
+5872-  duration_ms: 6.077755
+5873-  location: '/home/runner/work/applypilot/applypilot/app/lib/search-profile-step2-ui-contract.test.mjs:5:1'
+5874-  failureType: 'testCodeFailure'
+5875-  error: |-
+5876-    The input did not match the regular expression /Generated from CV 1/. Input:
+5877-    
+5878-    "'use client'\n" +
+5879-      "import {useEffect,useState} from 'react'\n" +
+5880-      "import styles from './search-profile-roles-step.module.css'\n" +
+5881-      '\n' +
+5882-      "const cleanLines=value=>String(value??'').split(/\\n|,/).map(item=>item.trim()).filter(Boolean)\n" +
+5883-      "const rolesText=roles=>(Array.isArray(roles)?roles:[]).join('\\n')\n" +
+5884-      '\n' +
+5885-      "export default function SearchProfileRolesStep({primaryRoles=[],adjacentRoles=[],status='idle',error='',source='ai',totalCount=0,analysedCount=0,failedCvs=[],onPrimaryChange,onAdjacentChange,onRetry}){\n" +
+5886-      "  const loading=status==='loading'\n" +
+5887-      "  const ready=status==='ready'\n" +
+5888-      "  const partial=status==='partial'\n" +
+5889-      '  const primaryValue=rolesText(primaryRoles)\n' +
+5890-      '  const adjacentValue=rolesText(adjacentRoles)\n' +
+5891-      '  const [primaryText,setPrimaryText]=useState(primaryValue)\n' +
+5892-      '  const [adjacentText,setAdjacentText]=useState(adjacentValue)\n' +
+5893-      "  const readyLabel=`${totalCount} ${totalCount===1?'CV':'CVs'}`\n" +
+5894-      "  const cached=source==='cache'||source==='saved'\n" +
+5895-      '\n' +
+5896-      '  useEffect(()=>{setPrimaryText(primaryValue)},[primaryValue])\n' +
+5897-      '  useEffect(()=>{setAdjacentText(adjacentValue)},[adjacentValue])\n' +
+5898-      '\n' +
+--
+5903-      '    {loading&&<div className="successBox"><b>Analysing {readyLabel}…</b><span>Building independent role directions from each ready CV.</span></div>}\n' +
+5904-      `    {ready&&<div className="successBox"><b>✓ Generated from {readyLabel}{cached?' · Cached':''}</b><span>You can edit every role before saving.</span></div>}\n` +
+5905-      '    {partial&&<div className="warningBox"><b>⚠ Generated from {analysedCount} of {totalCount} CVs</b><span>{error||\'Some CV role directions could not be generated. Successful CV results are preserved.\'}</span>{failedCvs.length>0&&<span>Retry: {failedCvs.map(cv=>`CV ${cv.slot}`).join(\' · \')}</span>}<button className="secondary" type="button" onClick={onRetry}>Retry missing CVs</button></div>}\n' +
+5906-      `    {status==='error'&&<div className="errorBox"><b>Search Profile generation failed safely</b><span>{error}</span><button className="secondary" type="button" onClick={onRetry}>Retry</button></div>}\n` +
+5907-      '\n' +
+5908-      '    <div className={styles.grid}>\n' +
+5909-      '      <label className={styles.field}><small>PRIMARY ROLES</small><span>Direct targets supported by at least one ready CV.</span><textarea value={primaryText} onChange={event=>setPrimaryText(event.target.value)} onBlur={()=>onPrimaryChange(cleanLines(primaryText))} rows="6" disabled={loading}/></label>\n' +
+5910-      '      <label className={styles.field}><small>ADJACENT ROLES</small><span>Credible nearby roles supported by the uploaded CV evidence.</span><textarea value={adjacentText} onChange={event=>setAdjacentText(event.target.value)} onBlur={()=>onAdjacentChange(cleanLines(adjacentText))} rows="6" disabled={loading}/></label>\n' +
+5911-      '    </div>\n' +
+5912-      '  </div>\n' +
+5913-      '}\n'
+5914-    
+5915:  code: 'ERR_ASSERTION'
+5916:  name: 'AssertionError'
+5917-  expected:
+5918-  actual: |-
+5919-    'use client'
+5920-    import {useEffect,useState} from 'react'
+5921-    import styles from './search-profile-roles-step.module.css'
+5922-    
+5923-    const cleanLines=value=>String(value??'').split(/\n|,/).map(item=>item.trim()).filter(Boolean)
+5924-    const rolesText=roles=>(Array.isArray(roles)?roles:[]).join('\n')
+5925-    
+5926-    export default function SearchProfileRolesStep({primaryRoles=[],adjacentRoles=[],status='idle',error='',source='ai',totalCount=0,analysedCount=0,failedCvs=[],onPrimaryChange,onAdjacentChange,onRetry}){
+5927-      const loading=status==='loading'
+5928-      const ready=status==='ready'
+5929-      const partial=status==='partial'
+5930-      const primaryValue=rolesText(primaryRoles)
+5931-      const adjacentValue=rolesText(adjacentRoles)
+5932-      const [primaryText,setPrimaryText]=useState(primaryValue)
+5933-      const [adjacentText,setAdjacentText]=useState(adjacentValue)
+5934-      const readyLabel=`${totalCount} ${totalCount===1?'CV':'CVs'}`
+5935-      const cached=source==='cache'||source==='saved'
+5936-    
+5937-      useEffect(()=>{setPrimaryText(primaryValue)},[primaryValue])
+5938-      useEffect(()=>{setAdjacentText(adjacentValue)},[adjacentValue])
+5939-    
+5940-      return <div className="wizard">
+5941-        <h3>Which roles should we search for?</h3>
+5942-        <p>ApplyPilot proposes credible target roles from all ready CVs. Review and edit the combined list before saving your Search Profile. The live LinkedIn search still keeps its existing logic unchanged in this step.</p>
+5943-    
+5944-        {loading&&<div className="successBox"><b>Analysing {readyLabel}…</b><span>Building independent role directions from each ready CV.</span></div>}
+--
+5956-  operator: 'match'
+5957-  stack: |-
+5958-    TestContext.<anonymous> (file:///home/runner/work/applypilot/applypilot/app/lib/search-profile-step2-ui-contract.test.mjs:19:10)
+5959-    Test.runInAsyncScope (node:async_hooks:206:9)
+5960-    Test.run (node:internal/test_runner/test:796:25)
+5961-    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+5962-    node:internal/test_runner/harness:255:12
+5963-    node:internal/process/task_queues:140:7
+5964-    AsyncResource.runInAsyncScope (node:async_hooks:206:9)
+5965-    AsyncResource.runMicrotask (node:internal/process/task_queues:137:8)
+5966-  ...
+5967-# Subtest: Search Profile Step 3 separates location from work model
+5968:not ok 316 - Search Profile Step 3 separates location from work model
+5969-  ---
+5970-  duration_ms: 6.298654
+5971-  location: '/home/runner/work/applypilot/applypilot/app/lib/search-profile-step3-ui-contract.test.mjs:5:1'
+5972-  failureType: 'testCodeFailure'
+5973-  error: |-
+5974-    The input did not match the regular expression /locations:/. Input:
+5975-    
+5976-    "'use client'\n" +
+5977-      "import { useEffect, useMemo, useState } from 'react'\n" +
+5978-      "import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'\n" +
+5979-      "import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'\n" +
+5980-      "import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'\n" +
+5981-      "import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'\n" +
+5982-      "import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'\n" +
+5983-      "import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'\n" +
+5984-      "import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'\n" +
+5985-      "import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'\n" +
+5986-      "import {requestJobAnalysis} from './lib/jd-analysis-client.js'\n" +
+5987-      "import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'\n" +
+5988-      "import {requestExpertiseMatch} from './lib/expertise-match-client.js'\n" +
+5989-      "import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'\n" +
+5990-      "import {evaluateJobConditions} from './lib/job-conditions.js'\n" +
+5991-      "import {fitLabel} from './lib/fit-label.js'\n" +
+5992-      "import SearchAudit from './components/search-audit.js'\n" +
+5993-      "import CvLibraryStep from './components/cv-library-step.js'\n" +
+5994-      "import SearchProfileRolesStep from './components/search-profile-roles-step.js'\n" +
+5995-      "import SearchProfileLocationStep from './components/search-profile-location-step.js'\n" +
+5996-      "import SearchPlanPreview from './components/search-plan-preview.js'\n" +
+--
+6105-      '\n' +
+6106-      '      if(slot===1){\n' +
+6107-      '        const primaryCv=getPrimaryCv(nextLibrary)\n' +
+6108-      '        localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(primaryCv))\n' +
+6109-      '        localStorage.removeItem(LEGACY_CV_STORAGE_KEY)\n' +
+6110-      '        setCvData(primaryCv)\n' +
+6111-      '        setDecisions({})\n' +
+6112-      '        setReviewOpen(false)\n' +
+6113-      '        setProfile(current=>{\n' +
+6114-      '          const next=resumeToProfile(current,primaryCv)\n' +
+6115-      "          if(current.savedAt) localStorage.setItem('app"... 27331 more characters
+6116-    
+6117:  code: 'ERR_ASSERTION'
+6118:  name: 'AssertionError'
+6119-  expected:
+6120-  actual: |-
+6121-    'use client'
+6122-    import { useEffect, useMemo, useState } from 'react'
+6123-    import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'
+6124-    import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'
+6125-    import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'
+6126-    import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'
+6127-    import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'
+6128-    import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'
+6129-    import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'
+6130-    import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'
+6131-    import {requestJobAnalysis} from './lib/jd-analysis-client.js'
+6132-    import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'
+6133-    import {requestExpertiseMatch} from './lib/expertise-match-client.js'
+6134-    import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'
+6135-    import {evaluateJobConditions} from './lib/job-conditions.js'
+6136-    import {fitLabel} from './lib/fit-label.js'
+6137-    import SearchAudit from './components/search-audit.js'
+6138-    import CvLibraryStep from './components/cv-library-step.js'
+6139-    import SearchProfileRolesStep from './components/search-profile-roles-step.js'
+6140-    import SearchProfileLocationStep from './components/search-profile-location-step.js'
+6141-    import SearchPlanPreview from './components/search-plan-preview.js'
+6142-    import BestCvPanel from './components/best-cv-panel.js'
+6143-    
+6144-    const WINDOWS=[1,3,7,14]
+6145-    const EMPTY_SEARCH_PROFILE={...DEFAULT_PROFILE,exclusions:''}
+6146-    const EMPTY_ROLE_STATE={status:'idle',error:'',source:'',totalCount:0,analysedCount:0,failedCvs:[]}
+--
+6580-    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+6581-    node:internal/test_runner/harness:255:12
+6582-    node:internal/process/task_queues:140:7
+6583-    AsyncResource.runInAsyncScope (node:async_hooks:206:9)
+6584-    AsyncResource.runMicrotask (node:internal/process/task_queues:137:8)
+6585-  ...
+6586-# Subtest: search engine has no hard-coded candidate CV fallback
+6587-ok 317 - search engine has no hard-coded candidate CV fallback
+6588-  ---
+6589-  duration_ms: 3.920326
+6590-  ...
+6591-# Subtest: LinkedIn API requires cvText and passes it into search evaluation
+6592:not ok 318 - LinkedIn API requires cvText and passes it into search evaluation
+6593-  ---
+6594-  duration_ms: 2.397244
+6595-  location: '/home/runner/work/applypilot/applypilot/app/lib/source-cv-search.contract.test.mjs:14:1'
+6596-  failureType: 'testCodeFailure'
+6597-  error: |-
+6598-    The input did not match the regular expression /searchLinkedIn\(\{freshnessDays,resume:cvText\}\)/. Input:
+6599-    
+6600-    "import { NextResponse } from 'next/server'\n" +
+6601-      "import { searchLinkedInStable as searchLinkedIn } from '../../lib/linkedin-stable-search.js'\n" +
+6602-      "import { createLinkedInStableFetcher } from '../../lib/linkedin-stable-fetcher.js'\n" +
+6603-      "import { requireUser } from '../../lib/auth/require-user.js'\n" +
+6604-      '\n' +
+6605-      "export const runtime = 'nodejs'\n" +
+6606-      "export const dynamic = 'force-dynamic'\n" +
+6607-      'export const maxDuration = 300\n' +
+6608-      '\n' +
+6609-      'export async function POST(request){\n' +
+6610-      '  const auth=await requireUser()\n' +
+6611-      '  if(!auth.user) return auth.response\n' +
+6612-      '\n' +
+6613-      '  try{\n' +
+6614-      '    const body=await request.json().catch(()=>({}))\n' +
+6615-      '    const freshnessDays=[1,3,7,14].includes(Number(body?.freshnessDays))?Number(body.freshnessDays):7\n' +
+6616-      "    const cvText=String(body?.cvText??'').trim()\n" +
+6617-      "    if(cvText.length<100) return NextResponse.json({error:'Please Upload Your CV'},{status:400})\n" +
+6618-      '    const fetcher=createLinkedInStableFetcher()\n' +
+6619-      '    const result=await searchLinkedIn({freshnessDays,resume:cvText,fetcher})\n' +
+6620-      "    console.log('linkedin-search',JSON.stringify({coverage:result.coverage.status,stats:result.stats,diagnostics:result.diagnostics}))\n" +
+6621-      '    return NextResponse.json({...result,fetchedAt:new Date().toISOString()})\n' +
+6622-      '  }catch(error){\n' +
+6623-      "    console.error('linkedin-search error',error)\n" +
+6624-      "    return NextResponse.json({error:String(error?.message||'LinkedIn public search failed')},{status:502})\n" +
+6625-      '  }\n' +
+6626-      '}\n'
+6627-    
+6628:  code: 'ERR_ASSERTION'
+6629:  name: 'AssertionError'
+6630-  expected:
+6631-  actual: |-
+6632-    import { NextResponse } from 'next/server'
+6633-    import { searchLinkedInStable as searchLinkedIn } from '../../lib/linkedin-stable-search.js'
+6634-    import { createLinkedInStableFetcher } from '../../lib/linkedin-stable-fetcher.js'
+6635-    import { requireUser } from '../../lib/auth/require-user.js'
+6636-    
+6637-    export const runtime = 'nodejs'
+6638-    export const dynamic = 'force-dynamic'
+6639-    export const maxDuration = 300
+6640-    
+6641-    export async function POST(request){
+6642-      const auth=await requireUser()
+6643-      if(!auth.user) return auth.response
+6644-    
+6645-      try{
+6646-        const body=await request.json().catch(()=>({}))
+6647-        const freshnessDays=[1,3,7,14].includes(Number(body?.freshnessDays))?Number(body.freshnessDays):7
+6648-        const cvText=String(body?.cvText??'').trim()
+6649-        if(cvText.length<100) return NextResponse.json({error:'Please Upload Your CV'},{status:400})
+6650-        const fetcher=createLinkedInStableFetcher()
+6651-        const result=await searchLinkedIn({freshnessDays,resume:cvText,fetcher})
+6652-        console.log('linkedin-search',JSON.stringify({coverage:result.coverage.status,stats:result.stats,diagnostics:result.diagnostics}))
+6653-        return NextResponse.json({...result,fetchedAt:new Date().toISOString()})
+6654-      }catch(error){
+6655-        console.error('linkedin-search error',error)
+6656-        return NextResponse.json({error:String(error?.message||'LinkedIn public search failed')},{status:502})
+6657-      }
+--
+6849-#     at Object.readFileSync (node:fs:448:20)
+6850-#     at file:///home/runner/work/applypilot/applypilot/app/lib/v15-cosmetic.contract.test.mjs:5:17
+6851-#     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+6852-#     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+6853-#     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {
+6854-#   errno: -2,
+6855-#   code: 'ENOENT',
+6856-#   syscall: 'open',
+6857-#   path: '/home/runner/work/applypilot/applypilot/app/app/layout.js'
+6858-# }
+6859-# Node.js v20.20.2
+6860-# Subtest: /home/runner/work/applypilot/applypilot/app/lib/v15-cosmetic.contract.test.mjs
+6861:not ok 86 - /home/runner/work/applypilot/applypilot/app/lib/v15-cosmetic.contract.test.mjs
+6862-  ---
+6863-  duration_ms: 56.32546
+6864-  location: '/home/runner/work/applypilot/applypilot/app/lib/v15-cosmetic.contract.test.mjs:1:1'
+6865-  failureType: 'testCodeFailure'
+6866-  exitCode: 1
+6867-  signal: ~
+6868-  error: 'test failed'
+6869:  code: 'ERR_TEST_FAILURE'
+6870-  ...
+6871-# Subtest: main condition grid hides Salary and uses three columns
+6872-ok 355 - main condition grid hides Salary and uses three columns
+6873-  ---
+6874-  duration_ms: 1.508255
+6875-  ...
+6876-# Subtest: CV Update Review reuses cached JD analysis before calling OpenAI
+6877-ok 356 - CV Update Review reuses cached JD analysis before calling OpenAI
+6878-  ---
+6879-  duration_ms: 2.086373
+6880-  ...
+6881-# Subtest: CV Update Review removes dashboard and large Truth Guard panel
+6882-ok 357 - CV Update Review removes dashboard and large Truth Guard panel
+6883-  ---
+6884-  duration_ms: 0.206803
+6885-  ...
+6886-# Subtest: JD evidence is collapsed by default in Hiring priorities and Must-haves
+6887-ok 358 - JD evidence is collapsed by default in Hiring priorities and Must-haves
+6888-  ---
+6889-  duration_ms: 0.18971
+6890-  ...
+6891-# Subtest: CV change card keeps original updated why and decisions but removes repeated source card
+6892-ok 359 - CV change card keeps original updated why and decisions but removes repeated source card
+6893-  ---
+6894-  duration_ms: 0.929585
+6895-  ...
+6896-# node:fs:448
+6897-#     return binding.readFileUtf8(path, stringToFlags(options.flag));
+--
+6900-#     at Object.readFileSync (node:fs:448:20)
+6901-#     at file:///home/runner/work/applypilot/applypilot/app/lib/v16-expertise-button-size.test.mjs:4:14
+6902-#     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+6903-#     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+6904-#     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {
+6905-#   errno: -2,
+6906-#   code: 'ENOENT',
+6907-#   syscall: 'open',
+6908-#   path: '/home/runner/work/applypilot/applypilot/app/lib/v15-polish.css'
+6909-# }
+6910-# Node.js v20.20.2
+6911-# Subtest: /home/runner/work/applypilot/applypilot/app/lib/v16-expertise-button-size.test.mjs
+6912:not ok 89 - /home/runner/work/applypilot/applypilot/app/lib/v16-expertise-button-size.test.mjs
+6913-  ---
+6914-  duration_ms: 51.7361
+6915-  location: '/home/runner/work/applypilot/applypilot/app/lib/v16-expertise-button-size.test.mjs:1:1'
+6916-  failureType: 'testCodeFailure'
+6917-  exitCode: 1
+6918-  signal: ~
+6919-  error: 'test failed'
+6920:  code: 'ERR_TEST_FAILURE'
+6921-  ...
+6922-# Subtest: missing visible vacancy facts normalize to N/A
+6923-ok 361 - missing visible vacancy facts normalize to N/A
+6924-  ---
+6925-  duration_ms: 2.337951
+6926-  ...
+6927-# Subtest: main vacancy fact cards visually promote factual values and hide match scores
+6928:not ok 362 - main vacancy fact cards visually promote factual values and hide match scores
+6929-  ---
+6930-  duration_ms: 10.531294
+6931-  location: '/home/runner/work/applypilot/applypilot/app/lib/v16-factual-condition-cards.test.mjs:13:1'
+6932-  failureType: 'testCodeFailure'
+6933-  error: |-
+6934-    The input did not match the regular expression /\.conditionCard\s*>\s*span\s*\{[^}]*font-size\s*:\s*24px/s. Input:
+6935-    
+6936-    '/* V15 cosmetic polish only — no search, scoring, audit, auth, or cache logic */\n' +
+6937-      '.expertiseHero:has(.primary) .expertiseScore{\n' +
+6938-      '  font-size:0;\n' +
+6939-      '  color:#8d97a5;\n' +
+6940-      '  font-weight:700;\n' +
+6941-      '  white-space:nowrap;\n' +
+6942-      '}\n' +
+6943-      '.expertiseHero:has(.primary) .expertiseScore::after{\n' +
+6944-      "  content:'Not analysed';\n" +
+6945-      '  font-size:15px;\n' +
+6946-      '  letter-spacing:0;\n' +
+6947-      '}\n' +
+6948-      'footer{\n' +
+6949-      '  font-size:0;\n' +
+6950-      '}\n' +
+6951-      'footer::after{\n' +
+6952-      "  content:'ApplyPilot · Search less. Apply better.';\n" +
+6953-      '  font-size:12px;\n' +
+6954-      '}\n' +
+6955-      '.expertiseHero .primary{\n' +
+6956-      '  width:max-content;\n' +
+--
+6988-      '.conditionGrid .conditionCard > b{\n' +
+6989-      '  display:none;\n' +
+6990-      '}\n' +
+6991-      '.conditionGrid .conditionCard > span{\n' +
+6992-      '  display:block;\n' +
+6993-      '  margin-top:8px;\n' +
+6994-      '  color:#f4f7fb;\n' +
+6995-      '  font-size:18px;\n' +
+6996-      '  font-weight:800;\n' +
+6997-      '  line-height:1.25;\n' +
+6998-      '}\n'
+6999-    
+7000:  code: 'ERR_ASSERTION'
+7001:  name: 'AssertionError'
+7002-  expected:
+7003-  actual: |-
+7004-    /* V15 cosmetic polish only — no search, scoring, audit, auth, or cache logic */
+7005-    .expertiseHero:has(.primary) .expertiseScore{
+7006-      font-size:0;
+7007-      color:#8d97a5;
+7008-      font-weight:700;
+7009-      white-space:nowrap;
+7010-    }
+7011-    .expertiseHero:has(.primary) .expertiseScore::after{
+7012-      content:'Not analysed';
+7013-      font-size:15px;
+7014-      letter-spacing:0;
+7015-    }
+7016-    footer{
+7017-      font-size:0;
+7018-    }
+7019-    footer::after{
+7020-      content:'ApplyPilot · Search less. Apply better.';
+7021-      font-size:12px;
+7022-    }
+7023-    .expertiseHero .primary{
+7024-      width:max-content;
+7025-      min-width:0;
+7026-      padding:8px 11px;
+7027-      font-size:12px;
+7028-      margin-top:7px;
+7029-    }
+
+=== FINAL 140 LINES ===
+      '  padding:8px 11px;\n' +
+      '  font-size:12px;\n' +
+      '  margin-top:7px;\n' +
+      '}\n' +
+      '\n' +
+      '/* V16 main vacancy facts — salary intentionally removed */\n' +
+      '.conditionGrid{\n' +
+      '  grid-template-columns:repeat(3,1fr);\n' +
+      '}\n' +
+      '.conditionGrid > .conditionCard:nth-child(2){\n' +
+      '  display:none;\n' +
+      '}\n' +
+      '\n' +
+      '.versionBadge{\n' +
+      '  position:fixed;\n' +
+      '  right:14px;\n' +
+      '  bottom:12px;\n' +
+      '  z-index:60;\n' +
+      '  padding:6px 9px;\n' +
+      '  border:1px solid #303946;\n' +
+      '  border-radius:999px;\n' +
+      '  background:rgba(17,21,26,.94);\n' +
+      '  color:#8d97a5;\n' +
+      '  font-size:10px;\n' +
+      '  font-weight:800;\n' +
+      '  letter-spacing:.04em;\n' +
+      '  pointer-events:none;\n' +
+      '}\n' +
+      '\n' +
+      '/* V16 vacancy facts show factual values only; match scores stay internal */\n' +
+      '.conditionGrid .conditionCard > b{\n' +
+      '  display:none;\n' +
+      '}\n' +
+      '.conditionGrid .conditionCard > span{\n' +
+      '  display:block;\n' +
+      '  margin-top:8px;\n' +
+      '  color:#f4f7fb;\n' +
+      '  font-size:18px;\n' +
+      '  font-weight:800;\n' +
+      '  line-height:1.25;\n' +
+      '}\n'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    /* V15 cosmetic polish only — no search, scoring, audit, auth, or cache logic */
+    .expertiseHero:has(.primary) .expertiseScore{
+      font-size:0;
+      color:#8d97a5;
+      font-weight:700;
+      white-space:nowrap;
+    }
+    .expertiseHero:has(.primary) .expertiseScore::after{
+      content:'Not analysed';
+      font-size:15px;
+      letter-spacing:0;
+    }
+    footer{
+      font-size:0;
+    }
+    footer::after{
+      content:'ApplyPilot · Search less. Apply better.';
+      font-size:12px;
+    }
+    .expertiseHero .primary{
+      width:max-content;
+      min-width:0;
+      padding:8px 11px;
+      font-size:12px;
+      margin-top:7px;
+    }
+    
+    /* V16 main vacancy facts — salary intentionally removed */
+    .conditionGrid{
+      grid-template-columns:repeat(3,1fr);
+    }
+    .conditionGrid > .conditionCard:nth-child(2){
+      display:none;
+    }
+    
+    .versionBadge{
+      position:fixed;
+      right:14px;
+      bottom:12px;
+      z-index:60;
+      padding:6px 9px;
+      border:1px solid #303946;
+      border-radius:999px;
+      background:rgba(17,21,26,.94);
+      color:#8d97a5;
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.04em;
+      pointer-events:none;
+    }
+    
+    /* V16 vacancy facts show factual values only; match scores stay internal */
+    .conditionGrid .conditionCard > b{
+      display:none;
+    }
+    .conditionGrid .conditionCard > span{
+      display:block;
+      margin-top:8px;
+      color:#f4f7fb;
+      font-size:18px;
+      font-weight:800;
+      line-height:1.25;
+    }
+    
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///home/runner/work/applypilot/applypilot/app/lib/v16-factual-condition-cards.test.mjs:16:10)
+    async Test.run (node:internal/test_runner/test:797:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: preview page middleware bypasses Supabase before getUser while production auth remains
+ok 363 - preview page middleware bypasses Supabase before getUser while production auth remains
+  ---
+  duration_ms: 5.459992
+  ...
+# Subtest: preview API auth bypass returns a synthetic admin user before Supabase while production still returns 401
+ok 364 - preview API auth bypass returns a synthetic admin user before Supabase while production still returns 401
+  ---
+  duration_ms: 1.666605
+  ...
+# Subtest: version badge is visible before search and preview includes short Vercel commit SHA
+ok 365 - version badge is visible before search and preview includes short Vercel commit SHA
+  ---
+  duration_ms: 1.395822
+  ...
+1..365
+# tests 365
+# suites 0
+# pass 352
+# fail 13
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2520.630598
