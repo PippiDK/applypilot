@@ -1,4 +1,4 @@
-name: maintenance-tdd
+name: maintenance-final-verifier
 
 on:
   push:
@@ -6,14 +6,31 @@ on:
       - feature/cv-library-3-slots
 
 jobs:
-  targeted-green:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - name: Install dependencies
         run: npm install
-      - name: Best CV cache contract
+      - name: Targeted Best CV cleanup contract
         run: node --test app/lib/best-cv-cache.test.mjs
+      - name: Full regression suite
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Frozen legacy Search core unchanged
+        shell: bash
+        run: |
+          test "$(git hash-object app/lib/linkedin-search.js)" = "e9645404dbe647486bbb7ee1c4afd38a20f434f9"
+          test "$(git hash-object app/lib/linkedin-stable-search.js)" = "2843327af6465db84523d80dc09b51eff5c236d4"
+          test "$(git hash-object app/lib/linkedin-role-gate.js)" = "29192de5696849286b6e5f9aaf53112ab028b05d"
+          test "$(git hash-object app/api/linkedin-search/route.js)" = "4a69ac52590bc9505448669cf88dcbe437abb0c3"
+      - name: Main branch untouched
+        shell: bash
+        run: |
+          MAIN_SHA="$(git ls-remote origin refs/heads/main | cut -f1)"
+          echo "main=$MAIN_SHA"
+          test "$MAIN_SHA" = "354c799c8ffe31e599f175ae4770ae4086a73a91"
