@@ -7,6 +7,7 @@ import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cac
 import {requestExpertiseMatch} from './lib/expertise-match-client.js'
 import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'
 import {evaluateJobConditions} from './lib/job-conditions.js'
+import {fitLabel} from './lib/fit-label.js'
 import SearchAudit from './components/search-audit.js'
 
 const WINDOWS=[1,3,7,14]
@@ -214,7 +215,7 @@ export default function Home(){
         {state.loading&&<div className="empty">Searching LinkedIn public pages and reading full job descriptions…</div>}
         {!state.loading&&state.stats&&jobs.length===0&&<div className="empty">NO STRONG NEW MATCHES FOUND.</div>}
         {jobs.map(item=>{const {job,evaluation}=item; const score=Math.round(evaluation.score*10); return <button key={job.sourceJobId} onClick={()=>setSelected(item)} className={'job '+(active?.job.sourceJobId===job.sourceJobId?'active':'')}>
-          <span className="score">{score}%</span>
+          <span className="score">{fitLabel(score)}</span>
           <span><b>{job.title}</b><small>{job.company} · {job.location}</small><small className="sourceLine">LinkedIn · {dateText(job.publishedAt)}</small></span>
           <span>→</span>
         </button>})}
