@@ -1,4 +1,4 @@
-name: Step 3 TDD
+name: Step 3 Final Verification
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - feature/cv-library-3-slots
 
 jobs:
-  test:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,5 +15,9 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: package.json
-      - run: npm install --no-audit --no-fund
-      - run: npm test
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Full regression tests
+        run: npm test
+      - name: Production build
+        run: npm run build
