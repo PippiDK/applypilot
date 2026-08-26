@@ -1,4 +1,4 @@
-name: cosmetic-ui-tdd
+name: cosmetic-ui-final-verifier
 
 on:
   push:
@@ -6,12 +6,31 @@ on:
       - feature/cv-library-3-slots
 
 jobs:
-  contract:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - run: npm install --no-audit --no-fund
-      - run: node --test app/lib/cosmetic-ui.contract.test.mjs
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Targeted cosmetic UI contract
+        run: node --test app/lib/cosmetic-ui.contract.test.mjs
+      - name: Full regression suite
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Frozen legacy Search core unchanged
+        run: |
+          git diff --exit-code 9b251f6d717ca9106127802ecd4fcb406ef8371a HEAD -- \
+            app/lib/linkedin-search.js \
+            app/lib/linkedin-stable-search.js \
+            app/lib/linkedin-role-gate.js \
+            app/api/linkedin-search/route.js
+      - name: Main branch untouched
+        run: |
+          ACTUAL_MAIN=$(git ls-remote origin refs/heads/main | cut -f1)
+          test "$ACTUAL_MAIN" = "354c799c8ffe31e599f175ae4770ae4086a73a91"
