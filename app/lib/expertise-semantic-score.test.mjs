@@ -27,7 +27,28 @@ test('semantic MATCHED, TRANSFERABLE, PARTIAL and NOT_EVIDENCED receive determin
   assert.equal(result.expertiseMatch,54) // (1 + .75 + .4 + 0) / 4
 })
 
-test('Annapurna-style evidence produces a high match while preserving the M&A-specific gap',()=>{
+test('TRANSFERABLE strengths are separate from direct fit and expertise gaps',()=>{
+  const requirements=[
+    req({id:'m',capability:'End-to-end programme delivery'}),
+    req({id:'t',capability:'Creative production context'}),
+    req({id:'p',capability:'External shoot production management'}),
+    req({id:'n',capability:'Brand process expertise'})
+  ]
+  const evaluations=[
+    judgement({id:'m',status:'MATCHED'}),
+    judgement({id:'t',status:'TRANSFERABLE'}),
+    judgement({id:'p',status:'PARTIAL'}),
+    judgement({id:'n',status:'NOT_EVIDENCED',cvEvidence:[]})
+  ]
+  const result=evaluateExpertiseFromJudgements(requirements,evaluations)
+  assert.deepEqual(result.whyYouFit,['End-to-end programme delivery'])
+  assert.deepEqual(result.transferableStrengths,['Creative production context'])
+  assert.ok(result.expertiseGaps.some(x=>/External shoot production management/.test(x)))
+  assert.ok(result.expertiseGaps.some(x=>/Brand process expertise/.test(x)))
+  assert.ok(!result.expertiseGaps.some(x=>/Creative production context/.test(x)))
+})
+
+test('Annapurna-style evidence produces a high match while keeping transferable evidence out of gaps',()=>{
   const requirements=[
     req({id:'delivery',capability:'End-to-end integration programme delivery',category:'delivery_execution',importance:'core'}),
     req({id:'cross',capability:'Cross-functional workstream leadership',category:'leadership_stakeholder_scope',importance:'core'}),
@@ -46,5 +67,6 @@ test('Annapurna-style evidence produces a high match while preserving the M&A-sp
   assert.ok(result.expertiseMatch>=85,`unexpected ${result.expertiseMatch}%`)
   assert.equal(result.breakdown.delivery_execution.score,100)
   assert.equal(result.breakdown.leadership_stakeholder_scope.score,100)
-  assert.ok(result.expertiseGaps.some(x=>/transferable evidence only/i.test(x)))
+  assert.deepEqual(result.transferableStrengths,['Hands-on M&A integration planning and execution'])
+  assert.ok(!result.expertiseGaps.some(x=>/M&A integration planning/i.test(x)))
 })
