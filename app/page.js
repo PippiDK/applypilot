@@ -358,6 +358,7 @@ export default function Home(){
             {!expertise&&!expertiseState.loading&&<button className="primary" onClick={runExpertiseMatch}>Run Expertise Match</button>}
             {expertise&&<>
               <div className="expertiseSection"><h3>Why you fit</h3>{expertise.whyYouFit.length?expertise.whyYouFit.map((item,index)=><p key={index}>✓ {item}</p>):<p className="muted">No direct professional match evidence returned.</p>}</div>
+              {expertise.transferableStrengths?.length>0&&<div className="expertiseSection"><h3>Transferable strengths</h3>{expertise.transferableStrengths.map((item,index)=><p key={index}>↔ {item}</p>)}</div>}
               <div className="expertiseSection"><h3>Expertise gaps</h3>{expertise.expertiseGaps.length?expertise.expertiseGaps.map((item,index)=><p key={index}>⚠ {item}</p>):<p>✓ No material expertise gap detected in the analysed requirements.</p>}</div>
               <div className="expertiseSection"><h3>Expertise breakdown</h3><div className="expertiseBreakdown">
                 <div><span>Delivery / execution</span><b>{conditionScore(expertise.breakdown.delivery_execution?.score)}</b></div>
