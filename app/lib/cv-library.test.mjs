@@ -6,6 +6,7 @@ import {
   createCvLibrary,
   normalizeCvLibrary,
   upsertCvSlot,
+  removeCvSlot,
   getCvSlot,
   getPrimaryCv,
   readyCvCount,
@@ -77,7 +78,32 @@ test('same sourceVersion cannot occupy two different slots',()=>{
   assert.throws(()=>upsertCvSlot(library,2,cv('same','duplicate.pdf')),/already uploaded as CV 1/i)
 })
 
+test('removing CV 2 leaves CV 1 and CV 3 in their original slots',()=>{
+  let library=createCvLibrary()
+  library=upsertCvSlot(library,1,cv('v1','one.pdf'))
+  library=upsertCvSlot(library,2,cv('v2','two.pdf'))
+  library=upsertCvSlot(library,3,cv('v3','three.pdf'))
+  library=removeCvSlot(library,2)
+  assert.equal(getCvSlot(library,1).fileName,'one.pdf')
+  assert.equal(getCvSlot(library,2),null)
+  assert.equal(getCvSlot(library,3).fileName,'three.pdf')
+  assert.equal(readyCvCount(library),2)
+})
+
+test('removing CV 1 does not promote CV 2 or CV 3',()=>{
+  let library=createCvLibrary()
+  library=upsertCvSlot(library,1,cv('v1','one.pdf'))
+  library=upsertCvSlot(library,2,cv('v2','two.pdf'))
+  library=upsertCvSlot(library,3,cv('v3','three.pdf'))
+  library=removeCvSlot(library,1)
+  assert.equal(getPrimaryCv(library),null)
+  assert.equal(getCvSlot(library,2).fileName,'two.pdf')
+  assert.equal(getCvSlot(library,3).fileName,'three.pdf')
+  assert.equal(readyCvCount(library),2)
+})
+
 test('slot number must stay within the MVP limit',()=>{
   const library=createCvLibrary()
   assert.throws(()=>upsertCvSlot(library,4,cv('v4','four.pdf')),/CV slot must be between 1 and 3/i)
+  assert.throws(()=>removeCvSlot(library,4),/CV slot must be between 1 and 3/i)
 })
