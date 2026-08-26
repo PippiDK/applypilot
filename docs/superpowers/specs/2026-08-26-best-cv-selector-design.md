@@ -1,363 +1,141 @@
-# Best CV Selector + Fit UX Design
+# Best CV Selector Design
 
 Date: 2026-08-26
-Status: Approved in chat for specification; implementation not started
-Branch: `feature/v16-cv-review-cache-ux-cleanup`
+Status: Approved for TEST implementation
+Branch: `feature/cv-library-3-slots`
 
-## 1. Goal
+## Goal
 
-Add a clear post-search decision flow that helps the user choose the best existing CV for a vacancy, then evaluates that selected CV against the full JD, and only then offers optional AI-assisted CV updating.
+For one selected vacancy, compare the existing CVs in the browser-local CV Library and recommend the single strongest existing CV for that JD.
 
-The existing LinkedIn discovery/search pipeline remains unchanged.
+Canonical flow:
 
-## 2. Product principle
+`Search -> Vacancy -> Best CV + Advice -> Use as is / Update recommended`
 
-The feature must preserve this sequence:
+Expertise Match remains optional diagnostics and is not a gate for Best CV. CV Update is a later step and is not implemented by this change.
 
-`Search -> Select vacancy -> Find best CV -> Confirm CV -> Expertise Match -> Optional CV Update`
+## Product rules
 
-The system must never merge, rebuild, or assemble a new CV from multiple source CVs. It selects one existing CV profile at a time.
+- MVP has exactly the existing configurable three slots: `CV 1`, `CV 2`, `CV 3` (`MAX_CVS=3`).
+- Compare only ready CV slots. Missing slots are ignored explicitly; no empty/fabricated candidate is created.
+- Never merge, rebuild, or assemble a CV from multiple source CVs.
+- Best CV selects one existing CV only.
+- Do not show a Best-CV percentage. This is a ranking/positioning decision, not a probability.
+- Opening or switching vacancies never triggers Best CV AI automatically.
+- One explicit `Find best CV` action may make one AI call for the full candidate set.
+- Repeating the same analysis with unchanged JD and unchanged CV source versions must use cache with zero new AI calls.
+- Search discovery, gates, Search Audit, ranking/scoring, Search Profile, and Expertise Match logic remain unchanged.
+- `main` remains unchanged.
 
-AI work is manual and cached. No AI call occurs merely because the user opens or navigates between vacancies.
+## Selector packets
 
-## 3. Left-side search results
+Before the AI request, create a deterministic compact packet from each ready Source CV. Preserve recruiter-significant positioning:
 
-### 3.1 Sorting
+- CV id / fixed slot / sourceVersion / filename metadata;
+- top-of-CV professional identity;
+- Professional Summary when safely detected;
+- stored skill/capability labels;
+- latest and previous role positioning and evidence;
+- compact older role history for context.
 
-Vacancies remain sorted by the existing internal fit/search score from strongest to weakest.
+Use the existing deterministic CV structure parser where possible. If the structure is not safe enough to compress without losing material evidence, fall back to the complete parsed CV text for that candidate rather than silently dropping evidence. Packet construction itself uses no AI.
 
-### 3.2 Visible fit labels
+## One-call AI comparison
 
-Do not display the internal numeric search percentage in the vacancy list.
+One structured AI request receives:
 
-Show a qualitative label derived from the existing verdict instead:
+- vacancy title, company, location, and Full JD;
+- all available selector packets (or full-text fallback packets).
 
-- `STRONG`
-- `PLAUSIBLE`
-- `STRETCH`
+The evaluator judges recruiter-style positioning: top identity, summary emphasis, prominence and recency of relevant evidence, domain framing, delivery/governance/consulting positioning, regulated/financial positioning where relevant, and likely hiring-manager interpretation.
 
-The internal numeric score remains available to the search engine for ranking and diagnostics but is not presented as a user-facing probability or match percentage.
+It must not invent experience, combine facts across CVs, or choose by keyword count alone.
 
-### 3.3 Rationale
+## Structured result
 
-The current left-side number is an internal search/ranking signal. Showing it next to the right-side Expertise Match percentage creates a false impression that two directly comparable percentages disagree.
+Return:
 
-## 4. Right-side vacancy flow
+```json
+{
+  "recommendedCvId": "cv-2",
+  "rankedCvIds": ["cv-2", "cv-1", "cv-3"],
+  "reason": "Concise recruiter-style explanation.",
+  "recommendation": "use_as_is",
+  "updateFocus": []
+}
+```
 
-The right panel is ordered as follows.
+Rules:
 
-### 4.1 Vacancy facts
+- `recommendedCvId` must be one of the supplied candidates.
+- `rankedCvIds` contains every supplied candidate exactly once and starts with the winner.
+- `recommendation` is exactly `use_as_is` or `update_recommended`.
+- `updateFocus` contains at most four concise areas and is only advisory for the later CV Update feature.
+- The service adds a selector version for cache/version control.
 
-Keep the existing vacancy header and factual cards:
+`use_as_is` means the existing winning CV is already positioned appropriately. `update_recommended` means truthful existing evidence could benefit from emphasis/order/wording changes; it must never mean fabricating missing expertise.
 
-- Area
-- Employment Type
-- Work Model
+## Cache
 
-These remain factual values or `N/A`; no scores are shown in these cards.
+Best CV cache fingerprint includes:
 
-### 4.2 Best CV for this job
+- job id;
+- Full JD fingerprint;
+- every available candidate id + sourceVersion;
+- selector version.
 
-Add a new section above Expertise Match.
+Adding, removing, or replacing a CV, or materially changing the JD, creates a new key. Reopening the same vacancy/library state returns the cached result.
 
-Initial state:
+## UI
 
-- heading: `BEST CV FOR THIS JOB`
-- status: `Not analysed`
-- primary action: `Find best CV`
-- optional secondary access: `Compare all 5 CVs`
+Add a compact `BEST CV FOR THIS JOB` section above Expertise Match.
 
-The five logical CV profiles are:
+Idle:
+- `Not analysed`
+- `Find best CV`
 
-1. DELIVERY
-2. ENTERPRISE
-3. CONSULTANT
-4. DELIVERY · SAXO
-5. ENTERPRISE · SAXO
+Analysing:
+- clear loading state; no duplicate calls while loading.
 
-Photo/no-photo presentation variants are not separate candidates for Best CV selection.
+Result:
+- winning `CV N` and filename;
+- short reason;
+- compact ranked order;
+- `USE AS IS` or `UPDATE RECOMMENDED`;
+- optional update-focus lines;
+- `Use this CV` selection action.
 
-After analysis, show:
+Selection is vacancy-specific state for downstream application work. This milestone must not silently switch or rerun the existing Expertise Match while its regression testing is ongoing.
 
-- one recommended CV profile
-- short recruiter-style explanation of why it is the strongest positioning for this JD
-- ranked alternatives in compact form
-- `Use this CV` / equivalent confirmation action
+## Error handling
 
-Do not show a Best-CV percentage. The purpose is ranking/selection, not a pseudo-probability score.
+- AI failure affects only Best CV; it must not remove or modify a vacancy or Search results.
+- Fewer than two ready CVs degrades safely: with one ready CV, identify it as the only available CV rather than fabricate a comparison.
+- Invalid AI candidate ids/rankings are rejected.
+- Safe API errors must not log CV or JD text.
 
-## 5. Best CV selection logic
-
-### 5.1 Token-efficient selector packets
-
-Do not send five complete CV documents to AI on every vacancy.
-
-When a CV is added or replaced, build and store a compact deterministic `selector packet` locally from the parsed CV. It should preserve the parts that drive recruiter positioning:
-
-- professional title / top identity
-- Professional Summary
-- Core Competences / key capability groups
-- recent role titles and dates
-- the most recent 1-2 role descriptions and achievement bullets
-- compact list of older role titles/domain history needed for context
-- profile id and sourceVersion
-
-Packet construction should not require an AI call. It is derived from already parsed CV text.
-
-If deterministic extraction is incomplete for a specific CV, the selector may fall back to full parsed CV text for that profile rather than silently losing evidence.
-
-### 5.2 AI input
-
-One manual AI request receives:
-
-- the Full JD
-- the five selector packets (or full-text fallback for a packet that could not be safely built)
-- explicit instruction to choose the strongest existing CV without combining content
-
-This remains one AI call per unique unchanged vacancy + CV-library state, not five separate calls.
-
-### 5.3 Evaluation lens
-
-The selector should judge recruiter-style positioning, including:
-
-- top-of-CV professional identity
-- relevance of summary emphasis
-- prominence and ordering of relevant experience
-- domain framing
-- governance/delivery/consulting positioning
-- regulated/financial positioning where relevant
-- recency and prominence of evidence
-- likely hiring-manager interpretation
-
-It must not invent experience or treat a weaker narrative as stronger only because of keyword count.
-
-### 5.4 Output
-
-Structured output should include at minimum:
-
-- recommended profile id
-- ranked profile ids
-- concise reason for the winner
-- concise reason for the strongest alternative(s)
-- selector version
-
-## 6. CV confirmation and active CV state
-
-The recommended CV is not automatically accepted.
-
-After Best CV analysis, the user explicitly confirms which CV to use for the vacancy.
-
-The confirmed CV becomes the vacancy-specific Active Source CV for downstream analysis.
-
-A user may override the recommendation and choose another of the five CVs.
-
-Changing the selected CV must update downstream state so Expertise Match and CV Update refer to the newly selected CV.
-
-## 7. Expertise Match
-
-Expertise Match remains a separate concept from Search Fit and Best CV selection.
-
-It answers:
-
-> How strongly does the selected concrete CV evidence the requirements of this concrete Full JD?
-
-The existing visible Expertise Match percentage is retained.
-
-The section must explicitly identify the selected CV profile, e.g.:
-
-`Full JD <-> ENTERPRISE · SAXO`
-
-Keep the existing sections:
-
-- Why you fit
-- Expertise gaps
-- Expertise breakdown
-
-Expertise Match remains manual and cached. Confirming a CV does not automatically spend AI tokens; the user explicitly runs Expertise Match.
-
-## 8. Optional CV Update
-
-CV Update is downstream of Expertise Match.
-
-It is not offered as an actionable AI update until:
-
-1. a CV has been selected for the vacancy; and
-2. an Expertise Match result exists for that vacancy + selected CV version.
-
-The interface should then communicate one of two outcomes:
-
-### 8.1 Use as is
-
-The selected CV is already well-positioned. No AI update is required.
-
-### 8.2 Update recommended
-
-The system may offer a manual `Review AI Update` action.
-
-The update may adjust only supported existing material, especially:
-
-- Professional Summary
-- emphasis/order of existing evidence
-- wording in the most relevant recent roles where justified
-
-It must not:
-
-- invent new experience
-- merge facts from different CVs into a Frankenstein CV
-- remove truthful content merely to force fit
-- silently mutate the original source CV
-
-Truth Guard remains active.
-
-## 9. Token/cost rules
-
-### 9.1 General rule
+## Token rules
 
 `No automatic AI repeat while source inputs are unchanged.`
 
-### 9.2 Best CV cache
+- 0 AI on vacancy open/navigation.
+- 1 AI call on explicit uncached Best CV analysis with two or three CVs.
+- 0 AI on cache hit.
+- Selector packet construction is deterministic code.
 
-Best CV analysis should be cached by a stable fingerprint including:
+## Explicit non-goals
 
-- LinkedIn job id or JD fingerprint
-- versions/fingerprints of all five CV profiles
-- selector version
+This change does not:
 
-Reopening the same vacancy with unchanged JD and unchanged CV library returns the cached result with zero new AI calls.
+- change LinkedIn Search;
+- connect Search Profile to Search;
+- modify Expertise Match scoring/prompt/cache/UI;
+- generate or rewrite a CV;
+- implement CV Update;
+- merge CVs;
+- add more than three MVP slots;
+- change production/main.
 
-### 9.3 Selector-packet reuse
+## Verification
 
-A selector packet is rebuilt only when its source CV version changes. Navigation and repeated vacancy analysis reuse the existing packet without AI cost.
-
-### 9.4 Expertise Match cache
-
-Preserve the existing cache concept:
-
-- vacancy/job id
-- selected CV sourceVersion
-- Expertise Match version
-
-### 9.5 CV Update cache
-
-Cache the update proposal by:
-
-- vacancy/JD fingerprint
-- selected CV sourceVersion
-- updater version
-
-## 10. CV Library storage for MVP
-
-For the first implementation, follow the app's current browser-local CV storage pattern rather than introducing a new backend database solely for this feature.
-
-Persist parsed CV profile data locally per browser, including:
-
-- logical profile id/name
-- original filename metadata
-- parsed CV text
-- deterministic selector packet
-- sourceVersion/content fingerprint
-- optional presentation-variant metadata
-
-Do not commit CV text or PDF files to the public GitHub repository.
-
-A later user-scoped Supabase/domain-storage migration can be treated as a separate architecture task when multi-device persistence becomes necessary.
-
-## 11. UI states
-
-### Best CV
-
-- `Not analysed`
-- `Analysing...`
-- `Recommended`
-- `Cached`
-- `Error`
-
-### Expertise Match
-
-- existing manual idle state (`Not analysed`)
-- analysing
-- result
-- cached result
-- error
-
-### CV Update
-
-- unavailable until a CV is selected and Expertise Match exists for that selected version
-- optional/use-as-is
-- update recommended
-- generating/review ready
-- accepted / keep original
-
-## 12. Error handling
-
-- A Best CV AI failure must not remove the vacancy or affect Search results.
-- Missing/invalid CV profiles must be shown explicitly and excluded from comparison rather than silently treated as empty text.
-- If fewer than two valid CV profiles exist, Best CV comparison should degrade to a simple selected-CV flow rather than fabricate a ranking.
-- If selector-packet extraction is incomplete, fall back to the full parsed text for that CV profile.
-- If the JD changes materially, invalidate the Best CV cache for that vacancy.
-- If a selected CV changes version, invalidate downstream Expertise Match/CV Update caches for that selected version only.
-
-## 13. Search isolation
-
-This feature must not alter:
-
-- LinkedIn discovery queries
-- discovery pagination/stabilization
-- pre-detail title gates
-- role gate
-- Full JD retrieval logic
-- Search Audit behavior
-- existing internal ranking formula
-
-The only search-list presentation change is replacing visible numeric percentages with qualitative fit labels while preserving score-based sorting.
-
-## 14. Testing strategy
-
-Use TDD for implementation.
-
-Minimum coverage:
-
-1. search list still sorts by existing internal score
-2. numeric search percentage is not rendered in the normal vacancy list
-3. verdict maps to STRONG / PLAUSIBLE / STRETCH correctly
-4. opening a vacancy does not call Best CV AI
-5. `Find best CV` calls AI once
-6. cached Best CV result avoids repeat AI call
-7. selector packets are deterministic and rebuilt only when a CV sourceVersion changes
-8. packet extraction retains title, summary, competences and recent-role positioning from each supported CV layout
-9. full-text fallback is used when a safe packet cannot be built
-10. recommendation can be overridden by user selection
-11. selected CV becomes downstream Active Source CV
-12. Expertise Match cache keys include selected CV version
-13. changing selected CV restores/recalculates the correct vacancy+CV analysis state
-14. CV Update is unavailable before Expertise Match for the selected CV
-15. unchanged CV Update result is reused from cache
-16. missing CV profiles are handled explicitly
-17. Search logic and Search Audit regression tests remain unchanged/passing
-18. no CV content is committed or serialized into repository source files
-19. on the five reference CV profiles, selector-packet ranking is checked against a full-CV comparison baseline before release; material ranking disagreements must be reviewed rather than ignored
-
-## 15. Explicit non-goals
-
-Not part of this feature:
-
-- changing LinkedIn Search scoring
-- multi-CV scoring during discovery/search
-- rewriting all five CVs
-- generating a master CV
-- assembling one CV from multiple source CVs
-- adding application tracking
-- redesigning the version badge
-- moving current user CV data into Supabase
-- changing production/main before explicit approval
-
-## 16. Intended user experience
-
-The user should be able to understand the screen without comparing unrelated percentages:
-
-1. Left list: which vacancies are strongest overall (`STRONG / PLAUSIBLE / STRETCH`), already sorted by internal fit.
-2. Best CV: which existing CV should be used for this job.
-3. Expertise Match: how strongly that selected CV evidences the JD, with one meaningful percentage.
-4. CV Update: whether spending additional AI tokens to improve positioning is worthwhile after Expertise Match has exposed the real fit/gaps.
-
-This preserves the existing strong Search engine while adding the next practical application decision in a token-efficient way.
+Use TDD for packet construction, validation, cache invalidation/reuse, client/API contract, and manual UI behavior. Final scope diff from the pre-feature TEST head must contain only Best CV files/tests/docs plus the minimal right-panel UI/CSS wiring; no Search or Expertise files may change.
