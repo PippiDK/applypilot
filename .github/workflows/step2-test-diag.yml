@@ -1,0 +1,47 @@
+name: Step 2 Test Diagnostic
+
+on:
+  push:
+    branches:
+      - feature/cv-library-3-slots
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    if: ${{ !contains(github.event.head_commit.message, '[diag-output]') && !contains(github.event.head_commit.message, '[cleanup-diag]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package.json
+      - run: npm install --no-audit --no-fund
+      - name: Capture exact npm test failure
+        shell: bash
+        run: |
+          set +e
+          npm test > /tmp/step2-test-output.txt 2>&1
+          code=$?
+          {
+            echo "npm test exit code: $code"
+            echo ""
+            echo "=== MATCHED FAILURE CONTEXT ==="
+            grep -n -B 12 -A 28 -E 'not ok|AssertionError|ERR_ASSERTION|ERR_MODULE_NOT_FOUND|SyntaxError|TypeError|ReferenceError|FAIL' /tmp/step2-test-output.txt || true
+            echo ""
+            echo "=== FINAL 140 LINES ==="
+            tail -n 140 /tmp/step2-test-output.txt
+          } > step2-test-summary.txt
+          exit 0
+      - name: Commit diagnostic summary
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add step2-test-summary.txt
+          git commit -m "[diag-output] capture step 2 npm test failure"
+          git push origin HEAD:feature/cv-library-3-slots
