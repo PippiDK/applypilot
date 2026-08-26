@@ -9,7 +9,7 @@ test('Search Profile wizard has five steps and no salary screen or salary scorin
   assert.doesNotMatch(page,/Minimum acceptable monthly salary/)
   assert.doesNotMatch(page,/Salary floor/)
   assert.doesNotMatch(page,/career\/comp/)
-  assert.match(page,/career level 15%/)
+  assert.doesNotMatch(page,/career level 15%/)
   assert.match(page,/profileStep===4.*What should ApplyPilot exclude\?/s)
   assert.match(page,/profileStep===5.*Confirm your search profile/s)
 })
