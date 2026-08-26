@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
-test('Search Profile step 2 is generated from CV 1 but does not drive Search yet',()=>{
+test('Search Profile step 2 combines all ready CVs while legacy Search keeps CV 1',()=>{
   const page=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
   const component=fs.readFileSync(new URL('../components/search-profile-roles-step.js',import.meta.url),'utf8')
 
@@ -16,7 +16,8 @@ test('Search Profile step 2 is generated from CV 1 but does not drive Search yet
 
   assert.match(component,/PRIMARY ROLES/)
   assert.match(component,/ADJACENT ROLES/)
-  assert.match(component,/Generated from CV 1/)
+  assert.match(component,/Generated from \{readyLabel\}/)
+  assert.match(component,/all ready CVs/)
   assert.match(component,/You can edit/)
   assert.match(component,/Retry/)
 })

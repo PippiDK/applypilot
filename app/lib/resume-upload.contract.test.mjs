@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 
 const route = readFileSync(new URL('../api/parse-cv/route.js', import.meta.url), 'utf8')
 const page = readFileSync(new URL('../page.js', import.meta.url), 'utf8')
+const cvLibraryStep = readFileSync(new URL('../components/cv-library-step.js', import.meta.url), 'utf8')
 const sourceCv = readFileSync(new URL('./source-cv.js', import.meta.url), 'utf8')
 
 test('parse-cv endpoint accepts resume uploads instead of being retired', () => {
@@ -25,7 +26,7 @@ test('parse-cv endpoint accepts resume uploads instead of being retired', () => 
 
 test('Feature 2 UI persists the complete active Source CV and supports legacy migration', () => {
   assert.match(page, /\/api\/parse-cv/)
-  assert.match(page, /accept="\.pdf,\.docx"/)
+  assert.match(cvLibraryStep, /accept="\.pdf,\.docx"/)
   assert.match(page, /SOURCE_CV_STORAGE_KEY/)
   assert.match(page, /LEGACY_CV_STORAGE_KEY/)
   assert.match(page, /buildSourceCvRecord/)

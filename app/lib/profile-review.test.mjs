@@ -79,7 +79,7 @@ test('merged UI restores Search Profile persistence without wiring it into Linke
   assert.match(source,/localStorage\.getItem\('applypilot-profile'\)/)
   assert.match(source,/localStorage\.setItem\('applypilot-profile'/)
   assert.match(source,/BUILD YOUR SEARCH AGENT/)
-  assert.match(source,/Step \{profileStep\} of 6/)
+  assert.match(source,/Step \{profileStep\} of 5/)
   assert.match(source,/Save profile/)
 })
 
@@ -89,7 +89,7 @@ test('merged UI restores Application Pack, CV Update Review and Truth Guard',()=
   assert.match(source,/Review CV changes/)
   assert.match(source,/CV UPDATE REVIEW/)
   assert.match(source,/Truth Guard active/)
-  assert.match(source,/Existing Master CV experience only · no new claim added/)
+  assert.match(source,/Truth Guard active · 0 unsupported claims/)
   assert.match(source,/Accept all safe changes/)
   assert.match(source,/Keep original/)
   assert.match(source,/Accept change/)
@@ -112,17 +112,18 @@ test('CV review shows a neutral empty state when there are no actual wording cha
   assert.doesNotMatch(source,/No usable CV evidence was found for this review/)
 })
 
-test('Source CV upload entry points keep the existing six-step Search Profile flow',()=>{
+test('Source CV upload entry points keep the current five-step Search Profile flow',()=>{
   const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+  const cvLibraryStep=fs.readFileSync(new URL('../components/cv-library-step.js',import.meta.url),'utf8')
   assert.doesNotMatch(source,/setCvOpen/)
   assert.doesNotMatch(source,/cvOpen&&/)
   assert.match(source,/className="cvButton" onClick=\{startProfile\}/)
   assert.match(source,/Upload CV<\/button>/)
-  assert.match(source,/Upload your CV/)
+  assert.match(cvLibraryStep,/Upload your CVs/)
   assert.doesNotMatch(source,/Upload your master CV/i)
   assert.doesNotMatch(source,/onClick=\{\(\)=>setCvOpen\(true\)\}[^>]*>Upload \/ analyse CV/)
-  assert.match(source,/Detected signals:/)
-  assert.match(source,/Step \{profileStep\} of 6/)
+  assert.match(cvLibraryStep,/Detected signals from CV 1:/)
+  assert.match(source,/Step \{profileStep\} of 5/)
 })
 
 
@@ -217,14 +218,13 @@ test('Version 2 Step 1 can read the Master CV summary from a complete saved prev
   assert.doesNotMatch(summary,/PROFESSIONAL EXPERIENCE/i)
 })
 
-test('Version 2 Step 1 UI reviews the Summary only and leaves bullet reordering for Step 2',()=>{
+test('Version 2 Step 1 UI reviews Summary-only changes without inventing a bullet workflow',()=>{
   const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
   assert.match(source,/buildReviewChanges\(cvData,active\)/)
   assert.doesNotMatch(source,/buildReviewChanges\(reviewFacts,active\)/)
-  assert.match(source,/summary change proposed/)
-  assert.match(source,/Tailored Summary/)
-  assert.match(source,/Step 1 updates Summary only/)
-  assert.match(source,/bullets reordered · Step 2/)
+  assert.match(source,/CV Summary update/)
+  assert.match(source,/No Summary change proposed\./)
+  assert.match(source,/<span>SUMMARY<\/span>/)
 })
 
 

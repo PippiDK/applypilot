@@ -14,7 +14,7 @@ test('search engine has no hard-coded candidate CV fallback', () => {
 test('LinkedIn API requires cvText and passes it into search evaluation', () => {
   assert.match(route, /body\?\.cvText/)
   assert.match(route, /Please Upload Your CV/)
-  assert.match(route, /searchLinkedIn\(\{freshnessDays,resume:cvText\}\)/)
+  assert.match(route, /searchLinkedIn\(\{freshnessDays,resume:cvText,fetcher\}\)/)
 })
 
 test('Search LinkedIn is blocked in the browser when Source CV is not ready', () => {

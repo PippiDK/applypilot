@@ -13,5 +13,5 @@ test('missing visible vacancy facts normalize to N/A',()=>{
 test('main vacancy fact cards visually promote factual values and hide match scores',async()=>{
   const css=await readFile(new URL('../v15-polish.css',import.meta.url),'utf8')
   assert.match(css,/\.conditionCard\s*>\s*b\s*\{[^}]*display\s*:\s*none/s)
-  assert.match(css,/\.conditionCard\s*>\s*span\s*\{[^}]*font-size\s*:\s*24px/s)
+  assert.match(css,/\.conditionCard\s*>\s*span\s*\{[^}]*font-size\s*:\s*18px/s)
 })

@@ -18,8 +18,8 @@ test('pretest review renders JD mission, priorities, must-haves and positioning'
   assert.match(source,/Candidate positioning/)
 })
 
-test('pretest labels the old Summary mechanism as legacy so it is not mistaken for Task 3 output',()=>{
-  assert.match(source,/Legacy Summary preview · not Task 3/)
+test('review keeps the Summary update clearly separate from the JD pretest',()=>{
+  assert.match(source,/CV Summary update/)
 })
 
 

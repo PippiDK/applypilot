@@ -2,9 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
-const layout=fs.readFileSync(new URL('../app/layout.js',import.meta.url),'utf8')
-const cssPath=new URL('../app/v15-polish.css',import.meta.url)
-const iconPath=new URL('../app/icon.svg',import.meta.url)
+const layout=fs.readFileSync(new URL('../layout.js',import.meta.url),'utf8')
+const cssPath=new URL('../v15-polish.css',import.meta.url)
+const iconPath=new URL('../icon.svg',import.meta.url)
 
 test('layout imports V15 polish stylesheet',()=>{
   assert.match(layout,/import '\.\/v15-polish\.css'/)
