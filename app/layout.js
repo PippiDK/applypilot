@@ -7,5 +7,11 @@ import SignOutButton from './components/sign-out-button.js'
 export const metadata={title:'ApplyPilot',description:'Job search autopilot for senior IT professionals'}
 
 export default function RootLayout({children}){
-  return <html lang="en"><body>{children}<SignOutButton/></body></html>
+  const environment=process.env.VERCEL_ENV||'development'
+  const shortSha=(process.env.VERCEL_GIT_COMMIT_SHA||'local').slice(0,7)
+  const versionLabel=environment==='production'
+    ? 'V16 · LIVE'
+    : `V16 · PREVIEW · ${shortSha}`
+
+  return <html lang="en"><body>{children}<div className="versionBadge">{versionLabel}</div><SignOutButton/></body></html>
 }
