@@ -10,7 +10,7 @@ test('Step 5 labels CV1 explicitly as the Primary Search CV',()=>{
 })
 
 test('profile strip shows a dynamic saved Union Search Plan summary instead of legacy role and score copy',()=>{
-  assert.match(page,/profile\.unionSearchPlan/)
+  assert.match(page,/profile\??\.unionSearchPlan/)
   assert.match(page,/search directions/)
   assert.match(page,/primary/)
   assert.match(page,/adjacent/)
