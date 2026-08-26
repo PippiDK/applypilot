@@ -23,14 +23,9 @@ function salaryValue(job){
   return {low,high,value:`${fmt(single)} DKK/month`}
 }
 
-function salaryCondition(job,profile){
+function salaryCondition(job){
   const salary=salaryValue(job)
-  if(salary.low==null&&salary.high==null) return {score:null,value:salary.value}
-  const floor=Number(profile?.salary)
-  if(!Number.isFinite(floor)||floor<=0) return {score:null,value:salary.value}
-  if(salary.low!=null&&salary.low>=floor) return {score:100,value:salary.value}
-  if(salary.high!=null&&salary.high>=floor) return {score:50,value:salary.value}
-  return {score:0,value:salary.value}
+  return {score:null,value:salary.value}
 }
 
 function normalizeEmployment(value=''){
@@ -65,7 +60,7 @@ function binaryPreferenceCondition(value,accepted,normalizeDisplay){
 export function evaluateJobConditions(job={},profile={}){
   return {
     area:areaCondition(job,profile),
-    salary:salaryCondition(job,profile),
+    salary:salaryCondition(job),
     employmentType:binaryPreferenceCondition(job.employmentType,profile.acceptedEmploymentTypes,normalizeEmployment),
     workModel:binaryPreferenceCondition(job.remoteType,profile.acceptedWorkModels,normalizeWorkModel)
   }
