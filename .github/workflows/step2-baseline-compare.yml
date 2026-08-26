@@ -1,0 +1,60 @@
+name: Step 2 Baseline Test Compare
+
+on:
+  push:
+    branches:
+      - feature/cv-library-3-slots
+
+permissions:
+  contents: write
+
+jobs:
+  compare:
+    if: ${{ !contains(github.event.head_commit.message, '[baseline-compare]') && !contains(github.event.head_commit.message, '[cleanup-compare]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package.json
+      - run: npm install --no-audit --no-fund
+      - name: Compare full-suite failures with Step 1 baseline
+        shell: bash
+        run: |
+          set +e
+          CURRENT_SHA="$GITHUB_SHA"
+          npm test > /tmp/current-tests.txt 2>&1
+          CURRENT_CODE=$?
+
+          git checkout d263959ca5f845ef468b071a04019948ff68d42d
+          npm test > /tmp/baseline-tests.txt 2>&1
+          BASELINE_CODE=$?
+
+          git checkout "$CURRENT_SHA"
+          {
+            echo "CURRENT_EXIT=$CURRENT_CODE"
+            echo "BASELINE_EXIT=$BASELINE_CODE"
+            echo ""
+            echo "=== CURRENT FAILING SUBTESTS ==="
+            grep '^not ok ' /tmp/current-tests.txt || true
+            echo ""
+            echo "=== BASELINE FAILING SUBTESTS ==="
+            grep '^not ok ' /tmp/baseline-tests.txt || true
+            echo ""
+            echo "=== CURRENT SUMMARY ==="
+            grep -E '^# (tests|pass|fail|cancelled|skipped|todo|duration_ms)' /tmp/current-tests.txt | tail -n 12 || true
+            echo ""
+            echo "=== BASELINE SUMMARY ==="
+            grep -E '^# (tests|pass|fail|cancelled|skipped|todo|duration_ms)' /tmp/baseline-tests.txt | tail -n 12 || true
+          } > step2-test-compare.txt
+      - name: Commit comparison result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add step2-test-compare.txt
+          git commit -m "[baseline-compare] capture step 2 vs step 1 test failures"
+          git push origin HEAD:feature/cv-library-3-slots
