@@ -18,9 +18,10 @@ footer::after{
   font-size:12px;
 }
 .expertiseHero .primary{
-  width:auto;
+  width:max-content;
   min-width:0;
-  padding:10px 14px;
+  padding:8px 11px;
+  font-size:12px;
 }
 
 /* V16 main vacancy facts — salary intentionally removed */
