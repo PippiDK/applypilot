@@ -1,5 +1,6 @@
 import styles from './cv-library-step.module.css'
-import {MAX_CVS,getCvSlot,readyCvCount} from '../lib/cv-library.js'
+import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,getCvSlot,readyCvCount,removeCvSlot} from '../lib/cv-library.js'
+import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY} from '../lib/source-cv.js'
 
 export default function CvLibraryStep({library,loadingSlot=null,error='',primarySkills=[],onUpload}){
   const count=readyCvCount(library)
@@ -7,6 +8,17 @@ export default function CvLibraryStep({library,loadingSlot=null,error='',primary
     const slot=index+1
     return {slot,cv:getCvSlot(library,slot)}
   })
+
+  function removeCv(slot){
+    if(!window.confirm('Remove this CV?')) return
+    const nextLibrary=removeCvSlot(library,slot)
+    localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(nextLibrary))
+    if(slot===1){
+      localStorage.removeItem(SOURCE_CV_STORAGE_KEY)
+      localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
+    }
+    window.location.reload()
+  }
 
   return <div className="wizard">
     <h3>Upload your CVs</h3>
@@ -19,10 +31,13 @@ export default function CvLibraryStep({library,loadingSlot=null,error='',primary
           <b className={cv?styles.ready:styles.empty}>{cv?'✓ Ready':'Empty'}</b>
         </div>
         <div className={styles.fileName}>{cv?.fileName||'No CV uploaded'}</div>
-        <label className={styles.slotAction}>
-          <input type="file" accept=".pdf,.docx" onChange={event=>{const file=event.target.files?.[0]; if(file) onUpload?.(file,slot); event.target.value=''}} disabled={Boolean(loadingSlot)}/>
-          {loadingSlot===slot?'Analysing…':cv?'Replace':'Upload CV'}
-        </label>
+        <div className={styles.slotActions}>
+          <label className={styles.slotAction}>
+            <input type="file" accept=".pdf,.docx" onChange={event=>{const file=event.target.files?.[0]; if(file) onUpload?.(file,slot); event.target.value=''}} disabled={Boolean(loadingSlot)}/>
+            {loadingSlot===slot?'Analysing…':cv?'Replace':'Upload CV'}
+          </label>
+          {cv&&<button type="button" className={styles.removeAction} onClick={()=>removeCv(slot)} disabled={Boolean(loadingSlot)}>Remove</button>}
+        </div>
       </div>)}
     </div>
 
