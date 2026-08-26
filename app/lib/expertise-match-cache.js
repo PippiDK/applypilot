@@ -1,4 +1,4 @@
-const PREFIX='applypilot-expertise-match:v1'
+const PREFIX='applypilot-expertise-match:v2'
 
 const text=value=>String(value??'').trim()
 
