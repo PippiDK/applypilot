@@ -311,7 +311,7 @@ export default function Home(){
       <div className="metric"><b>{state.loading?'…':jobs.length}</b><span>matches</span></div>
     </section>
 
-    <div className="profileStrip"><span>{profileReady?profile.roles.split(',').slice(0,2).join(' · '):'Senior IT Project / Delivery · Denmark'}</span><span>JD responsibilities 40% · experience/domain 25% · geography 20% · career/comp 15%</span><button className="profileEditButton" onClick={startProfile}>{profileReady?'Edit profile':'Search profile'}</button><button className="cvButton" onClick={startProfile}>{cvReadyCount?`✓ CVs ${cvReadyCount}/${MAX_CVS}`:'Upload CVs'}</button></div>
+    <div className="profileStrip"><span>{profileReady?profile.roles.split(',').slice(0,2).join(' · '):'Senior IT Project / Delivery · Denmark'}</span><span>JD responsibilities 40% · experience/domain 25% · geography 20% · career level 15%</span><button className="profileEditButton" onClick={startProfile}>{profileReady?'Edit profile':'Search profile'}</button><button className="cvButton" onClick={startProfile}>{cvReadyCount?`✓ CVs ${cvReadyCount}/${MAX_CVS}`:'Upload CVs'}</button></div>
 
     <section className="controls">
       <div><small>POSTED WITHIN</small><div className="choices">{WINDOWS.map(days=><button key={days} className={freshnessDays===days?'choice selected':'choice'} onClick={()=>setFreshnessDays(days)}>{days} day{days===1?'':'s'}</button>)}</div></div>
