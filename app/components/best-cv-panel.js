@@ -2,7 +2,7 @@
 import {useEffect,useMemo,useState} from 'react'
 import {isSourceCvReady} from '../lib/source-cv.js'
 import {requestBestCv} from '../lib/best-cv-client.js'
-import {readBestCvCache,writeBestCvCache,readBestCvSelection,writeBestCvSelection} from '../lib/best-cv-cache.js'
+import {readBestCvCache,writeBestCvCache} from '../lib/best-cv-cache.js'
 import styles from './best-cv-panel.module.css'
 
 const text=value=>String(value??'').trim()
@@ -14,19 +14,15 @@ export default function BestCvPanel({job,cvLibrary}){
   const jobId=text(job?.sourceJobId)||`${text(job?.title)}|${text(job?.company)}`
   const description=text(job?.description)
   const [state,setState]=useState({loading:false,error:'',analysis:null,source:'idle'})
-  const [selectedCvId,setSelectedCvId]=useState('')
 
   useEffect(()=>{
     if(!jobId||!description||!readyCvs.length){
       setState({loading:false,error:'',analysis:null,source:'idle'})
-      setSelectedCvId('')
       return
     }
     const args={storage:localStorage,jobId,description,cvs:readyCvs}
     const cached=readBestCvCache(args)
-    const selected=readBestCvSelection(args)
     setState({loading:false,error:'',analysis:cached,source:cached?'cache':'idle'})
-    setSelectedCvId(selected?.cvId||'')
   },[jobId,description,librarySignature])
 
   async function runBestCv(){
@@ -51,17 +47,9 @@ export default function BestCvPanel({job,cvLibrary}){
     }
   }
 
-  function useRecommendedCv(){
-    const cvId=text(state.analysis?.recommendedCvId)
-    if(!cvId) return
-    const saved=writeBestCvSelection({storage:localStorage,jobId,description,cvs:readyCvs,cvId})
-    if(saved) setSelectedCvId(cvId)
-  }
-
   const analysis=state.analysis
   const winner=analysis?readyCvs.find(cv=>cv.id===analysis.recommendedCvId):null
   const ranked=analysis?analysis.rankedCvIds.map(id=>readyCvs.find(cv=>cv.id===id)).filter(Boolean):[]
-  const selected=Boolean(winner&&selectedCvId===winner.id)
   const advice=analysis?.recommendation==='update_recommended'?'UPDATE RECOMMENDED':'USE AS IS'
 
   return <section className={styles.card}>
@@ -86,7 +74,6 @@ export default function BestCvPanel({job,cvLibrary}){
       <p className={styles.reason}>{analysis.reason}</p>
       <div className={styles.ranking}><small>RANKED</small><span>{ranked.map(cv=>cvLabel(cv)).join(' › ')}</span></div>
       {analysis.recommendation==='update_recommended'&&analysis.updateFocus?.length>0&&<div className={styles.focus}><small>UPDATE FOCUS</small>{analysis.updateFocus.map((item,index)=><p key={index}>• {item}</p>)}</div>}
-      <button className={`${selected?'secondary':'primary'} ${styles.action}`} onClick={useRecommendedCv} disabled={selected}>{selected?'✓ Selected for this job':'Use this CV'}</button>
     </>}
   </section>
 }
