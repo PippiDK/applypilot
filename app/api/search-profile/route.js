@@ -1,5 +1,5 @@
 import {NextResponse} from 'next/server'
-import {buildSearchProfileRoles} from '../../lib/search-profile-ai.js'
+import {buildSearchProfileRoles,buildSearchProfileExclusions} from '../../lib/search-profile-ai.js'
 import {requireUser} from '../../lib/auth/require-user.js'
 
 export const dynamic='force-dynamic'
@@ -20,6 +20,10 @@ export async function POST(request){
 
   try{
     const body=await request.json()
+    if(body?.mode==='exclusions'){
+      const exclusions=await buildSearchProfileExclusions({exclusionsText:text(body?.exclusionsText)})
+      return NextResponse.json({exclusions})
+    }
     const roles=await buildSearchProfileRoles({cvText:text(body?.cvText)})
     return NextResponse.json({roles})
   }catch(error){
