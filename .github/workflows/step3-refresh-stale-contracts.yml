@@ -1,0 +1,110 @@
+name: Step 3 Refresh Stale Contracts
+
+on:
+  push:
+    branches:
+      - feature/cv-library-3-slots
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: ${{ !contains(github.event.head_commit.message, 'refresh stale contracts for step 3') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/cv-library-3-slots
+          fetch-depth: 0
+      - name: Refresh stale contract expectations
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=1):
+              p=Path(path)
+              text=p.read_text()
+              actual=text.count(old)
+              if actual != count:
+                  raise SystemExit(f'{path}: expected {count} occurrences, found {actual}: {old!r}')
+              p.write_text(text.replace(old,new))
+
+          replace('app/lib/cv-library-ui-contract.test.mjs',
+                  '  assert.match(page,/readyCvCount\\(cvLibrary\\)/)\n',
+                  '  assert.match(page,/const cvReadyCount=readyCvs\\.length/)\n')
+
+          replace('app/lib/jd-analysis-ui.contract.test.mjs',
+                  "test('pretest labels the old Summary mechanism as legacy so it is not mistaken for Task 3 output',()=>{\n  assert.match(source,/Legacy Summary preview · not Task 3/)\n})",
+                  "test('review keeps the Summary update clearly separate from the JD pretest',()=>{\n  assert.match(source,/CV Summary update/)\n})")
+
+          replace('app/lib/profile-review.test.mjs',
+                  'assert.match(source,/Step \\{profileStep\\} of 6/)',
+                  'assert.match(source,/Step \\{profileStep\\} of 5/)',
+                  count=2)
+          replace('app/lib/profile-review.test.mjs',
+                  '  assert.match(source,/Existing Master CV experience only · no new claim added/)\n',
+                  '  assert.match(source,/Truth Guard active · 0 unsupported claims/)\n')
+          replace('app/lib/profile-review.test.mjs',
+                  "test('Source CV upload entry points keep the existing six-step Search Profile flow',()=>{\n  const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')",
+                  "test('Source CV upload entry points keep the current five-step Search Profile flow',()=>{\n  const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')\n  const cvLibraryStep=fs.readFileSync(new URL('../components/cv-library-step.js',import.meta.url),'utf8')")
+          replace('app/lib/profile-review.test.mjs',
+                  '  assert.match(source,/Upload your CV/)\n',
+                  '  assert.match(cvLibraryStep,/Upload your CVs/)\n')
+          replace('app/lib/profile-review.test.mjs',
+                  '  assert.match(source,/Detected signals:/)\n',
+                  '  assert.match(cvLibraryStep,/Detected signals from CV 1:/)\n')
+          replace('app/lib/profile-review.test.mjs',
+                  "test('Version 2 Step 1 UI reviews the Summary only and leaves bullet reordering for Step 2',()=>{\n  const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')\n  assert.match(source,/buildReviewChanges\\(cvData,active\\)/)\n  assert.doesNotMatch(source,/buildReviewChanges\\(reviewFacts,active\\)/)\n  assert.match(source,/summary change proposed/)\n  assert.match(source,/Tailored Summary/)\n  assert.match(source,/Step 1 updates Summary only/)\n  assert.match(source,/bullets reordered · Step 2/)\n})",
+                  "test('Version 2 Step 1 UI reviews Summary-only changes without inventing a bullet workflow',()=>{\n  const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')\n  assert.match(source,/buildReviewChanges\\(cvData,active\\)/)\n  assert.doesNotMatch(source,/buildReviewChanges\\(reviewFacts,active\\)/)\n  assert.match(source,/CV Summary update/)\n  assert.match(source,/No Summary change proposed\\./)\n  assert.match(source,/<span>SUMMARY<\\/span>/)\n})")
+
+          p=Path('app/lib/resume-upload.contract.test.mjs')
+          text=p.read_text()
+          marker="const page = readFileSync(new URL('../page.js', import.meta.url), 'utf8')\n"
+          if text.count(marker)!=1: raise SystemExit('resume-upload page marker mismatch')
+          text=text.replace(marker,marker+"const cvLibraryStep = readFileSync(new URL('../components/cv-library-step.js', import.meta.url), 'utf8')\n")
+          old='  assert.match(page, /accept="\\.pdf,\\.docx"/)\n'
+          if text.count(old)!=1: raise SystemExit('resume-upload accept assertion mismatch')
+          p.write_text(text.replace(old,'  assert.match(cvLibraryStep, /accept="\\.pdf,\\.docx"/)\n'))
+
+          replace('app/lib/search-profile-step2-ui-contract.test.mjs',
+                  "test('Search Profile step 2 is generated from CV 1 but does not drive Search yet',()=>{",
+                  "test('Search Profile step 2 combines all ready CVs while legacy Search keeps CV 1',()=>{")
+          replace('app/lib/search-profile-step2-ui-contract.test.mjs',
+                  '  assert.match(component,/Generated from CV 1/)\n',
+                  '  assert.match(component,/Generated from \\{readyLabel\\}/)\n  assert.match(component,/all ready CVs/)\n')
+
+          replace('app/lib/search-profile-step3-ui-contract.test.mjs',
+                  '  assert.match(page,/locations:/)\n  assert.match(page,/workModels:/)\n',
+                  '  assert.match(page,/const \\{locations,workModels\\}=normalizeSearchPreferences\\(draft\\)/)\n  assert.match(page,/locations,workModels,geography/)\n')
+
+          replace('app/lib/source-cv-search.contract.test.mjs',
+                  '  assert.match(route, /searchLinkedIn\\(\\{freshnessDays,resume:cvText\\}\\)/)\n',
+                  '  assert.match(route, /searchLinkedIn\\(\\{freshnessDays,resume:cvText,fetcher\\}\\)/)\n')
+
+          p=Path('app/lib/union-search-plan-wiring.test.mjs')
+          text=p.read_text()
+          old="""test('current LinkedIn Search request remains isolated from the new plan',async()=>{\n  const source=await readFile(pageUrl,'utf8')\n  const searchStart=source.indexOf('async function search(){')\n  const searchEnd=source.indexOf('\\n  function startProfile()',searchStart)\n  assert.ok(searchStart>=0&&searchEnd>searchStart,'search() block must be found')\n  const searchBlock=source.slice(searchStart,searchEnd)\n  assert.match(searchBlock,/fetch\\('\\/api\\/linkedin-search'/)\n  assert.match(searchBlock,/JSON\\.stringify\\(\\{freshnessDays,cvText:cvData\\.cvText\\}\\)/)\n  assert.doesNotMatch(searchBlock,/unionSearchPlan|draftUnionSearchPlan|primaryRoles|adjacentRoles/)\n})\n"""
+          new="""test('legacy LinkedIn request stays isolated while shadow receives the saved plan',async()=>{\n  const source=await readFile(pageUrl,'utf8')\n  const searchStart=source.indexOf('async function search(){')\n  const searchEnd=source.indexOf('\\n  function startProfile()',searchStart)\n  assert.ok(searchStart>=0&&searchEnd>searchStart,'search() block must be found')\n  const searchBlock=source.slice(searchStart,searchEnd)\n  const legacyLine=searchBlock.split('\\n').find(line=>line.includes(\"fetch('/api/linkedin-search'\"))||''\n  assert.match(searchBlock,/fetch\\('\\/api\\/linkedin-shadow-search'/)\n  assert.match(searchBlock,/JSON\\.stringify\\(\\{freshnessDays,unionSearchPlan:profile\\.unionSearchPlan\\}\\)/)\n  assert.match(legacyLine,/JSON\\.stringify\\(\\{freshnessDays,cvText:cvData\\.cvText\\}\\)/)\n  assert.doesNotMatch(legacyLine,/unionSearchPlan|primaryRoles|adjacentRoles/)\n})\n"""
+          if text.count(old)!=1: raise SystemExit('union-search-plan legacy block mismatch')
+          p.write_text(text.replace(old,new))
+
+          replace('app/lib/v15-cosmetic.contract.test.mjs',"new URL('../app/layout.js',import.meta.url)","new URL('../layout.js',import.meta.url)")
+          replace('app/lib/v15-cosmetic.contract.test.mjs',"new URL('../app/v15-polish.css',import.meta.url)","new URL('../v15-polish.css',import.meta.url)")
+          replace('app/lib/v15-cosmetic.contract.test.mjs',"new URL('../app/icon.svg',import.meta.url)","new URL('../icon.svg',import.meta.url)")
+
+          replace('app/lib/v16-expertise-button-size.test.mjs',"new URL('./v15-polish.css',import.meta.url)","new URL('../v15-polish.css',import.meta.url)")
+          replace('app/lib/v16-expertise-button-size.test.mjs','width:\\s*fit-content;','width:\\s*max-content;')
+          replace('app/lib/v16-expertise-button-size.test.mjs','min-width:\\s*190px;','min-width:\\s*0;')
+          replace('app/lib/v16-expertise-button-size.test.mjs','padding:\\s*12px\\s+18px;','padding:\\s*8px\\s+11px;')
+
+          replace('app/lib/v16-factual-condition-cards.test.mjs','font-size\\s*:\\s*24px','font-size\\s*:\\s*18px')
+          PY
+
+          git diff --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app/lib/*.test.mjs
+          git commit -m "test: refresh stale contracts for step 3"
+          git push origin feature/cv-library-3-slots
