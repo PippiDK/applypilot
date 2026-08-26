@@ -3,8 +3,7 @@ import {EXPERTISE_EVALUATION_STATUSES} from './expertise-evaluator.js'
 
 const IMPORTANCE_WEIGHT={critical:3,core:2,supporting:1}
 const STATUS_CREDIT={MATCHED:1,TRANSFERABLE:.75,PARTIAL:.4,NOT_EVIDENCED:0}
-const FIT_STATUS_RANK={MATCHED:0,TRANSFERABLE:1,PARTIAL:2,NOT_EVIDENCED:3}
-const GAP_STATUS_RANK={NOT_EVIDENCED:0,PARTIAL:1,TRANSFERABLE:2,MATCHED:3}
+const GAP_STATUS_RANK={NOT_EVIDENCED:0,PARTIAL:1}
 
 function scoreFor(items=[]){
   const possible=items.reduce((sum,item)=>sum+(IMPORTANCE_WEIGHT[item.importance]||0),0)
@@ -49,18 +48,21 @@ export function evaluateExpertiseFromJudgements(requirements=[],evaluations=[]){
 
   const expertiseMatch=scoreFor(evaluated)??0
   const fit=[...evaluated]
-    .filter(x=>x.status==='MATCHED'||x.status==='TRANSFERABLE')
-    .sort((a,b)=>importanceRank(a.importance)-importanceRank(b.importance)||(FIT_STATUS_RANK[a.status]??9)-(FIT_STATUS_RANK[b.status]??9))
+    .filter(x=>x.status==='MATCHED')
+    .sort((a,b)=>importanceRank(a.importance)-importanceRank(b.importance))
+  const transferable=[...evaluated]
+    .filter(x=>x.status==='TRANSFERABLE')
+    .sort((a,b)=>importanceRank(a.importance)-importanceRank(b.importance))
   const gaps=[...evaluated]
-    .filter(x=>x.status!=='MATCHED')
+    .filter(x=>x.status==='PARTIAL'||x.status==='NOT_EVIDENCED')
     .sort((a,b)=>importanceRank(a.importance)-importanceRank(b.importance)||(GAP_STATUS_RANK[a.status]??9)-(GAP_STATUS_RANK[b.status]??9))
 
   const whyYouFit=fit.slice(0,5).map(item=>item.capability)
+  const transferableStrengths=transferable.slice(0,5).map(item=>item.capability)
   const expertiseGaps=gaps.slice(0,5).map(item=>{
-    if(item.status==='TRANSFERABLE') return `${item.capability} — transferable evidence only in Source CV`
     if(item.status==='PARTIAL') return `${item.capability} — partially evidenced in Source CV`
     return `${item.capability} — not evidenced in Source CV`
   })
 
-  return {expertiseMatch,whyYouFit,expertiseGaps,breakdown,requirements:evaluated}
+  return {expertiseMatch,whyYouFit,transferableStrengths,expertiseGaps,breakdown,requirements:evaluated}
 }
