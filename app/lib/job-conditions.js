@@ -4,7 +4,7 @@ const title=value=>text(value).replace(/(^|[-_\s])([a-z])/g,(_,p,c)=>p+c.toUpper
 
 function areaCondition(job,profile){
   const location=text(job?.location)
-  if(!location) return {score:null,value:'Not stated'}
+  if(!location) return {score:null,value:'N/A'}
   const prefs=text(profile?.preferredLocations).split(/[,;\n]/).map(norm).filter(Boolean)
   if(!prefs.length) return {score:null,value:location}
   const loc=norm(location)
@@ -35,7 +35,7 @@ function salaryCondition(job,profile){
 
 function normalizeEmployment(value=''){
   const v=norm(value)
-  if(!v||v==='unknown') return 'Unknown'
+  if(!v||v==='unknown') return 'N/A'
   if(/permanent|full[- ]?time/.test(v)) return 'Permanent'
   if(/fixed[- ]?term|temporary/.test(v)) return /fixed/.test(v)?'Fixed-term':'Temporary'
   if(/contract|consultant|freelance/.test(v)) return /freelance/.test(v)?'Freelance / Consultant':'Contract'
@@ -46,7 +46,7 @@ function normalizeEmployment(value=''){
 
 function normalizeWorkModel(value=''){
   const v=norm(value)
-  if(!v||v==='unknown') return 'Unknown / Not stated'
+  if(!v||v==='unknown') return 'N/A'
   if(/hybrid/.test(v)) return 'Hybrid'
   if(/remote/.test(v)) return 'Remote'
   if(/onsite|on-site|on site/.test(v)) return 'On-site'
@@ -56,7 +56,7 @@ function normalizeWorkModel(value=''){
 
 function binaryPreferenceCondition(value,accepted,normalizeDisplay){
   const display=normalizeDisplay(value)
-  if(/Unknown|Not stated/i.test(display)) return {score:null,value:display}
+  if(display==='N/A') return {score:null,value:display}
   if(!Array.isArray(accepted)||!accepted.length) return {score:null,value:display}
   const allowed=accepted.map(norm)
   return {score:allowed.includes(norm(value))||allowed.includes(norm(display))?100:0,value:display}

@@ -46,3 +46,16 @@ footer::after{
   letter-spacing:.04em;
   pointer-events:none;
 }
+
+/* V16 vacancy facts show factual values only; match scores stay internal */
+.conditionGrid .conditionCard > b{
+  display:none;
+}
+.conditionGrid .conditionCard > span{
+  display:block;
+  margin-top:8px;
+  color:#f4f7fb;
+  font-size:24px;
+  font-weight:800;
+  line-height:1.15;
+}
