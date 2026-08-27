@@ -31,7 +31,7 @@ test('discovery continues beyond start=50 and reaches 100 when unique rows conti
 })
 
 test('exact repeated page fingerprint completes a direction without infinite paging',async()=>{
-  const same=page(['1','2','3'])
+  const same=page(['9000000101','9000000102','9000000103'])
   const fetcher=async()=>same
   let state=createDiscoveryState({directions:[plan.directions[0]]})
   let known=[]
@@ -44,7 +44,7 @@ test('exact repeated page fingerprint completes a direction without infinite pag
 })
 
 test('two consecutive pages with no new job ids complete a direction',async()=>{
-  const responses=[page(['11','12']),page(['12']),page(['11'])]
+  const responses=[page(['9000000111','9000000112']),page(['9000000112']),page(['9000000111'])]
   let call=0
   const fetcher=async()=>responses[Math.min(call++,responses.length-1)]
   let state=createDiscoveryState({directions:[plan.directions[0]]})
@@ -58,7 +58,7 @@ test('two consecutive pages with no new job ids complete a direction',async()=>{
 })
 
 test('duplicate job across role directions is one candidate with merged foundBy provenance',async()=>{
-  const fetcher=async url=>startOf(url)===0?page(['777']):''
+  const fetcher=async url=>startOf(url)===0?page(['9000000777']):''
   let state=createDiscoveryState(plan)
   let known=[]
   while(!state.complete){
@@ -72,7 +72,7 @@ test('duplicate job across role directions is one candidate with merged foundBy 
 test('access failure marks ACCESS LIMITED while retaining resumable state',async()=>{
   const fetcher=async url=>{
     if(keywordOf(url)==='Technical Project Manager'&&startOf(url)===25) throw new Error('LinkedIn public page returned an access wall/challenge')
-    return startOf(url)===0?page(['501']):''
+    return startOf(url)===0?page(['9000000501']):''
   }
   let state=createDiscoveryState(plan)
   let known=[]
@@ -81,5 +81,5 @@ test('access failure marks ACCESS LIMITED while retaining resumable state',async
     state=result.state; known=result.candidates
   }
   assert.equal(state.accessLimited,true)
-  assert.equal(known.some(row=>row.jobId==='501'),true)
+  assert.equal(known.some(row=>row.jobId==='9000000501'),true)
 })
