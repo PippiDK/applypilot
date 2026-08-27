@@ -2,11 +2,7 @@
 
 function scoreText(value){
   if(value==null||value==='') return '—'
-  const numeric=Number(value)
-  if(!Number.isFinite(numeric)) return '—'
-  const percent=numeric>=0&&numeric<=10?numeric*10:numeric
-  const rounded=Math.round(percent*10)/10
-  return `${rounded}%`
+  return Number.isFinite(Number(value))?`${Number(value)}%`:'—'
 }
 
 export default function SearchAudit({audit=[]}){
