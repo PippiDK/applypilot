@@ -28,7 +28,8 @@ function previewResult(run,candidates=[]){
   const jobs=rows.filter(row=>row.detailStatus==='PROCESSED'&&row.job&&row.evaluation&&row.audit?.decision==='KEEP').map(row=>({job:row.job,evaluation:row.evaluation})).sort((a,b)=>Number(b.evaluation?.score||0)-Number(a.evaluation?.score||0))
   const audit=rows.filter(row=>row.audit).map(row=>({jobId:String(row.jobId),title:row.job?.title||row.title||'',company:row.job?.company||row.company||'',...row.audit}))
   const fullJdProcessed=rows.filter(row=>row.detailStatus==='PROCESSED'||row.detailStatus==='UNVERIFIED').length
-  return {jobs,audit,coverage:run.coverage||{status:run.status==='ACCESS_LIMITED'?'ACCESS LIMITED':'SEARCHED'},stats:{...(run.stats||{}),discovered:rows.length,fullJdProcessed,evaluated:jobs.length,returned:jobs.length},fetchedAt:run.updated_at||new Date().toISOString(),runId:run.id}
+  const fullJdVerified=rows.filter(row=>row.detailStatus==='PROCESSED').length
+  return {jobs,audit,coverage:run.coverage||{status:run.status==='ACCESS_LIMITED'?'ACCESS LIMITED':'SEARCHED'},stats:{...(run.stats||{}),discovered:rows.length,fullJdProcessed,fullJdVerified,evaluated:jobs.length,returned:jobs.length},fetchedAt:run.updated_at||new Date().toISOString(),runId:run.id}
 }
 
 async function continueSearchRun({snapshot,fetchImpl,storage,onProgress}){
