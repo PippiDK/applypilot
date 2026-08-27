@@ -1,5 +1,5 @@
 import {parseDetailHtml} from './linkedin-search.js'
-import {searchLinkedInShadow} from './linkedin-shadow-discovery.js'
+import {searchLinkedInProfileDiscovery} from './linkedin-profile-discovery.js'
 import {createAuditRecord,updateAuditRecord,auditList} from './linkedin-search-audit.js'
 
 const LINKEDIN_JOB_DETAIL='https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/'
@@ -166,7 +166,7 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
   if(typeof fetcher!=='function') throw new Error('Profile-driven LinkedIn fetcher is required.')
   if(!Array.isArray(unionSearchPlan?.directions)||unionSearchPlan.directions.length===0) throw new Error('Search Profile requires at least one role direction.')
 
-  const discovery=await searchLinkedInShadow({freshnessDays:days,unionSearchPlan,fetcher})
+  const discovery=await searchLinkedInProfileDiscovery({freshnessDays:days,unionSearchPlan,fetcher})
   const auditMap=new Map(discovery.candidates.map(candidate=>[String(candidate.jobId),createAuditRecord(candidate)]))
   let detailRequests=0
   let detailFailures=0
