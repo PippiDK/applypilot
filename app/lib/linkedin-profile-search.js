@@ -21,7 +21,7 @@ const clean=value=>String(value??'').toLowerCase().replace(/[–—_/&]+/g,' ').
 const round1=value=>Math.round(value*10)/10
 
 function normalizeRoleLanguage(value=''){
-  return clean(value)
+  return clean(value).replace(/-/g,' ')
     .replace(/\bprojektledere?\b/g,'project manager')
     .replace(/\bprojektledelse\b/g,'project management')
     .replace(/\bprojekter\b/g,'project')
@@ -93,7 +93,7 @@ function strongRoleFamily(value=''){
 }
 
 function technologyEvidence(job){
-  const text=clean(`${job.title} ${job.description}`)
+  const text=normalizeRoleLanguage(`${job.title} ${job.description}`)
   return TECHNOLOGY_EVIDENCE.filter(pattern=>pattern.test(text)).length
 }
 
