@@ -33,4 +33,5 @@ test('compose result exposes kept jobs audit and access-limited coverage from pe
   assert.equal(result.audit.length,2)
   assert.equal(result.coverage.status,'ACCESS LIMITED')
   assert.equal(result.stats.fullJdProcessed,2)
+  assert.equal(result.stats.fullJdVerified,1)
 })
