@@ -65,7 +65,7 @@ test('IT Project Manager direction rejects a finance project role when the full 
   })
   const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:plan('Senior IT Project Manager'),fetcher,now:new Date('2026-08-27T12:00:00Z')})
   assert.equal(result.jobs.length,0)
-  assert.ok(result.audit.some(row=>row.jobId==='8100000001'&&row.stage==='PROFILE_ROLE_REJECT'))
+  assert.ok(result.audit.some(row=>row.jobId==='8100000001'&&row.stage==='PROFILE_DOMAIN_REJECT'))
 })
 
 test('IT Project Manager direction rejects a construction project role when the full JD confirms physical construction delivery',async()=>{
@@ -75,7 +75,7 @@ test('IT Project Manager direction rejects a construction project role when the 
   })
   const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:plan('Senior IT Project Manager'),fetcher,now:new Date('2026-08-27T12:00:00Z')})
   assert.equal(result.jobs.length,0)
-  assert.ok(result.audit.some(row=>row.jobId==='8100000002'&&row.stage==='PROFILE_ROLE_REJECT'))
+  assert.ok(result.audit.some(row=>row.jobId==='8100000002'&&row.stage==='PROFILE_DOMAIN_REJECT'))
 })
 
 test('IT Program Manager direction rejects an IT Product Manager whose JD is product ownership rather than program delivery',async()=>{
@@ -85,7 +85,7 @@ test('IT Program Manager direction rejects an IT Product Manager whose JD is pro
   })
   const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:plan('IT Program Manager'),fetcher,now:new Date('2026-08-27T12:00:00Z')})
   assert.equal(result.jobs.length,0)
-  assert.ok(result.audit.some(row=>row.jobId==='8100000003'&&row.stage==='PROFILE_ROLE_REJECT'))
+  assert.ok(result.audit.some(row=>row.jobId==='8100000003'&&row.stage==='PROFILE_ROLE_FAMILY_REJECT'))
 })
 
 test('manager-level transformation direction rejects an explicit Head-of-division vacancy',async()=>{
@@ -95,7 +95,7 @@ test('manager-level transformation direction rejects an explicit Head-of-divisio
   })
   const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:plan('Technology Transformation Manager'),fetcher,now:new Date('2026-08-27T12:00:00Z')})
   assert.equal(result.jobs.length,0)
-  assert.ok(result.audit.some(row=>row.jobId==='8100000004'&&row.stage==='PROFILE_ROLE_REJECT'))
+  assert.ok(result.audit.some(row=>row.jobId==='8100000004'&&row.stage==='PROFILE_ROLE_FAMILY_REJECT'))
 })
 
 test('IT Project Manager direction keeps an atypical eCOA title when the full JD confirms digital system delivery',async()=>{
