@@ -22,6 +22,7 @@ const TARGET_GROUPS=[
   ['tech:cloud-data',/\b(cloud|azure|aws|gcp|data platform|data foundation|data warehouse|analytics platform|business intelligence|databricks|snowflake)\b/],
   ['tech:cyber-ot',/\b(cyber|cybersecurity|scada|ot security|operational technology)\b/],
   ['tech:digital',/\b(digital delivery|digital transformation|digital projects?|digitalisation|digitalization|digitalisering|digitaliseringsprojekter|teknologiprojekter|tekniske leverancer)\b/],
+  ['tech:software-quality',/\b(software testing|software quality assurance|test strategy.{0,80}digital products?|regression testing.{0,80}digital products?)\b/],
 ]
 
 const PHYSICAL_GROUPS=[
