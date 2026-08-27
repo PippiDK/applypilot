@@ -61,3 +61,27 @@ footer::after{
   font-weight:800;
   line-height:1.25;
 }
+
+/* Step 1 UX clarification only */
+.fieldHint{
+  margin-top:-12px!important;
+  color:#7f8a97!important;
+  font-size:12px;
+}
+.searchPlanPreview{
+  display:block;
+}
+.searchPlanPreview summary{
+  cursor:pointer;
+  list-style-position:outside;
+}
+.searchPlanPreview summary b{
+  display:block;
+}
+.searchPlanPreview summary span{
+  display:block;
+  margin-top:5px;
+}
+.searchPlanDirections{
+  margin-top:10px;
+}
