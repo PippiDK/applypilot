@@ -16,4 +16,11 @@ jobs:
       - run: npm install
       - run: node --test app/lib/linkedin-profile-discovery-batch.test.mjs
       - run: node --test app/lib/linkedin-profile-jd-batch.test.mjs
+      - run: node --test app/lib/search-run-store.test.mjs
+      - run: node --test app/lib/profile-search-run-client.test.mjs
       - run: node --test app/lib/profile-role-confirmation-regression.test.mjs
+      - run: node --test app/lib/union-search-plan.test.mjs app/lib/union-search-plan-wiring.test.mjs
+      - run: npm run build
+      - name: Full repository suite (diagnostic)
+        continue-on-error: true
+        run: npm test
