@@ -22,3 +22,12 @@ test('new unsaved profiles do not inherit another user’s exclusions',()=>{
   assert.match(page,/EMPTY_SEARCH_PROFILE=\{\.\.\.DEFAULT_PROFILE,exclusions:''\}/)
   assert.match(page,/savedProfileRaw\?JSON\.parse\(savedProfileRaw\):\{exclusions:''\}/)
 })
+
+test('exclusion field shows concrete examples without changing exclusion logic',()=>{
+  const page=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+  assert.match(page,/Examples: Danish required/)
+  assert.match(page,/R&amp;D roles/)
+  assert.match(page,/ERP specialist roles/)
+  assert.match(page,/fully on-site roles/)
+  assert.match(page,/Company X/)
+})
