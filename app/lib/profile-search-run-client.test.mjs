@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {runProfileSearchRun,readActiveSearchRun} from './profile-search-run-client.js'
+import {runProfileSearchRun,readActiveSearchRun,resumeActiveProfileSearchRun} from './profile-search-run-client.js'
 
 function response(data,ok=true){return {ok,json:async()=>data}}
 function memoryStorage(){const map=new Map();return {getItem:key=>map.has(key)?map.get(key):null,setItem:(key,value)=>map.set(key,String(value)),removeItem:key=>map.delete(key)}}
@@ -46,4 +46,20 @@ test('preview checkpoints are saved so a refresh can resume the active run',asyn
   const saved=readActiveSearchRun(storage)
   assert.equal(saved.run.id,'preview-2')
   assert.equal(calls,2)
+})
+
+test('production can resume latest persisted run after browser session storage is gone',async()=>{
+  const storage=memoryStorage()
+  let processed=false
+  const fetchImpl=async url=>{
+    if(url.includes('/run?active=1')) return response({active:true,mode:'persistent',run:{id:'run-persisted',status:'READING_JDS',coverage:{status:'SEARCHING'},stats:{discovered:1,fullJdProcessed:0}}})
+    if(url.endsWith('/process')){
+      processed=true
+      return response({mode:'persistent',run:{id:'run-persisted',status:'COMPLETE',coverage:{status:'SEARCHED'},stats:{discovered:1,fullJdProcessed:1}},complete:true,result:{jobs:[{job:{sourceJobId:'1'},evaluation:{score:9}}],audit:[],coverage:{status:'SEARCHED'},stats:{discovered:1,fullJdProcessed:1}}})
+    }
+    throw new Error(`unexpected ${url}`)
+  }
+  const result=await resumeActiveProfileSearchRun({fetchImpl,storage})
+  assert.equal(processed,true)
+  assert.equal(result.jobs.length,1)
 })
