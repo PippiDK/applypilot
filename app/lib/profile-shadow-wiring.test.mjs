@@ -2,18 +2,18 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFile} from 'node:fs/promises'
 
-test('page runs shadow independently while preserving legacy search payload and jobs',async()=>{
+test('page promotes the saved Union Search Plan to LIVE while preserving legacy fallback payload',async()=>{
   const source=await readFile(new URL('../page.js',import.meta.url),'utf8')
-  assert.match(source,/compareShadowToLegacy/)
-  assert.match(source,/ShadowSearchAudit/)
-  assert.match(source,/const \[shadowState,setShadowState\]=useState/)
-  assert.match(source,/JSON\.stringify\(\{freshnessDays,cvText:cvData\.cvText\}\)/)
-  assert.match(source,/JSON\.stringify\(\{freshnessDays,unionSearchPlan:profile\.unionSearchPlan\}\)/)
-  assert.match(source,/\/api\/linkedin-shadow-search/)
-  const shadowIndex=source.indexOf("fetch('/api/linkedin-shadow-search'")
-  const legacyIndex=source.indexOf("await fetch('/api/linkedin-search'")
-  assert.ok(shadowIndex>=0&&legacyIndex>=0&&shadowIndex<legacyIndex)
-  assert.match(source,/setJobs\(Array\.isArray\(data\.jobs\)\?data\.jobs:\[\]\)/)
-  assert.doesNotMatch(source,/setJobs\([^)]*shadow/i)
-  assert.match(source,/<SearchAudit audit=\{state\.audit\}\/>[\s\S]{0,300}<ShadowSearchAudit shadowState=\{shadowState\}\/>/)
+  const searchStart=source.indexOf('async function search(){')
+  const searchEnd=source.indexOf('\n  function startProfile()',searchStart)
+  assert.ok(searchStart>=0&&searchEnd>searchStart,'search() block must be found')
+  const searchBlock=source.slice(searchStart,searchEnd)
+
+  assert.match(searchBlock,/\/api\/linkedin-profile-search/)
+  assert.match(searchBlock,/unionSearchPlan:profile\.unionSearchPlan/)
+  assert.match(searchBlock,/exclusionRules:Array\.isArray\(profile\.exclusionRules\)\?profile\.exclusionRules:\[\]/)
+  assert.match(searchBlock,/\/api\/linkedin-search/)
+  assert.match(searchBlock,/JSON\.stringify\(\{freshnessDays,cvText:cvData\.cvText\}\)/)
+  assert.doesNotMatch(searchBlock,/\/api\/linkedin-shadow-search/)
+  assert.match(searchBlock,/setJobs\(Array\.isArray\(data\.jobs\)\?data\.jobs:\[\]\)/)
 })
