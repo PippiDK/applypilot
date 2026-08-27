@@ -16,6 +16,7 @@ import {evaluateJobConditions} from './lib/job-conditions.js'
 import {fitLabel} from './lib/fit-label.js'
 import {compareShadowToLegacy} from './lib/shadow-search-compare.js'
 import {JOB_STATUS_OPTIONS,readJobStatuses,writeJobStatus} from './lib/job-statuses.js'
+import {runProfileSearchRun,readActiveSearchRun} from './lib/profile-search-run-client.js'
 import SearchAudit from './components/search-audit.js'
 import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
@@ -87,6 +88,15 @@ export default function Home(){
 
   useEffect(()=>{
     setJobStatuses(readJobStatuses(localStorage))
+  },[])
+
+  useEffect(()=>{
+    if(!readActiveSearchRun(sessionStorage)) return
+    setJobs([])
+    setState({loading:true,error:'',coverage:{source:'LinkedIn Jobs',status:'SEARCHING'},stats:{discovered:0,fullJdVerified:0,evaluated:0},fetchedAt:null,audit:[]})
+    runProfileSearchRun({resume:true,storage:sessionStorage,onProgress:applySearchProgress})
+      .then(applySearchResult)
+      .catch(error=>setState({loading:false,error:error.message||'LinkedIn search failed',coverage:null,stats:null,fetchedAt:null,audit:[]}))
   },[])
 
   const profileReady=Boolean(profile.savedAt)
@@ -186,24 +196,57 @@ export default function Home(){
     setJobStatuses(current=>writeJobStatus({storage:localStorage,statuses:current,jobId,status}))
   }
 
-  async function search(){
-  if(!resumeLoaded){
-    setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[]})
-    return
+  function applySearchProgress(progress={}){
+    setState(current=>({
+      ...current,
+      loading:true,
+      error:'',
+      coverage:{source:'LinkedIn Jobs',status:'SEARCHING'},
+      stats:{
+        ...(current.stats||{}),
+        discovered:Number(progress.discovered??current.stats?.discovered??0),
+        fullJdVerified:Number(progress.fullJdProcessed??current.stats?.fullJdVerified??0),
+        evaluated:Number(current.stats?.evaluated??0),
+      },
+    }))
   }
-  setJobs([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
-  setShadowState({status:'skipped',error:'',stats:null,coverage:null,comparison:null})
-  const hasProfilePlan=Array.isArray(profile?.unionSearchPlan?.directions)&&profile.unionSearchPlan.directions.length>0
-  try{
-    const res=hasProfilePlan
-      ? await fetch('/api/linkedin-profile-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,unionSearchPlan:profile.unionSearchPlan,exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[]})})
-      : await fetch('/api/linkedin-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,cvText:cvData.cvText})})
-    const data=await res.json()
-    if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
+
+  function applySearchResult(data={}){
+    const stats={...(data.stats||{}),fullJdVerified:Number(data.stats?.fullJdVerified??data.stats?.fullJdProcessed??0)}
     setJobs(Array.isArray(data.jobs)?data.jobs:[])
-    setState({loading:false,error:'',coverage:data.coverage||null,stats:data.stats||null,fetchedAt:data.fetchedAt||null,audit:Array.isArray(data.audit)?data.audit:[]})
-  }catch(error){ setState({loading:false,error:error.message||'LinkedIn search failed',coverage:null,stats:null,fetchedAt:null,audit:[]}) }
-}
+    setState({loading:false,error:'',coverage:data.coverage||null,stats,fetchedAt:data.fetchedAt||null,audit:Array.isArray(data.audit)?data.audit:[]})
+  }
+
+  async function search(){
+    if(!resumeLoaded){
+      setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[]})
+      return
+    }
+    setJobs([])
+    setState({loading:true,error:'',coverage:{source:'LinkedIn Jobs',status:'SEARCHING'},stats:{discovered:0,fullJdVerified:0,evaluated:0},fetchedAt:null,audit:[]})
+    setShadowState({status:'skipped',error:'',stats:null,coverage:null,comparison:null})
+    const hasProfilePlan=Array.isArray(profile?.unionSearchPlan?.directions)&&profile.unionSearchPlan.directions.length>0
+    try{
+      if(hasProfilePlan){
+        const data=await runProfileSearchRun({
+          freshnessDays,
+          unionSearchPlan:profile.unionSearchPlan,
+          exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[],
+          storage:sessionStorage,
+          onProgress:applySearchProgress,
+        })
+        applySearchResult(data)
+        return
+      }
+      const res=await fetch('/api/linkedin-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,cvText:cvData.cvText})})
+      const data=await res.json()
+      if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
+      applySearchResult(data)
+    }catch(error){
+      setState({loading:false,error:error.message||'LinkedIn search failed',coverage:null,stats:null,fetchedAt:null,audit:[]})
+    }
+  }
+
   function startProfile(){
     const base=resumeToProfile(profile,cvData)
     const preferences=normalizeSearchPreferences(base)
