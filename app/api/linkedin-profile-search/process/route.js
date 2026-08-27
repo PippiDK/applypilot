@@ -32,7 +32,7 @@ export async function POST(request){
       const all=Array.isArray(body?.candidates)?body.candidates:[]
       const pending=asPending(all)
       if(run.status!=='READING_JDS'&&pending.length) return NextResponse.json({error:`Search Run cannot process JDs from status ${run.status}.`},{status:409})
-      const batch=await runProfileJdBatch({candidates:pending,fetcher,freshnessDays:run.freshness_days,exclusionRules:run.exclusion_rules,maxCandidates:30,safeBudgetMs:70000})
+      const batch=await runProfileJdBatch({candidates:pending,fetcher,freshnessDays:run.freshness_days,exclusionRules:run.exclusion_rules,maxCandidates:16,safeBudgetMs:45000})
       const candidates=mergePreviewCandidates(all,batch.processed)
       const remaining=asPending(candidates).length
       const accessLimited=run.coverage?.status==='ACCESS LIMITED'||batch.accessLimited
@@ -52,7 +52,7 @@ export async function POST(request){
       return NextResponse.json({error:`Search Run cannot process JDs from status ${snapshot.run.status}.`},{status:409})
     }
 
-    const pending=await loadPendingPersistentCandidates({supabase,runId,limit:30})
+    const pending=await loadPendingPersistentCandidates({supabase,runId,limit:16})
     if(!pending.length){
       const accessLimited=snapshot.run.coverage?.status==='ACCESS LIMITED'||snapshot.candidates.some(row=>row.detail_status==='UNVERIFIED')
       const status=accessLimited?'ACCESS_LIMITED':'COMPLETE'
@@ -61,7 +61,7 @@ export async function POST(request){
       return NextResponse.json({mode:'persistent',run,result:composeSearchRunResult(run,finalSnapshot.candidates),complete:true})
     }
 
-    const batch=await runProfileJdBatch({candidates:pending,fetcher,freshnessDays:snapshot.run.freshness_days,exclusionRules:snapshot.run.exclusion_rules,maxCandidates:30,safeBudgetMs:70000})
+    const batch=await runProfileJdBatch({candidates:pending,fetcher,freshnessDays:snapshot.run.freshness_days,exclusionRules:snapshot.run.exclusion_rules,maxCandidates:16,safeBudgetMs:45000})
     await saveProcessedPersistentCandidates({supabase,runId,processed:batch.processed})
     const after=await loadPersistentSearchRun({supabase,userId:auth.user.id,runId})
     const remaining=after.candidates.filter(row=>row.detail_status==='PENDING').length
