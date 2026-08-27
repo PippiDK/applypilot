@@ -202,14 +202,14 @@ export default function Home(){
       stats:{
         ...(current.stats||{}),
         discovered:Number(progress.discovered??current.stats?.discovered??0),
-        fullJdVerified:Number(progress.fullJdProcessed??current.stats?.fullJdVerified??0),
+        fullJdVerified:Number(progress.fullJdVerified??current.stats?.fullJdVerified??0),
         evaluated:Number(current.stats?.evaluated??0),
       },
     }))
   }
 
   function applySearchResult(data={}){
-    const stats={...(data.stats||{}),fullJdVerified:Number(data.stats?.fullJdVerified??data.stats?.fullJdProcessed??0)}
+    const stats={...(data.stats||{}),fullJdVerified:Number(data.stats?.fullJdVerified??0)}
     setJobs(Array.isArray(data.jobs)?data.jobs:[])
     setState({loading:false,error:'',coverage:data.coverage||null,stats,fetchedAt:data.fetchedAt||null,audit:Array.isArray(data.audit)?data.audit:[]})
   }
