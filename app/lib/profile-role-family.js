@@ -50,6 +50,9 @@ export function classifyProfileRoleFamily(job={}){
   evidence=match(title,/\b(project manager|project management|program manager|program management|delivery manager|delivery lead|delivery management|project lead|program lead|pmo)\b/,'delivery-management role')
   if(evidence) return {family:'delivery-management',evidence}
 
+  evidence=match(title,/\bdrive\b.*\bprojects?\b/,'explicitly drives projects')
+  if(evidence) return {family:'delivery-management',evidence}
+
   evidence=match(title,/\b(specialist|consultant|advisor|adviser|konsulent|rådgiver|custodian|kustode)\b/,'specialist role')
   if(evidence) return {family:'specialist',evidence}
 
