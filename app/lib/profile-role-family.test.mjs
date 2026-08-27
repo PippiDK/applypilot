@@ -7,6 +7,7 @@ const cases=[
   ['Technical Program Manager','delivery-management'],
   ['IT Delivery Lead','delivery-management'],
   ['PMO Manager','delivery-management'],
+  ['Project and Construction Manager','delivery-management'],
   ['Senior IT-projektleder med teknisk indsigt','delivery-management'],
   ['Erfaren programleder til digitale leverancer','delivery-management'],
   ['Implementation Manager','implementation-transformation'],
