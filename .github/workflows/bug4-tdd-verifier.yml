@@ -1,4 +1,4 @@
-name: BUG4 TDD verifier
+name: BUG4 Final verifier
 on:
   push:
     branches:
@@ -12,4 +12,12 @@ jobs:
         with:
           node-version: '24'
       - run: npm install
-      - run: node --test app/lib/profile-role-family.test.mjs app/lib/profile-delivery-domain.test.mjs app/lib/profile-semantic-exclusions.test.mjs app/lib/profile-eligibility-gate-regression.test.mjs app/lib/profile-role-confirmation-regression.test.mjs
+      - name: Eligibility and multilingual regressions
+        run: node --test app/lib/profile-role-family.test.mjs app/lib/profile-delivery-domain.test.mjs app/lib/profile-semantic-exclusions.test.mjs app/lib/profile-eligibility-gate-regression.test.mjs app/lib/profile-role-confirmation-regression.test.mjs
+      - name: Search Run and Union regressions
+        run: node --test app/lib/linkedin-profile-discovery-batch.test.mjs app/lib/linkedin-profile-jd-batch.test.mjs app/lib/search-run-store.test.mjs app/lib/profile-search-run-client.test.mjs app/lib/union-search-plan.test.mjs app/lib/union-search-plan-wiring.test.mjs app/lib/profile-driven-live.contract.test.mjs app/lib/profile-shadow-wiring.test.mjs app/lib/search-profile-exclusions-save-ui.test.mjs
+      - name: Production build
+        run: npm run build
+      - name: Full repository suite
+        continue-on-error: true
+        run: npm test
