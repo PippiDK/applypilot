@@ -15,3 +15,5 @@ jobs:
           node-version: '24'
       - run: npm install
       - run: node --test app/lib/linkedin-profile-discovery-batch.test.mjs
+      - run: node --test app/lib/linkedin-profile-jd-batch.test.mjs
+      - run: node --test app/lib/profile-role-confirmation-regression.test.mjs
