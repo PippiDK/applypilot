@@ -2,7 +2,19 @@
 
 Living backlog for the active TEST product. Items remain here until explicitly implemented and verified; presence in this file does **not** mean a feature is shipped.
 
-## NEXT
+## DEMO SCOPE FREEZE — UNTIL TUESDAY
+
+The only product journey to finish before the meeting is:
+
+`find → understand why → choose Best CV → adapt`
+
+Until the Tuesday meeting:
+- finish **AI CV Adaptation**;
+- then do regression, bug fixing, stability and demo-path verification only;
+- do **not** add Location Gate, Jobindex, Target Company sources, new filters, dashboard expansion or other roadmap features;
+- a concise 2–4 page Quick Start / user manual is optional only if the core demo flow is already regression-green. Documentation must not delay stability work.
+
+## NEXT — BEFORE TUESDAY
 
 ### AI CV Adaptation
 
@@ -16,6 +28,8 @@ Acceptance direction:
 - do not merge facts across CVs unless a future design explicitly permits it;
 - Truth Guard remains mandatory: no invented skills, employers, achievements or responsibilities;
 - provide preview + accept/reject + save workflow.
+
+## NEXT — AFTER TUESDAY
 
 ### Persistent Job Analysis
 
@@ -31,6 +45,24 @@ Current gap to resolve deliberately:
 - Best CV cache already fingerprints job + JD + candidate-library source versions;
 - Expertise Match cache currently keys more narrowly and needs JD-aware invalidation before it can be trusted as a unified persistent analysis;
 - `job-analysis-cache.js` exists, but end-to-end persistence semantics across all analysis panels still need one coherent design and manual reload verification.
+
+### Location & Commute Eligibility
+
+Add a source-agnostic geography gate after the Tuesday demo.
+
+Target behavior:
+- Search Profile stores a preferred base location and an acceptable distance/radius;
+- normalize/geocode usable vacancy locations and calculate distance from the preferred base;
+- apply location eligibility to **On-site / Hybrid** roles;
+- keep **Remote** roles eligible independent of distance unless the vacancy itself imposes a country/region restriction;
+- do not silently guess ambiguous/unknown locations;
+- Audit Log must expose an explicit reason such as `Excluded: Location — 146 km from preferred base`;
+- build a regression benchmark from real prior search results, including known geography rejects such as Aarhus / Fyn / Møn, and verify Remote exceptions;
+- after evidence, evaluate commute/travel time as a better metric than raw kilometres.
+
+Architecture rule:
+- Location Gate belongs to the common evaluation pipeline, not to a LinkedIn-specific parser;
+- the same rule must later apply to Jobindex and company career-site sources.
 
 ## PLANNED
 
@@ -51,6 +83,24 @@ Jobindex implementation direction:
 - deduplicate the same vacancy found on LinkedIn and Jobindex using stable source identities plus a canonical vacancy fingerprint, not title/company text alone;
 - expose per-source coverage/parser-health diagnostics so Audit can distinguish source failure from common evaluation decisions;
 - after Jobindex is proven stable, evaluate whether IT-Jobbank can reuse the same adapter family.
+
+### Target Companies / Company Sources
+
+Allow users to configure company career sites they explicitly want ApplyPilot to monitor.
+
+Configuration direction:
+- user can add/remove a company;
+- store company name + career-site URL + enabled/disabled state;
+- examples for a future starter catalogue can include large employers such as Danske Bank, Saxo, Maersk and Nordea;
+- user-owned configuration remains primary; any Suggested Companies catalogue is opt-in.
+
+Architecture direction:
+- resolve configured career sites behind isolated source adapters, preferably reusable ATS-family adapters where practical;
+- source-specific parsing must not leak into the common Search/evaluation core;
+- normalize every company-site vacancy into the canonical Job model;
+- reuse Search Profile, role gates, Location Gate, Full JD evaluation, dedup, scoring, Live Matches and Audit Log;
+- expose source provenance on the vacancy, e.g. `Danske Bank Careers`;
+- one company-site parser failure must remain isolated and diagnosable.
 
 ### Vacancy filtering and sorting — after UX evidence
 
