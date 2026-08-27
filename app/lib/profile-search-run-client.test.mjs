@@ -85,3 +85,15 @@ test('preview search still completes when sessionStorage quota is exhausted',asy
   assert.equal(processing,true)
   assert.equal(result.jobs.length,1)
 })
+
+test('preview result counts only verified Full JDs as fullJdVerified',async()=>{
+  const fetchImpl=async url=>{
+    if(url.endsWith('/run')) return response({mode:'preview',run:{id:'preview-verified',status:'DISCOVERING',freshness_days:7,union_search_plan:plan,exclusion_rules:[],discovery_state:{},stats:{}},candidates:[]})
+    if(url.endsWith('/discover')) return response({mode:'preview',run:{id:'preview-verified',status:'READING_JDS',freshness_days:7,union_search_plan:plan,exclusion_rules:[],coverage:{status:'SEARCHING'},stats:{discovered:2}},candidates:[{jobId:'1'},{jobId:'2'}],complete:true,progress:{discovered:2}})
+    if(url.endsWith('/process')) return response({mode:'preview',run:{id:'preview-verified',status:'ACCESS_LIMITED',coverage:{status:'ACCESS LIMITED'},stats:{discovered:2,fullJdProcessed:2}},candidates:[{jobId:'1',detailStatus:'PROCESSED',job:{sourceJobId:'1'},evaluation:{score:9},audit:{decision:'KEEP'}},{jobId:'2',detailStatus:'UNVERIFIED',job:null,evaluation:null,audit:{decision:'UNVERIFIED'}}],complete:true,progress:{discovered:2,fullJdProcessed:2}})
+    throw new Error(`unexpected ${url}`)
+  }
+  const result=await runProfileSearchRun({freshnessDays:7,unionSearchPlan:plan,fetchImpl,storage:memoryStorage()})
+  assert.equal(result.stats.fullJdProcessed,2)
+  assert.equal(result.stats.fullJdVerified,1)
+})
