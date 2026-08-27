@@ -137,6 +137,20 @@ test('profile-driven search returns legacy-compatible result shape and full-JD s
   assert.equal(result.jobs[0].job.fullJdVerified,true)
 })
 
+test('worthwhile evaluated stat counts only kept matches while evaluatedCandidates tracks reviewed JDs',async()=>{
+  const fetcher=scenarioFetcher({
+    searchHtml:card('8200000001','Software Developer')+card('8200000002','Senior Project Manager'),
+    details:{
+      '8200000001':detailHtml({title:'Software Developer',description:'Develop, test and maintain production software and APIs. '.repeat(8)}),
+      '8200000002':detailHtml({title:'Senior Project Manager',description:'Own budgets, schedules and steering committees for business projects. '.repeat(8)})
+    }
+  })
+  const result=await searchLinkedInProfile({freshnessDays:1,unionSearchPlan:plan('Software Developer'),fetcher,now:new Date('2026-08-27T12:00:00Z')})
+  assert.equal(result.stats.evaluatedCandidates,2)
+  assert.equal(result.stats.evaluated,1)
+  assert.equal(result.stats.returned,1)
+})
+
 test('7-day profile discovery uses repeated deep LinkedIn pages instead of shadow start=0 only',async()=>{
   const searchStarts=[]
   const fetcher=async url=>{
