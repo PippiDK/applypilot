@@ -45,7 +45,7 @@ test('QA/Test profile recognizes Test Manager as the same professional direction
   assert.ok(result.jobs[0].evaluation.score>=6)
 })
 
-test('existing IT Project Manager profile still keeps a credible PM baseline vacancy',async()=>{
+test('existing IT Project Manager profile still keeps a credible PM baseline vacancy and writes a 0-100 audit percentage',async()=>{
   const fetcher=scenarioFetcher({
     searchHtml:card('4444444444','Senior IT Project Manager','Ambu'),
     details:{'4444444444':detailHtml({title:'Senior IT Project Manager',company:'Ambu',description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, risks, dependencies, stakeholders and delivery outcomes. '.repeat(5)})}
@@ -54,6 +54,8 @@ test('existing IT Project Manager profile still keeps a credible PM baseline vac
   assert.equal(result.jobs.length,1)
   assert.equal(result.jobs[0].job.company,'Ambu')
   assert.ok(result.jobs[0].evaluation.score>=7.5)
+  const kept=result.audit.find(row=>row.jobId==='4444444444'&&row.decision==='KEEP')
+  assert.ok(kept.score>10&&kept.score<=100)
 })
 
 test('IT Project Manager direction rejects a finance project role when the full JD has no technology delivery evidence',async()=>{
