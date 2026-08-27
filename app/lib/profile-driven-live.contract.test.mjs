@@ -25,3 +25,8 @@ test('profile-driven LIVE Search Run endpoints exist separately from the frozen 
 test('LIVE meta keeps the established worthwhile-after-evaluation stats contract',()=>{
   assert.match(page,/state\.stats\.evaluated}<\/b> worthwhile after evaluation/)
 })
+
+test('LIVE meta counts only verified Full JDs as full JDs read',()=>{
+  assert.match(page,/fullJdVerified:Number\(progress\.fullJdVerified\?\?current\.stats\?\.fullJdVerified\?\?0\)/)
+  assert.match(page,/fullJdVerified:Number\(data\.stats\?\.fullJdVerified\?\?0\)/)
+})
