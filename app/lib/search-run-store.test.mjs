@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {candidateRowsForUpsert,processedRowPatch,composeSearchRunResult} from './search-run-store.js'
+import {candidateRowsForUpsert,processedRowPatch,composeSearchRunResult,createPersistentSearchRun} from './search-run-store.js'
 
 const directionA={key:'technical project manager',role:'Technical Project Manager',tier:'primary',origin:'cv',cvSlots:[1]}
 const directionB={key:'it project manager',role:'IT Project Manager',tier:'primary',origin:'cv',cvSlots:[1]}
@@ -34,4 +34,24 @@ test('compose result exposes kept jobs audit and access-limited coverage from pe
   assert.equal(result.coverage.status,'ACCESS LIMITED')
   assert.equal(result.stats.fullJdProcessed,2)
   assert.equal(result.stats.fullJdVerified,1)
+})
+
+test('new persistent Search Run stores profile-semantic-v1 evaluation version',async()=>{
+  let inserted=null
+  const chain={
+    insert(payload){inserted=payload;return this},
+    select(){return this},
+    async single(){return {data:{id:'run-1',...inserted},error:null}}
+  }
+  const supabase={from(table){assert.equal(table,'search_runs');return chain}}
+  const result=await createPersistentSearchRun({
+    supabase,
+    userId:'user-1',
+    freshnessDays:7,
+    unionSearchPlan:{directions:[directionA]},
+    exclusionRules:[],
+    discoveryState:{version:'profile-discovery-run-v1'}
+  })
+  assert.equal(inserted.evaluation_version,'profile-semantic-v1')
+  assert.equal(result.evaluation_version,'profile-semantic-v1')
 })
