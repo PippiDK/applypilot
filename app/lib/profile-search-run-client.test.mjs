@@ -63,3 +63,25 @@ test('production can resume latest persisted run after browser session storage i
   assert.equal(processed,true)
   assert.equal(result.jobs.length,1)
 })
+
+test('preview search still completes when sessionStorage quota is exhausted',async()=>{
+  const storage={getItem:()=>null,setItem:()=>{throw new Error('QuotaExceededError')},removeItem:()=>{}}
+  let discovery=false
+  let processing=false
+  const fetchImpl=async url=>{
+    if(url.endsWith('/run')) return response({mode:'preview',run:{id:'preview-quota',status:'DISCOVERING',freshness_days:14,union_search_plan:plan,exclusion_rules:[],discovery_state:{},stats:{}},candidates:[]})
+    if(url.endsWith('/discover')){
+      discovery=true
+      return response({mode:'preview',run:{id:'preview-quota',status:'READING_JDS',freshness_days:14,union_search_plan:plan,exclusion_rules:[],coverage:{status:'SEARCHING'},stats:{discovered:1}},candidates:[{jobId:'1'}],complete:true,progress:{discovered:1}})
+    }
+    if(url.endsWith('/process')){
+      processing=true
+      return response({mode:'preview',run:{id:'preview-quota',status:'COMPLETE',coverage:{status:'SEARCHED'},stats:{discovered:1,fullJdProcessed:1}},candidates:[{jobId:'1',detailStatus:'PROCESSED',job:{sourceJobId:'1'},evaluation:{score:9},audit:{decision:'KEEP'}}],complete:true,progress:{discovered:1,fullJdProcessed:1}})
+    }
+    throw new Error(`unexpected ${url}`)
+  }
+  const result=await runProfileSearchRun({freshnessDays:14,unionSearchPlan:plan,fetchImpl,storage})
+  assert.equal(discovery,true)
+  assert.equal(processing,true)
+  assert.equal(result.jobs.length,1)
+})
