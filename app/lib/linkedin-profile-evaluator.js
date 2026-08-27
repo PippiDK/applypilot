@@ -1,9 +1,8 @@
-import {classifyProfileRoleFamily} from './profile-role-family.js'
+import {classifyProfileRoleFamily,profileRoleFamiliesCompatible} from './profile-role-family.js'
 import {classifyDeliveryDomain} from './profile-delivery-domain.js'
 import {semanticProfileExclusion} from './profile-semantic-exclusions.js'
 
 const WINDOWS=new Set([1,3,7,14])
-const TARGET_ROLE_FAMILIES=new Set(['delivery-management','implementation-transformation'])
 const GENERIC_ROLE_WORDS=new Set(['senior','sr','junior','jr','principal','global','regional','international','experienced','manager','lead','specialist','consultant','coordinator'])
 const EXECUTIVE_TITLE=/\b(head of|director|vice president|vp|chief)\b/
 const TECHNOLOGY_DIRECTION=/\b(it|information technology|technology|technical|digital|software|systems?|platform|cloud|data|cyber|integration|teknisk|digitalisering|systemer|platforme|integrationer)\b/
@@ -111,6 +110,13 @@ function confirmsDirection(directionRole,job){
   return true
 }
 
+function familyCompatibleDirections(foundBy=[],jobFamily=''){
+  return (Array.isArray(foundBy)?foundBy:[]).filter(direction=>{
+    const directionFamily=classifyProfileRoleFamily({title:direction?.role}).family
+    return profileRoleFamiliesCompatible(jobFamily,directionFamily)
+  })
+}
+
 function profileEvaluation(job,foundBy=[]){
   let best=null
   for(const direction of Array.isArray(foundBy)?foundBy:[]){
@@ -215,8 +221,9 @@ export function evaluateProfileJob({candidate={},job,freshnessDays=7,exclusionRu
   if(semanticExclusion) return {keep:false,evaluated:false,stage:'PROFILE_EXCLUSION_REJECT',decision:'REJECT',reason:semanticExclusion,score:null,evaluation:null}
 
   const roleFamily=classifyProfileRoleFamily(job)
-  if(!TARGET_ROLE_FAMILIES.has(roleFamily.family)){
-    return {keep:false,evaluated:true,stage:'PROFILE_ROLE_FAMILY_REJECT',decision:'REJECT',reason:'Vacancy professional role family is not project/delivery/implementation/transformation management',score:0,evaluation:null}
+  const compatibleDirections=familyCompatibleDirections(candidate.foundBy,roleFamily.family)
+  if(!compatibleDirections.length){
+    return {keep:false,evaluated:true,stage:'PROFILE_ROLE_FAMILY_REJECT',decision:'REJECT',reason:'Vacancy professional role family does not match an approved Search Profile role direction',score:0,evaluation:null}
   }
 
   if(['NON_TARGET_PHYSICAL','NON_TARGET_FUNCTIONAL','EXCLUDED_SPECIALISM'].includes(domainClassification.domain)){
@@ -227,7 +234,7 @@ export function evaluateProfileJob({candidate={},job,freshnessDays=7,exclusionRu
     return {keep:false,evaluated:true,stage:'PROFILE_DOMAIN_AMBIGUOUS',decision:'HOLD',reason:'Delivery domain is not sufficiently confirmed from the Full JD',score:null,evaluation:null}
   }
 
-  const result=profileEvaluation(job,candidate.foundBy)
+  const result=profileEvaluation(job,compatibleDirections)
   if(!result.pass) return {keep:false,evaluated:true,stage:'PROFILE_ROLE_REJECT',decision:'REJECT',reason:result.reason,score:0,evaluation:null}
   const evaluation=result.evaluation
   return {keep:true,evaluated:true,stage:'KEPT',decision:'KEEP',reason:`Matched ${evaluation.breakdown.tier} Search Profile direction: ${evaluation.breakdown.roleDirection}`,score:Math.round(evaluation.score*10),evaluation}
