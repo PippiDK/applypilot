@@ -216,7 +216,7 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
   let detailFailures=0
   let incompleteDetails=0
   let fullJdVerified=0
-  let evaluated=0
+  let evaluatedCandidates=0
 
   const settled=await mapLimit(discovery.candidates,4,async candidate=>{
     detailRequests++
@@ -260,7 +260,7 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
       continue
     }
 
-    evaluated++
+    evaluatedCandidates++
     const result=profileEvaluation(job,candidate.foundBy)
     if(!result.pass){
       updateAuditRecord(auditMap,candidate.jobId,{stage:'PROFILE_ROLE_REJECT',decision:'REJECT',reason:result.reason,score:0})
@@ -286,7 +286,8 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
       detailFailures,
       incompleteDetails,
       fullJdVerified,
-      evaluated,
+      evaluatedCandidates,
+      evaluated:jobs.length,
       returned:jobs.length,
     },
     coverage:{source:'LinkedIn Jobs',freshnessDays:days,status,detail},
