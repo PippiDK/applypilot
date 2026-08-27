@@ -7,6 +7,8 @@ const classify=(title,description)=>classifyDeliveryDomain({title,description})
 const cases=[
   ['explicit IT delivery','Senior IT Project Manager','Lead enterprise IT systems, software platforms, integrations, APIs and cloud delivery.','TARGET_TECH'],
   ['Danish digitalisation','Erfaren projektleder søges til kliniknær digitalisering','Drive digitalisering, digitale løsninger, IT-systemer, integrationer og tekniske leverancer.','TARGET_TECH'],
+  ['Atea Danish IT delivery','Senior IT-projektledere med teknisk indsigt','Atea søger senior IT-projektledere til komplekse kundeinitiativer og større IT-leverancer. Du leder tekniske projektteams, styrer projektledelse, afhængigheder, milepæle og leverancer på tværs af IT-systemer og platforme.','TARGET_TECH'],
+  ['PET Danish strategic IT delivery','Kan du drive succesfulde strategiske IT projekter i PET?','Som vores nye IT-projektleder driver du komplekse strategiske IT-projekter. Du har erfaring med IT-projektledelse og Scrum Master-arbejde og skaber fremdrift, koordinering og leverancer mellem tekniske teams og forretningen.','TARGET_TECH'],
   ['integration delivery','Integration Project Manager','Lead API, middleware, interfaces, SaaS and enterprise application integrations.','TARGET_TECH'],
   ['data platform','Senior Project Manager – Data Platform Modernisation','Lead cloud data platform, data warehouse, analytics, Azure migration and technology delivery.','TARGET_TECH'],
   ['OT security project','Senior SCADA & OT Security Package/Project Manager','Lead SCADA and OT security systems delivery, cyber controls and platform integration.','TARGET_TECH'],
