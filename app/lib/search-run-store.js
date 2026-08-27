@@ -78,6 +78,16 @@ export async function loadPersistentSearchRun({supabase,userId,runId}={}){
   return {run,candidates:candidates||[]}
 }
 
+export async function loadLatestActiveSearchRun({supabase,userId}={}){
+  const {data,error}=await supabase.from('search_runs').select('*').eq('user_id',userId).in('status',['DISCOVERING','READING_JDS']).order('created_at',{ascending:false}).limit(1)
+  throwIf(error,'Could not find active Search Run')
+  const run=Array.isArray(data)?data[0]:null
+  if(!run) return null
+  const {data:candidates,error:candidateError}=await supabase.from('search_candidates').select('*').eq('run_id',run.id).order('created_at',{ascending:true})
+  throwIf(candidateError,'Could not load active Search Run candidates')
+  return {run,candidates:candidates||[]}
+}
+
 export async function updatePersistentSearchRun({supabase,userId,runId,patch}={}){
   const payload={...patch,updated_at:nowIso()}
   const {data,error}=await supabase.from('search_runs').update(payload).eq('id',runId).eq('user_id',userId).select('*').single()
