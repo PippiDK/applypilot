@@ -9,7 +9,7 @@ async function requestJson(fetchImpl,url,body){
 
 function saveActiveSearchRun(storage,snapshot){
   if(!storage?.setItem) return
-  storage.setItem(ACTIVE_SEARCH_RUN_KEY,JSON.stringify(snapshot))
+  try{storage.setItem(ACTIVE_SEARCH_RUN_KEY,JSON.stringify(snapshot))}catch{}
 }
 
 export function readActiveSearchRun(storage){
