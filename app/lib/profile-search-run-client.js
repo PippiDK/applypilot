@@ -31,23 +31,8 @@ function previewResult(run,candidates=[]){
   return {jobs,audit,coverage:run.coverage||{status:run.status==='ACCESS_LIMITED'?'ACCESS LIMITED':'SEARCHED'},stats:{...(run.stats||{}),discovered:rows.length,fullJdProcessed,evaluated:jobs.length,returned:jobs.length},fetchedAt:run.updated_at||new Date().toISOString(),runId:run.id}
 }
 
-export async function runProfileSearchRun({freshnessDays=7,unionSearchPlan={},exclusionRules=[],fetchImpl=globalThis.fetch,storage=globalThis.sessionStorage,onProgress=()=>{},resume=false}={}){
-  if(typeof fetchImpl!=='function') throw new Error('Search Run fetch implementation is required.')
-  let snapshot=resume?readActiveSearchRun(storage):null
-
-  if(!snapshot){
-    const created=await requestJson(fetchImpl,'/api/linkedin-profile-search/run',{freshnessDays,unionSearchPlan,exclusionRules})
-    snapshot={mode:created.mode,run:created.run,candidates:Array.isArray(created.candidates)?created.candidates:[]}
-    saveActiveSearchRun(storage,snapshot)
-  }else if(snapshot.mode==='persistent'&&snapshot.run?.id&&!snapshot.run?.status){
-    const loaded=await requestJson(fetchImpl,`/api/linkedin-profile-search/run?id=${encodeURIComponent(snapshot.run.id)}`,null)
-    if(loaded.result&&['COMPLETE','ACCESS_LIMITED'].includes(loaded.run?.status)){
-      clearActiveSearchRun(storage)
-      return loaded.result
-    }
-    snapshot={mode:'persistent',run:loaded.run,candidates:[]}
-    saveActiveSearchRun(storage,snapshot)
-  }
+async function continueSearchRun({snapshot,fetchImpl,storage,onProgress}){
+  saveActiveSearchRun(storage,snapshot)
 
   while(snapshot.run?.status==='DISCOVERING'){
     const body=snapshot.mode==='preview'?{run:snapshot.run,candidates:snapshot.candidates}:{runId:snapshot.run.id}
@@ -82,4 +67,27 @@ export async function runProfileSearchRun({freshnessDays=7,unionSearchPlan={},ex
   }
 
   throw new Error(`Search Run stopped in unexpected status ${snapshot.run?.status||'UNKNOWN'}`)
+}
+
+export async function runProfileSearchRun({freshnessDays=7,unionSearchPlan={},exclusionRules=[],fetchImpl=globalThis.fetch,storage=globalThis.sessionStorage,onProgress=()=>{},resume=false}={}){
+  if(typeof fetchImpl!=='function') throw new Error('Search Run fetch implementation is required.')
+  let snapshot=resume?readActiveSearchRun(storage):null
+
+  if(!snapshot){
+    const created=await requestJson(fetchImpl,'/api/linkedin-profile-search/run',{freshnessDays,unionSearchPlan,exclusionRules})
+    snapshot={mode:created.mode,run:created.run,candidates:Array.isArray(created.candidates)?created.candidates:[]}
+  }
+
+  return continueSearchRun({snapshot,fetchImpl,storage,onProgress})
+}
+
+export async function resumeActiveProfileSearchRun({fetchImpl=globalThis.fetch,storage=globalThis.sessionStorage,onProgress=()=>{}}={}){
+  if(typeof fetchImpl!=='function') throw new Error('Search Run fetch implementation is required.')
+  let snapshot=readActiveSearchRun(storage)
+  if(!snapshot){
+    const active=await requestJson(fetchImpl,'/api/linkedin-profile-search/run?active=1',null)
+    if(!active?.active) return null
+    snapshot={mode:active.mode||'persistent',run:active.run,candidates:Array.isArray(active.candidates)?active.candidates:[]}
+  }
+  return continueSearchRun({snapshot,fetchImpl,storage,onProgress})
 }
