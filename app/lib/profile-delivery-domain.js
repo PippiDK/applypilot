@@ -5,6 +5,8 @@ const clean=value=>String(value??'')
   .replace(/\s+/g,' ')
   .trim()
 
+const normalizeDomainText=value=>clean(value).replace(/-/g,' ')
+
 function evidenceFor(text,groups){
   const evidence=[]
   for(const [label,pattern] of groups){
@@ -15,6 +17,7 @@ function evidenceFor(text,groups){
 
 const TARGET_GROUPS=[
   ['tech:systems',/\b(information technology|enterprise it|corporate it|group it|it systems?|it platform|technology delivery|technology projects?|software|applications?|enterprise applications?|saas|digitale løsninger|it systemer|it platforme)\b/],
+  ['tech:it-delivery',/\b(it projects?|it project management|it delivery|it deliveries|it projekter?|it projektledelse|it projektledere?|it leverancer?)\b/],
   ['tech:integration',/\b(api|apis|middleware|integration|integrations|interfaces?|integrationer)\b/],
   ['tech:cloud-data',/\b(cloud|azure|aws|gcp|data platform|data foundation|data warehouse|analytics platform|business intelligence|databricks|snowflake)\b/],
   ['tech:cyber-ot',/\b(cyber|cybersecurity|scada|ot security|operational technology)\b/],
@@ -38,7 +41,7 @@ const FUNCTIONAL_GROUPS=[
 ]
 
 const STRONG_PHYSICAL_TITLE=/\b(roads?|highways?|construction|civil|mechanical construction|geotechnical|geoteknisk|byggeri|anlægsprojekter|anlæg|vejprojekter|trafik|entreprisestyring)\b/
-const EXPLICIT_TECH_TITLE=/\b(it project|it program|it programme|information technology|software|data platform|cloud|integration|digital project|digital transformation|cyber|scada|ot security|teknisk it|it projekt|digitalisering)\b/
+const EXPLICIT_TECH_TITLE=/\b(it project|it program|it programme|it projekt(?:er|leder|ledere)?|information technology|software|data platform|cloud|integration|digital project|digital transformation|cyber|scada|ot security|teknisk it|digitalisering)\b/
 const STRONG_FUNCTIONAL_TITLE=/\b(finance project|financial project|payroll|marketing project|content project|procurement|purchasing project|property|real estate|facilities|regulatory affairs)\b/
 const ERP_TITLE=/\b(sap|s\/4hana|s4hana|erp|enterprise resource planning|dynamics 365|d365|oracle erp)\b/
 const ERP_DETAIL=/\b(configuration|modules?|customi[sz]ation|fit to standard|erp implementation|s\/4hana implementation|s4hana implementation)\b/
@@ -46,8 +49,8 @@ const RND_TITLE=/\b(r\s*&?\s*d|research and development|research & development)\
 const RND_DETAIL=/\b(product development|design controls?|laboratory|clinical development|research program|research programme|r&d engineering)\b/
 
 export function classifyDeliveryDomain(job={}){
-  const title=clean(job?.title)
-  const description=clean(job?.description)
+  const title=normalizeDomainText(job?.title)
+  const description=normalizeDomainText(job?.description)
   const text=`${title} ${description}`.trim()
 
   const erpInTitle=ERP_TITLE.test(title)
