@@ -1,79 +1,67 @@
-import {parseDetailHtml} from './linkedin-search.js'
 import {searchLinkedInProfileDiscovery} from './linkedin-profile-discovery.js'
 import {createAuditRecord,updateAuditRecord,auditList} from './linkedin-search-audit.js'
-import {evaluateProfileJob} from './linkedin-profile-evaluator.js'
+import {runProfileJdBatch} from './linkedin-profile-jd-batch.js'
 
-const LINKEDIN_JOB_DETAIL='https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/'
 const WINDOWS=new Set([1,3,7,14])
 
-async function mapLimit(items,limit,fn){
-  const results=new Array(items.length)
-  let next=0
-  async function worker(){
-    while(true){
-      const index=next++
-      if(index>=items.length) return
-      try{results[index]={status:'fulfilled',value:await fn(items[index],index)}}
-      catch(reason){results[index]={status:'rejected',reason,item:items[index]}}
-    }
-  }
-  await Promise.all(Array.from({length:Math.min(limit,items.length)},worker))
-  return results
-}
-
-export {evaluateProfileJob} from './linkedin-profile-evaluator.js'
-
-export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},exclusionRules=[],fetcher,now=new Date()}={}){
+export async function searchLinkedInProfile({
+  freshnessDays=7,unionSearchPlan={},exclusionRules=[],fetcher,now=new Date(),modelCall
+}={}){
   const days=WINDOWS.has(Number(freshnessDays))?Number(freshnessDays):7
   if(typeof fetcher!=='function') throw new Error('Profile-driven LinkedIn fetcher is required.')
   if(!Array.isArray(unionSearchPlan?.directions)||unionSearchPlan.directions.length===0) throw new Error('Search Profile requires at least one role direction.')
 
   const discovery=await searchLinkedInProfileDiscovery({freshnessDays:days,unionSearchPlan,fetcher})
   const auditMap=new Map(discovery.candidates.map(candidate=>[String(candidate.jobId),createAuditRecord(candidate)]))
-  let detailRequests=0
-  let detailFailures=0
-  let incompleteDetails=0
+  let remaining=discovery.candidates
+  const processed=[]
   let fullJdVerified=0
   let evaluatedCandidates=0
+  let accessLimited=Number(discovery.stats?.searchFailures||0)>0
 
-  const settled=await mapLimit(discovery.candidates,4,async candidate=>{
-    detailRequests++
-    const html=await fetcher(`${LINKEDIN_JOB_DETAIL}${candidate.jobId}`)
-    const job=parseDetailHtml(candidate,html,now)
-    return {candidate,job}
-  })
-
-  const jobs=[]
-  const detailErrors=[]
-  for(const item of settled){
-    if(item.status==='rejected'){
-      detailFailures++
-      const candidate=item.item||{}
-      detailErrors.push(String(item.reason?.message||item.reason||'LinkedIn detail request failed'))
-      updateAuditRecord(auditMap,candidate.jobId,{stage:'DETAIL_FETCH_FAILED',decision:'UNVERIFIED',reason:'Full Job Description could not be retrieved'})
-      continue
-    }
-
-    const {candidate,job}=item.value
-    if(!job){
-      incompleteDetails++
-      const outcome=evaluateProfileJob({candidate,job,freshnessDays:days,exclusionRules,now})
-      updateAuditRecord(auditMap,candidate.jobId,{stage:outcome.stage,decision:outcome.decision,reason:outcome.reason})
-      continue
-    }
-
-    fullJdVerified++
-    updateAuditRecord(auditMap,candidate.jobId,{title:job.title,company:job.company,stage:'FULL_JD_VERIFIED',decision:'PENDING'})
-    const outcome=evaluateProfileJob({candidate,job,freshnessDays:days,exclusionRules,now})
-    if(outcome.evaluated) evaluatedCandidates++
-    updateAuditRecord(auditMap,candidate.jobId,{stage:outcome.stage,decision:outcome.decision,reason:outcome.reason,...(outcome.score==null?{}:{score:outcome.score})})
-    if(outcome.keep) jobs.push({job,evaluation:outcome.evaluation})
+  while(remaining.length){
+    const batch=await runProfileJdBatch({
+      candidates:remaining,
+      fetcher,
+      freshnessDays:days,
+      exclusionRules,
+      now,
+      maxCandidates:16,
+      safeBudgetMs:Number.MAX_SAFE_INTEGER,
+      modelCall
+    })
+    processed.push(...batch.processed)
+    fullJdVerified+=Number(batch.stats?.fullJdVerified||0)
+    evaluatedCandidates+=Number(batch.stats?.evaluatedCandidates||0)
+    accessLimited=accessLimited||batch.accessLimited
+    if(batch.processed.length===0) break
+    remaining=batch.remaining
   }
 
-  jobs.sort((a,b)=>b.evaluation.score-a.evaluation.score||(new Date(b.job.publishedAt||0)-new Date(a.job.publishedAt||0)))
-  const inaccessible=Number(discovery.stats?.searchFailures||0)+detailFailures+incompleteDetails
-  const status=inaccessible?'ACCESS LIMITED':jobs.length?'SEARCHED':'NO RELEVANT RESULTS'
-  const detail=inaccessible?(discovery.coverage?.detail||detailErrors[0]||`${inaccessible} LinkedIn item(s) could not be fully verified`):null
+  for(const row of processed){
+    updateAuditRecord(auditMap,row.candidate.jobId,{
+      title:row.job?.title||row.candidate.title||'',
+      company:row.job?.company||row.candidate.company||'',
+      stage:row.audit?.stage||'FULL_JD_UNVERIFIED',
+      decision:row.audit?.decision||'UNVERIFIED',
+      reason:row.audit?.reason||row.error||null,
+      ...(row.audit?.score==null?{}:{score:row.audit.score})
+    })
+  }
+
+  const jobs=processed
+    .filter(row=>row.detailStatus==='PROCESSED'&&row.job&&row.evaluation&&row.audit?.decision==='KEEP')
+    .map(row=>({job:row.job,evaluation:row.evaluation}))
+    .sort((a,b)=>b.evaluation.score-a.evaluation.score||(new Date(b.job.publishedAt||0)-new Date(a.job.publishedAt||0)))
+
+  const detailRequests=processed.length
+  const detailFailures=processed.filter(row=>row.audit?.stage==='DETAIL_FETCH_FAILED').length
+  const incompleteDetails=processed.filter(row=>row.audit?.stage==='FULL_JD_UNVERIFIED').length
+  const unverified=processed.filter(row=>row.detailStatus==='UNVERIFIED').length
+  const inaccessible=Number(discovery.stats?.searchFailures||0)+unverified
+  const status=accessLimited||inaccessible?'ACCESS LIMITED':jobs.length?'SEARCHED':'NO RELEVANT RESULTS'
+  const firstError=processed.find(row=>row.detailStatus==='UNVERIFIED')?.error||null
+  const detail=status==='ACCESS LIMITED'?(discovery.coverage?.detail||firstError||`${inaccessible} LinkedIn item(s) could not be fully verified`):null
 
   return {
     jobs,
