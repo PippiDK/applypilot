@@ -78,3 +78,20 @@ test('profile-driven search returns legacy-compatible result shape and full-JD s
   assert.ok(Array.isArray(result.audit))
   assert.equal(result.jobs[0].job.fullJdVerified,true)
 })
+
+test('7-day profile discovery uses repeated deep LinkedIn pages instead of shadow start=0 only',async()=>{
+  const searchStarts=[]
+  const fetcher=async url=>{
+    if(url.includes('/seeMoreJobPostings/search')){
+      searchStarts.push(Number(new URL(url).searchParams.get('start')))
+      return card('7777777777','Software Developer')
+    }
+    return detailHtml({title:'Software Developer',description:'Develop, test and maintain production software and APIs for customer-facing services. '.repeat(8)})
+  }
+  const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:plan('Software Developer'),fetcher,now:new Date('2026-08-27T12:00:00Z')})
+  assert.ok(searchStarts.includes(25))
+  assert.ok(searchStarts.includes(50))
+  assert.ok(searchStarts.filter(start=>start===0).length>=2)
+  assert.ok(Array.isArray(result.stats.discoveryPasses))
+  assert.equal(result.jobs.length,1)
+})
