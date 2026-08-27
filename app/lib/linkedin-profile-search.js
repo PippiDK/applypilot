@@ -6,7 +6,7 @@ const LINKEDIN_JOB_DETAIL='https://www.linkedin.com/jobs-guest/jobs/api/jobPosti
 const WINDOWS=new Set([1,3,7,14])
 const GENERIC_ROLE_WORDS=new Set(['senior','sr','junior','jr','principal','global','regional','international','experienced','manager','lead','specialist','consultant','coordinator'])
 const EXECUTIVE_TITLE=/\b(head of|director|vice president|vp|chief)\b/
-const TECHNOLOGY_DIRECTION=/\b(it|information technology|technology|digital|software|systems?|platform|cloud|data|cyber|integration)\b/
+const TECHNOLOGY_DIRECTION=/\b(it|information technology|technology|technical|digital|software|systems?|platform|cloud|data|cyber|integration)\b/
 const TECHNOLOGY_TITLE=/\b(it|information technology|technology|digital|software|platform|cloud|data|integration|ai|artificial intelligence|cyber|scada|ot)\b/
 const TECHNOLOGY_EVIDENCE=[
   /\b(information technology|enterprise it|corporate it|group it|it projects?|it systems?|it platform|technology delivery|technology transformation|technology projects?|digital delivery|digital transformation|digital projects?)\b/,
