@@ -192,46 +192,18 @@ export default function Home(){
     return
   }
   setJobs([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
-  setShadowState({status:'idle',error:'',stats:null,coverage:null,comparison:null})
-  const shadowPlan=profile?.unionSearchPlan
-  const shadowPromise=Array.isArray(shadowPlan?.directions)&&shadowPlan.directions.length
-    ? fetch('/api/linkedin-shadow-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,unionSearchPlan:profile.unionSearchPlan})})
-        .then(async shadowRes=>{
-          const shadowData=await shadowRes.json()
-          if(!shadowRes.ok) throw new Error(shadowData.error||'LinkedIn shadow search failed')
-          return shadowData
-        })
-        .catch(error=>({__shadowError:error.message||'LinkedIn shadow search failed'}))
-    : Promise.resolve(null)
+  setShadowState({status:'skipped',error:'',stats:null,coverage:null,comparison:null})
+  const hasProfilePlan=Array.isArray(profile?.unionSearchPlan?.directions)&&profile.unionSearchPlan.directions.length>0
   try{
-    const res=await fetch('/api/linkedin-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,cvText:cvData.cvText})})
+    const res=hasProfilePlan
+      ? await fetch('/api/linkedin-profile-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,unionSearchPlan:profile.unionSearchPlan,exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[]})})
+      : await fetch('/api/linkedin-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,cvText:cvData.cvText})})
     const data=await res.json()
     if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
     setJobs(Array.isArray(data.jobs)?data.jobs:[])
     setState({loading:false,error:'',coverage:data.coverage||null,stats:data.stats||null,fetchedAt:data.fetchedAt||null,audit:Array.isArray(data.audit)?data.audit:[]})
-    void shadowPromise.then(shadow=>{
-      if(!shadow){
-        setShadowState({status:'skipped',error:'',stats:null,coverage:null,comparison:null})
-        return
-      }
-      if(shadow.__shadowError){
-        setShadowState({status:'error',error:shadow.__shadowError,stats:null,coverage:null,comparison:null})
-        return
-      }
-      setShadowState({
-        status:'ready',
-        error:'',
-        stats:shadow.stats||null,
-        coverage:shadow.coverage||null,
-        comparison:compareShadowToLegacy({
-          candidates:Array.isArray(shadow.candidates)?shadow.candidates:[],
-          legacyAudit:Array.isArray(data.audit)?data.audit:[]
-        })
-      })
-    })
   }catch(error){ setState({loading:false,error:error.message||'LinkedIn search failed',coverage:null,stats:null,fetchedAt:null,audit:[]}) }
 }
-
   function startProfile(){
     const base=resumeToProfile(profile,cvData)
     const preferences=normalizeSearchPreferences(base)
@@ -399,7 +371,7 @@ export default function Home(){
     <header><div><div className="brand">ApplyPilot</div><div className="tag">Search less. Apply better.</div></div><div className="headerActions"><div className={`sourceBadge profileStatus ${resumeLoaded?'statusReady':'statusEmpty'}`}>{resumeLoaded?'Profile ready':'Profile empty'}</div><div className="sourceBadge">LINKEDIN · PUBLIC</div></div></header>
 
     <section className="hero">
-      <div><p className="eyebrow">ONE SOURCE · END-TO-END</p><h1>Find Senior IT Project & Delivery roles in Denmark.</h1><p>LinkedIn public search → full job description → CV evaluation → worthwhile matches only.</p></div>
+      <div><p className="eyebrow">ONE SOURCE · END-TO-END</p><h1>Find the right roles for your Search Profile in Denmark.</h1><p>Search Profile → LinkedIn discovery → full job description → worthwhile matches only.</p></div>
       <div className="metric"><b>{state.loading?'…':jobs.length}</b><span>matches</span></div>
     </section>
 
@@ -486,7 +458,7 @@ export default function Home(){
       {profileStep===2&&<SearchProfileRolesStep primaryRoles={draftPrimaryRoles} adjacentRoles={draftAdjacentRoles} status={profileRoleState.status} error={profileRoleState.error} source={profileRoleState.source} totalCount={profileRoleState.totalCount||cvReadyCount} analysedCount={profileRoleState.analysedCount} failedCvs={profileRoleState.failedCvs} onPrimaryChange={roles=>updateDraftRoles('primaryRoles',roles)} onAdjacentChange={roles=>updateDraftRoles('adjacentRoles',roles)} onRetry={()=>buildProfileRoles({forceCvIds:(profileRoleState.failedCvs||[]).map(cv=>cv.cvId)})}/>} 
       {profileStep===3&&<SearchProfileLocationStep locations={draftLocations} workModels={draftWorkModels} onToggleLocation={value=>togglePreference('locations',value)} onToggleWorkModel={value=>togglePreference('workModels',value)}/>} 
       {profileStep===4&&<div className="wizard"><h3>What should ApplyPilot exclude?</h3><p>Optional. Write any hard no-go roles, industries, languages or working conditions. ApplyPilot interprets this text only when you save the profile.</p><textarea value={draft.exclusions} onChange={event=>setDraft(current=>({...current,exclusions:event.target.value}))} rows="6"/></div>}
-      {profileStep===5&&<div className="wizard review"><h3>Confirm your search profile</h3><p>This saves your Search Profile for the next product step. The current LinkedIn search engine remains unchanged in this milestone.</p><div className="reviewRow"><span>Primary Search CV</span><b>{resumeLoaded?cvData.fileName:cvData?.fileName?'Re-upload required':'Not uploaded yet'}</b></div><div className="reviewRow"><span>CV preparation</span><b>{resumeLoaded?'Ready — complete Source CV prepared':'CV not ready'}</b></div><div className="reviewRow"><span>Role profiles</span><b>{cvReadyCount?`${analysedRoleProfileCount}/${cvReadyCount} CVs analysed`:'Not generated'}</b></div><div className="reviewRow"><span>Target roles</span><b>{draft.roles||'Not set'}</b></div><div className="reviewRow"><span>Where</span><b>{draftLocations.length?draftLocations.join(' · '):'Not set'}</b></div><div className="reviewRow"><span>Work model</span><b>{draftWorkModels.length?workModelText(draftWorkModels):'Not set'}</b></div><div className="reviewRow"><span>Exclude</span><b>{draft.exclusions||'None'}</b></div><SearchPlanPreview plan={draftUnionSearchPlan}/>{profileSaveState.error&&<div className="errorBox"><b>Search Profile save failed</b><span>{profileSaveState.error}</span></div>}<div className="truth"><b>Truth rule</b><span>ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.</span></div></div>}
+      {profileStep===5&&<div className="wizard review"><h3>Confirm your search profile</h3><p>This saves your Search Profile and activates profile-driven LinkedIn discovery for future searches.</p><div className="reviewRow"><span>Primary Search CV</span><b>{resumeLoaded?cvData.fileName:cvData?.fileName?'Re-upload required':'Not uploaded yet'}</b></div><div className="reviewRow"><span>CV preparation</span><b>{resumeLoaded?'Ready — complete Source CV prepared':'CV not ready'}</b></div><div className="reviewRow"><span>Role profiles</span><b>{cvReadyCount?`${analysedRoleProfileCount}/${cvReadyCount} CVs analysed`:'Not generated'}</b></div><div className="reviewRow"><span>Target roles</span><b>{draft.roles||'Not set'}</b></div><div className="reviewRow"><span>Where</span><b>{draftLocations.length?draftLocations.join(' · '):'Not set'}</b></div><div className="reviewRow"><span>Work model</span><b>{draftWorkModels.length?workModelText(draftWorkModels):'Not set'}</b></div><div className="reviewRow"><span>Exclude</span><b>{draft.exclusions||'None'}</b></div><SearchPlanPreview plan={draftUnionSearchPlan}/>{profileSaveState.error&&<div className="errorBox"><b>Search Profile save failed</b><span>{profileSaveState.error}</span></div>}<div className="truth"><b>Truth rule</b><span>ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.</span></div></div>}
       <div className="modalActions"><button className="secondary" disabled={profileSaveState.loading} onClick={()=>profileStep===1?closeProfile():setProfileStep(step=>step-1)}>{profileStep===1?'Cancel':'Back'}</button>{profileStep<5?<button className="primary" disabled={(profileStep===1&&(Boolean(cvState.loadingSlot)||cvReadyCount===0))||(profileStep===2&&profileRoleState.status==='loading')} onClick={nextProfileStep}>Continue</button>:<button className="primary" disabled={profileSaveState.loading} onClick={saveProfile}>{profileSaveState.loading?'Saving profile…':'Save profile'}</button>}</div>
     </div></div>}
 
