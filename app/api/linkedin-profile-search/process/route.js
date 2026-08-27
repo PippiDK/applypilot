@@ -38,8 +38,9 @@ export async function POST(request){
       const accessLimited=run.coverage?.status==='ACCESS LIMITED'||batch.accessLimited
       const status=remaining?'READING_JDS':accessLimited?'ACCESS_LIMITED':'COMPLETE'
       const processedCount=candidates.filter(row=>row.detailStatus==='PROCESSED'||row.detailStatus==='UNVERIFIED').length
-      const nextRun={...run,status,stats:{...(run.stats||{}),discovered:candidates.length,fullJdProcessed:processedCount},coverage:{status:accessLimited?'ACCESS LIMITED':remaining?'SEARCHING':'SEARCHED',detail:run.coverage?.detail||null},updated_at:new Date().toISOString(),...(remaining?{}:{completed_at:new Date().toISOString()})}
-      return NextResponse.json({mode:'preview',run:nextRun,candidates,batchJobs:batch.jobs,batchAudit:batch.processed.map(row=>({jobId:row.candidate.jobId,title:row.job?.title||row.candidate.title||'',company:row.job?.company||row.candidate.company||'',...row.audit})),complete:remaining===0,progress:{discovered:candidates.length,fullJdProcessed:processedCount}})
+      const verifiedCount=candidates.filter(row=>row.detailStatus==='PROCESSED').length
+      const nextRun={...run,status,stats:{...(run.stats||{}),discovered:candidates.length,fullJdProcessed:processedCount,fullJdVerified:verifiedCount},coverage:{status:accessLimited?'ACCESS LIMITED':remaining?'SEARCHING':'SEARCHED',detail:run.coverage?.detail||null},updated_at:new Date().toISOString(),...(remaining?{}:{completed_at:new Date().toISOString()})}
+      return NextResponse.json({mode:'preview',run:nextRun,candidates,batchJobs:batch.jobs,batchAudit:batch.processed.map(row=>({jobId:row.candidate.jobId,title:row.job?.title||row.candidate.title||'',company:row.job?.company||row.candidate.company||'',...row.audit})),complete:remaining===0,progress:{discovered:candidates.length,fullJdProcessed:processedCount,fullJdVerified:verifiedCount}})
     }
 
     const runId=String(body?.runId||'')
@@ -65,12 +66,13 @@ export async function POST(request){
     const after=await loadPersistentSearchRun({supabase,userId:auth.user.id,runId})
     const remaining=after.candidates.filter(row=>row.detail_status==='PENDING').length
     const processedCount=after.candidates.filter(row=>row.detail_status==='PROCESSED'||row.detail_status==='UNVERIFIED').length
+    const verifiedCount=after.candidates.filter(row=>row.detail_status==='PROCESSED').length
     const accessLimited=snapshot.run.coverage?.status==='ACCESS LIMITED'||batch.accessLimited||after.candidates.some(row=>row.detail_status==='UNVERIFIED')
     const status=remaining?'READING_JDS':accessLimited?'ACCESS_LIMITED':'COMPLETE'
     const coverage={...(snapshot.run.coverage||{}),status:accessLimited?'ACCESS LIMITED':remaining?'SEARCHING':'SEARCHED'}
-    const run=await updatePersistentSearchRun({supabase,userId:auth.user.id,runId,patch:{status,stats:{...(snapshot.run.stats||{}),discovered:after.candidates.length,fullJdProcessed:processedCount},coverage,...(remaining?{}:{completed_at:new Date().toISOString()})}})
+    const run=await updatePersistentSearchRun({supabase,userId:auth.user.id,runId,patch:{status,stats:{...(snapshot.run.stats||{}),discovered:after.candidates.length,fullJdProcessed:processedCount,fullJdVerified:verifiedCount},coverage,...(remaining?{}:{completed_at:new Date().toISOString()})}})
     const result=remaining?null:composeSearchRunResult(run,after.candidates)
-    return NextResponse.json({mode:'persistent',run,batchJobs:batch.jobs,batchAudit:batch.processed.map(row=>({jobId:row.candidate.jobId,title:row.job?.title||row.candidate.title||'',company:row.job?.company||row.candidate.company||'',...row.audit})),result,complete:remaining===0,progress:{discovered:after.candidates.length,fullJdProcessed:processedCount}})
+    return NextResponse.json({mode:'persistent',run,batchJobs:batch.jobs,batchAudit:batch.processed.map(row=>({jobId:row.candidate.jobId,title:row.job?.title||row.candidate.title||'',company:row.job?.company||row.candidate.company||'',...row.audit})),result,complete:remaining===0,progress:{discovered:after.candidates.length,fullJdProcessed:processedCount,fullJdVerified:verifiedCount}})
   }catch(error){
     console.error('Search Run JD processing error',error)
     return NextResponse.json({error:String(error?.message||'Search Run JD processing failed')},{status:502})
