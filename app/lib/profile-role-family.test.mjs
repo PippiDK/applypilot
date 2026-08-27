@@ -32,6 +32,14 @@ for(const [title,family] of cases){
   })
 }
 
+test('PET-style action title that explicitly drives IT projects is delivery-management',()=>{
+  const result=classifyProfileRoleFamily({
+    title:'Kan du drive succesfulde strategiske IT projekter i PET?',
+    description:'Som vores nye IT-projektleder driver du komplekse strategiske IT-projekter.',
+  })
+  assert.equal(result.family,'delivery-management')
+})
+
 test('specific specialist family wins over generic project references in description',()=>{
   const result=classifyProfileRoleFamily({
     title:'Regulatory Affairs Specialist',
