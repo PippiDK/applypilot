@@ -6,13 +6,13 @@ const LINKEDIN_JOB_DETAIL='https://www.linkedin.com/jobs-guest/jobs/api/jobPosti
 const WINDOWS=new Set([1,3,7,14])
 const GENERIC_ROLE_WORDS=new Set(['senior','sr','junior','jr','principal','global','regional','international','experienced','manager','lead','specialist','consultant','coordinator'])
 const EXECUTIVE_TITLE=/\b(head of|director|vice president|vp|chief)\b/
-const TECHNOLOGY_DIRECTION=/\b(it|information technology|technology|technical|digital|software|systems?|platform|cloud|data|cyber|integration)\b/
-const TECHNOLOGY_TITLE=/\b(it|information technology|technology|digital|software|platform|cloud|data|integration|ai|artificial intelligence|cyber|scada|ot)\b/
+const TECHNOLOGY_DIRECTION=/\b(it|information technology|technology|technical|digital|software|systems?|platform|cloud|data|cyber|integration|teknisk|digitalisering|systemer|platforme|integrationer)\b/
+const TECHNOLOGY_TITLE=/\b(it|information technology|technology|technical|digital|software|platform|cloud|data|integration|ai|artificial intelligence|cyber|scada|ot|teknisk|digitalisering|systemer|platforme|integrationer)\b/
 const TECHNOLOGY_EVIDENCE=[
-  /\b(information technology|enterprise it|corporate it|group it|it projects?|it systems?|it platform|technology delivery|technology transformation|technology projects?|digital delivery|digital transformation|digital projects?)\b/,
+  /\b(information technology|enterprise it|corporate it|group it|it projects?|it systems?|it platform|technology delivery|technology transformation|technology projects?|digital delivery|digital transformation|digital projects?|it projekt(?:er)?|it leverance(?:r)?|it system(?:er)?|it platform(?:e)?|digitalisering|digitaliseringsprojekt(?:er)?|digitale løsninger|digitale projekt(?:er)?)\b/,
   /\b(software|applications?|api|apis|saas|digital product|enterprise applications?)\b/,
-  /\b(platform|enterprise systems?|business systems?|information systems?)\b/,
-  /\b(integration|integrations|middleware|interfaces?)\b/,
+  /\b(platform|enterprise systems?|business systems?|information systems?|it system(?:er)?|it platform(?:e)?|digitale system(?:er)?)\b/,
+  /\b(integration|integrations|middleware|interfaces?|integrationer)\b/,
   /\b(cloud|azure|aws|gcp|data platform|data foundation|data warehouse|analytics|business intelligence|databricks|snowflake|artificial intelligence|ai)\b/,
   /\b(cyber|cybersecurity|scada|ot security|operational technology)\b/,
 ]
@@ -20,8 +20,25 @@ const TECHNOLOGY_EVIDENCE=[
 const clean=value=>String(value??'').toLowerCase().replace(/[–—_/&]+/g,' ').replace(/[^a-z0-9æøå+.# -]/g,' ').replace(/\s+/g,' ').trim()
 const round1=value=>Math.round(value*10)/10
 
+function normalizeRoleLanguage(value=''){
+  return clean(value)
+    .replace(/\bprojektledere?\b/g,'project manager')
+    .replace(/\bprojektledelse\b/g,'project management')
+    .replace(/\bprojekter\b/g,'project')
+    .replace(/\bprogramledere?\b/g,'program manager')
+    .replace(/\bprogramledelse\b/g,'program management')
+    .replace(/\btekniske?\b/g,'technical')
+    .replace(/\bleverancer?\b/g,'delivery')
+    .replace(/\bsystemer\b/g,'systems')
+    .replace(/\bplatforme\b/g,'platform')
+    .replace(/\bintegrationer\b/g,'integration')
+    .replace(/\bdigitaliseringsprojekter\b/g,'digital project')
+    .replace(/\bdigitalisering\b/g,'digital')
+    .replace(/\bdigitale\b/g,'digital')
+}
+
 function canonicalRoleTokens(value=''){
-  const text=clean(value)
+  const text=normalizeRoleLanguage(value)
     .replace(/\bprogramme\b/g,'program')
     .replace(/\bquality assurance\b/g,'qa')
   const raw=text.split(' ').filter(Boolean)
@@ -67,7 +84,7 @@ function jdSupport(directionRole,job){
 }
 
 function strongRoleFamily(value=''){
-  const text=clean(value).replace(/\bprogramme\b/g,'program')
+  const text=normalizeRoleLanguage(value).replace(/\bprogramme\b/g,'program')
   if(/\b(product manager|product owner|product lead|product director)\b/.test(text)) return 'product'
   if(/\b(software developer|software engineer|software engineering|developer|programmer)\b/.test(text)) return 'software-builder'
   if(/\b(qa manager|qa lead|test manager|test lead|quality assurance|software tester|testing manager)\b/.test(text)) return 'quality-test'
