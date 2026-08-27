@@ -5,8 +5,17 @@ import fs from 'node:fs'
 const page=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
 const css=fs.readFileSync(new URL('../globals.css',import.meta.url),'utf8')
 
-test('Step 5 labels CV1 explicitly as the Primary Search CV',()=>{
+test('Step 5 clarifies CV library and labels CV1 explicitly as the Primary Search CV',()=>{
+  assert.match(page,/<span>CV library<\/span>/)
+  assert.match(page,/CVs ready/)
   assert.match(page,/<span>Primary Search CV<\/span>/)
+  assert.match(page,/CV 1 ·/)
+})
+
+test('left vacancy list labels its ranking as Search relevance',()=>{
+  assert.match(page,/<h2>Search relevance<\/h2>/)
+  assert.match(page,/How closely the job matches your Search Profile/)
+  assert.match(page,/fitLabel\(score\)/)
 })
 
 test('profile strip shows a dynamic saved Union Search Plan summary instead of legacy role and score copy',()=>{
