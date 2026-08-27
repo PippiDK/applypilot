@@ -59,7 +59,7 @@ The evaluator becomes a staged eligibility pipeline:
 ```text
 FULL JD
   ↓
-HARD PROFILE EXCLUSIONS
+EXPLICIT SEARCH PROFILE EXCLUSIONS
   ↓
 ROLE FAMILY CLASSIFICATION
   ↓
@@ -77,23 +77,22 @@ DELIVERY DOMAIN CLASSIFICATION
 └──────────────────┴───────────────────┴────────────────────┘
 ```
 
-### 4.1 Hard profile exclusions
+### 4.1 Explicit Search Profile exclusions
 
-Hard exclusions are evaluated first and always override positive role similarity.
+User-authored exclusions are evaluated first and always override positive role similarity.
 
-They are semantic categories, not only literal phrases. The initial protected categories are:
+Existing deterministic company, location, work-model, language, employment-type and literal role/domain exclusions continue to work.
+
+For exclusion rules that express a category rather than a literal phrase, the evaluator adds a conservative semantic interpretation. The initial protected semantic exclusion categories are those already represented by the current Search Profile, especially:
 
 - R&D-specialist roles
 - ERP-specialist roles
-- physical construction / civil works / roads / buildings / utilities delivery
-- finance-only project delivery
-- HR / payroll-only project delivery when not explicitly enabled by the Search Profile
-- marketing / content-only project delivery
-- regulatory-affairs specialist roles when they are not delivery/project-management roles
 
-User-authored explicit exclusions remain authoritative. Existing deterministic company, location, work-model, language, and employment-type exclusions continue to work.
+Example: the user rule `R&D roles` must reject `Senior Project Manager, Global R&D, Respiratory & ENT` even though the exact string `R&D roles` is not present in the vacancy.
 
-The new semantic exclusion layer must be conservative: a category must have strong evidence before it becomes a hard reject.
+Example: the user rule `ERP specialist roles` must reject `SAP S/4HANA Public Cloud Finance Project Manager` when the Full JD establishes that the role is an ERP/SAP specialist position.
+
+Semantic expansion must never invent a new user exclusion. Physical construction, finance-only, HR-only, marketing-only and similar non-target domains are handled by delivery-domain compatibility unless the user has explicitly excluded them.
 
 ### 4.2 Role family classification
 
@@ -146,18 +145,21 @@ Initial domain outcomes:
   - physical plant / mechanical project delivery
 - `NON_TARGET_FUNCTIONAL`
   - finance-only
-  - HR-only
+  - HR/payroll-only
   - marketing/content-only
   - procurement-only
   - property/facilities-only
   - regulatory-affairs-only
 - `EXCLUDED_SPECIALISM`
-  - ERP specialist
-  - R&D specialist
+  - a semantic category explicitly excluded by the Search Profile, such as ERP specialist or R&D specialist
 - `AMBIGUOUS`
   - project/delivery role is plausible but the Full JD does not provide enough evidence to establish a compatible delivery domain
 
 The classifier must use evidence groups rather than one-off word lists. Multiple corroborating signals are preferred over a single token.
+
+A functional domain is not automatically rejected if the Search Profile explicitly enables that professional direction and the role is genuine delivery management. For example, a true regulatory project-management role may remain eligible through an approved `Regulatory Project Manager` direction, while `Regulatory Affairs Specialist` remains ineligible because its role family is specialist rather than delivery-management.
+
+Likewise, `Implementation Manager` does not automatically make every HR/payroll implementation role worthwhile. The Full JD must establish delivery responsibilities compatible with the approved direction rather than a narrow functional-specialist position.
 
 Danish and English evidence must both be supported. Existing BUG #3 normalization remains and is extended only where needed to classify delivery domain safely.
 
@@ -192,7 +194,7 @@ A score must therefore mean:
 
 `The vacancy is professionally eligible AND this is how strongly it matches an approved Search Profile direction.`
 
-A high token-similarity score must never resurrect a hard-excluded or non-target-domain role.
+A high token-similarity score must never resurrect an explicitly excluded or non-target-domain role.
 
 ## 5. Audit semantics
 
@@ -241,9 +243,9 @@ These cases protect recall and BUG #3:
 - Danish Crown — `Senior Finance Project Manager`
   - reason category: finance-only delivery
 - Eursap — `SAP S/4HANA Public Cloud Finance Project Manager`
-  - reason category: ERP specialist
+  - reason category: ERP specialist exclusion
 - Ambu — `Senior Project Manager, Global R&D, Respiratory & ENT`
-  - reason category: R&D specialist
+  - reason category: R&D specialist exclusion
 - Phillips Medisize — `Regulatory Affairs Specialist`
   - reason category: specialist family, not delivery-management
 
@@ -259,14 +261,15 @@ Required tests:
 
 1. RED regression tests for every protected KEEP and REJECT example above.
 2. RED test for the HOLD/AMBIGUOUS path.
-3. Hard exclusions override otherwise strong title similarity.
-4. Role-family conflict overrides shared tokens.
-5. Domain evidence is based on Full JD, not title-only.
-6. Danish BUG #3 cases remain GREEN.
-7. Primary/Adjacent provenance and direction scoring remain unchanged for eligible vacancies.
-8. `worthwhile` count includes only KEEP.
-9. Audit differentiates REJECT, HOLD and KEEP.
-10. Search Run discovery/batching tests remain unchanged and GREEN.
+3. Explicit Search Profile exclusions override otherwise strong title similarity.
+4. Semantic expansion of R&D/ERP exclusions is applied only when the corresponding user exclusion exists.
+5. Role-family conflict overrides shared tokens.
+6. Domain evidence is based on Full JD, not title-only.
+7. Danish BUG #3 cases remain GREEN.
+8. Primary/Adjacent provenance and direction scoring remain unchanged for eligible vacancies.
+9. `worthwhile` count includes only KEEP.
+10. Audit differentiates REJECT, HOLD and KEEP.
+11. Search Run discovery/batching tests remain unchanged and GREEN.
 
 A larger replay-oriented regression set should be extracted from the 442-job live audit where practical, but implementation must not depend on reproducing live LinkedIn network calls.
 
@@ -294,17 +297,18 @@ The fix is accepted when:
 2. Protected target cases remain KEEP.
 3. Protected false positives become the expected REJECT category.
 4. Ambiguous generic PM cases become HOLD, not worthwhile.
-5. Hard Search Profile exclusions have precedence over positive role matching.
-6. No hidden shortlist quota is introduced.
-7. Search relevance is only assigned after eligibility passes.
-8. Existing Search Run, Union Search Plan, CV and BUG #3 regression suites remain GREEN.
-9. Production build is GREEN.
-10. `main` remains unchanged and deployment remains permission-gated.
+5. Explicit Search Profile exclusions have precedence over positive role matching.
+6. Semantic exclusion expansion never creates a new exclusion the user did not configure.
+7. No hidden shortlist quota is introduced.
+8. Search relevance is only assigned after eligibility passes.
+9. Existing Search Run, Union Search Plan, CV and BUG #3 regression suites remain GREEN.
+10. Production build is GREEN.
+11. `main` remains unchanged and deployment remains permission-gated.
 
 ## 10. Explicit design decision
 
 The recommended and approved architecture is:
 
-**Eligibility Gate + Role Family + Delivery Domain + hard exclusion precedence + AMBIGUOUS/HOLD, followed by the existing Search Profile direction matcher and existing score.**
+**Eligibility Gate + Role Family + Delivery Domain + explicit exclusion precedence + AMBIGUOUS/HOLD, followed by the existing Search Profile direction matcher and existing score.**
 
 We intentionally reject the alternatives of merely increasing similarity thresholds or maintaining an ever-growing blacklist, because both approaches either destroy recall or become brittle and unmaintainable.
