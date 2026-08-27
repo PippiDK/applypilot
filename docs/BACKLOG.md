@@ -2,6 +2,69 @@
 
 Living backlog for the active TEST product. Items remain here until explicitly implemented and verified; presence in this file does **not** mean a feature is shipped.
 
+## MILESTONE ROADMAP
+
+ApplyPilot is now organized around one end-to-end user journey:
+
+`FOUND → UNDERSTOOD → CHOSEN → ADAPTED → ENHANCEMENTS`
+
+| Milestone | User outcome | Current state | Rule until Tuesday |
+| --- | --- | --- | --- |
+| **M1 — FOUND** | The user gets vacancies that are genuinely worth reviewing. | DEMO-READY / REGRESSION | Regression, bugs and stability only. Do not expand Search core. |
+| **M2 — UNDERSTOOD** | The user understands why the vacancy fits, what is missing and what is merely not evidenced. | DEMO-READY / REGRESSION | Regression, bugs and stability only. |
+| **M3 — CHOSEN** | The user knows which existing CV is strongest for the Full JD and whether it can be used as-is. | DEMO-READY / REGRESSION | Regression, bugs and stability only. |
+| **M4 — ADAPTED** | The user gets a truthful vacancy-specific CV ready for application. | NEXT / IN PROGRESS | This is the only product feature work before the meeting. Finish it, then run end-to-end regression. |
+| **M5 — ENHANCEMENTS** | Everything beyond the core M1–M4 journey: persistence, automation, extra sources, geography, dashboard, tracking, analytics, scale and further UX. | FROZEN UNTIL AFTER TUESDAY | Do not build before the meeting. Optional Quick Start only if M1–M4 are already green. |
+
+### M1 — FOUND · Definition of Done
+
+- Search is stable across `1 / 3 / 7 / 14 days`;
+- Full JD is read where available;
+- good vacancies are not silently lost;
+- repeated Search does not create unexplained duplicates/instability;
+- Audit Log shows what was discovered, excluded and why;
+- frozen Search core remains protected by regression.
+
+User result: **“These are the jobs actually worth my attention.”**
+
+### M2 — UNDERSTOOD · Definition of Done
+
+- fit / strengths / gaps are understandable;
+- vacancy facts are clearly separated from AI interpretation;
+- missing evidence is not converted into invented candidate experience;
+- Expertise / analysis remains reproducible enough for the demo path;
+- the user can decide whether the vacancy deserves more time.
+
+User result: **“I understand whether this job is worth pursuing and why.”**
+
+### M3 — CHOSEN · Definition of Done
+
+- CV1 / CV2 / CV3 can be compared against one Full JD;
+- Best CV recommendation is explainable;
+- the user keeps final control;
+- `USE AS IS` is shown when no adaptation is justified;
+- `UPDATE RECOMMENDED` is shown when adaptation would materially improve presentation.
+
+User result: **“I know which of my CVs to send.”**
+
+### M4 — ADAPTED · Definition of Done
+
+- the user can choose CV1 / CV2 / CV3 as the adaptation baseline;
+- the recommended Best CV is highlighted but never forced;
+- AI changes emphasis, ordering and wording without inventing experience;
+- Truth Guard remains mandatory;
+- changes can be reviewed before acceptance;
+- the final state is clearly application-ready;
+- the complete path works without manual JD copy/paste between tools.
+
+User result: **“I have the right truthful CV ready to apply.”**
+
+### M5 — ENHANCEMENTS
+
+This is the post-core improvement bucket. It includes Persistent Job Memory, NEW/SEEN/UPDATED, Location & Commute Gate, Jobindex, Target Company career sites, cross-source deduplication, Daily Search, filters/sorting, dashboard, application tracking, analytics, payments, outcome learning and future scaling work.
+
+Rule: if ApplyPilot can already complete `FOUND → UNDERSTOOD → CHOSEN → ADAPTED` without it, it belongs in **M5**.
+
 ## DEMO SCOPE FREEZE — UNTIL TUESDAY
 
 The only product journey to finish before the meeting is:
@@ -9,12 +72,12 @@ The only product journey to finish before the meeting is:
 `find → understand why → choose Best CV → adapt`
 
 Until the Tuesday meeting:
-- finish **AI CV Adaptation**;
-- then do regression, bug fixing, stability and demo-path verification only;
-- do **not** add Location Gate, Jobindex, Target Company sources, new filters, dashboard expansion or other roadmap features;
+- **M1–M3:** regression, bug fixing, stability and demo-path verification only;
+- **M4:** finish AI CV Adaptation, then run full end-to-end regression;
+- **M5:** frozen — do **not** add Location Gate, Jobindex, Target Company sources, new filters, dashboard expansion or other roadmap features;
 - a concise 2–4 page Quick Start / user manual is optional only if the core demo flow is already regression-green. Documentation must not delay stability work.
 
-## NEXT — BEFORE TUESDAY
+## M4 — ADAPTED / NEXT — BEFORE TUESDAY
 
 ### AI CV Adaptation
 
@@ -29,7 +92,7 @@ Acceptance direction:
 - Truth Guard remains mandatory: no invented skills, employers, achievements or responsibilities;
 - provide preview + accept/reject + save workflow.
 
-## NEXT — AFTER TUESDAY
+## M5 — ENHANCEMENTS / AFTER TUESDAY
 
 ### Persistent Job Analysis
 
