@@ -5,6 +5,8 @@ const clean=value=>String(value??'')
   .replace(/\s+/g,' ')
   .trim()
 
+const MANAGEMENT_FAMILIES=new Set(['delivery-management','implementation-transformation'])
+
 function normalizeRole(value=''){
   return clean(value).replace(/-/g,' ')
     .replace(/\bprogramme\b/g,'program')
@@ -57,4 +59,10 @@ export function classifyProfileRoleFamily(job={}){
   if(evidence) return {family:'specialist',evidence}
 
   return {family:'other',evidence:[]}
+}
+
+export function profileRoleFamiliesCompatible(jobFamily='',directionFamily=''){
+  if(!jobFamily||!directionFamily||jobFamily==='other'||directionFamily==='other') return false
+  if(jobFamily===directionFamily) return true
+  return MANAGEMENT_FAMILIES.has(jobFamily)&&MANAGEMENT_FAMILIES.has(directionFamily)
 }
