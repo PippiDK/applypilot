@@ -59,7 +59,7 @@ test('existing IT Project Manager profile still keeps a credible PM baseline vac
 test('deterministic company exclusion rejects an otherwise relevant profile match',async()=>{
   const fetcher=scenarioFetcher({
     searchHtml:card('5555555555','Software Developer','NoGo Corp'),
-    details:{'5555555555':detailHtml({title:'Software Developer',company:'NoGo Corp',description:'Develop, test and maintain production software and APIs. '.repeat(6)})}
+    details:{'5555555555':detailHtml({title:'Software Developer',company:'NoGo Corp',description:'Develop, test and maintain production software and APIs. '.repeat(8)})}
   })
   const exclusionRules=[{category:'company',operator:'exclude',value:'NoGo Corp',unit:'',evaluation:'deterministic',originalText:'No NoGo Corp'}]
   const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:plan('Software Developer'),exclusionRules,fetcher,now:new Date('2026-08-27T12:00:00Z')})
