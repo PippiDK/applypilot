@@ -53,7 +53,7 @@ export function composeSearchRunResult(run={},candidateRows=[]){
   }
 }
 
-export async function createPersistentSearchRun({supabase,userId,freshnessDays,unionSearchPlan,exclusionRules,discoveryState,evaluationVersion='profile-v1'}={}){
+export async function createPersistentSearchRun({supabase,userId,freshnessDays,unionSearchPlan,exclusionRules,discoveryState,evaluationVersion='profile-semantic-v1'}={}){
   const payload={
     user_id:userId,
     status:'DISCOVERING',
