@@ -12,7 +12,7 @@ function detail(candidate){
 }
 
 function genericDetail(candidate){
-  const description='Lead complex cross-functional initiatives, stakeholders, plans, risks, milestones, dependencies and delivery.'
+  const description='Lead complex cross-functional initiatives, stakeholders, plans, risks, milestones, dependencies and delivery. '.repeat(5)
   const data={"@context":"https://schema.org","@type":"JobPosting",title:candidate.title,datePosted:'2026-08-27',validThrough:'2026-09-30',employmentType:'FULL_TIME',hiringOrganization:{"@type":"Organization",name:candidate.company},jobLocation:{"@type":"Place",address:{"@type":"PostalAddress",addressLocality:'Copenhagen',addressCountry:'Denmark'}},description}
   return `<html><head><script type="application/ld+json">${JSON.stringify(data)}</script></head><body><div class="show-more-less-html__markup">${description}</div></body></html>`
 }
