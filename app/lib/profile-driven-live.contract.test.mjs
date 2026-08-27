@@ -17,3 +17,8 @@ test('LIVE Search keeps the frozen legacy endpoint as fallback',()=>{
 test('profile-driven LIVE endpoint exists separately from the frozen legacy endpoint',()=>{
   assert.equal(fs.existsSync(routePath),true)
 })
+
+test('LIVE meta labels returned matches as worthwhile instead of calling every evaluated JD worthwhile',()=>{
+  assert.match(page,/state\.stats\.returned}<\/b> worthwhile matches/)
+  assert.doesNotMatch(page,/state\.stats\.evaluated}<\/b> worthwhile after evaluation/)
+})
