@@ -1,4 +1,9 @@
+import {classifyProfileRoleFamily} from './profile-role-family.js'
+import {classifyDeliveryDomain} from './profile-delivery-domain.js'
+import {semanticProfileExclusion} from './profile-semantic-exclusions.js'
+
 const WINDOWS=new Set([1,3,7,14])
+const TARGET_ROLE_FAMILIES=new Set(['delivery-management','implementation-transformation'])
 const GENERIC_ROLE_WORDS=new Set(['senior','sr','junior','jr','principal','global','regional','international','experienced','manager','lead','specialist','consultant','coordinator'])
 const EXECUTIVE_TITLE=/\b(head of|director|vice president|vp|chief)\b/
 const TECHNOLOGY_DIRECTION=/\b(it|information technology|technology|technical|digital|software|systems?|platform|cloud|data|cyber|integration|teknisk|digitalisering|systemer|platforme|integrationer)\b/
@@ -176,6 +181,17 @@ function deterministicExclusion(job,rules=[]){
   return null
 }
 
+function domainRejectReason(classification={}){
+  if(classification.domain==='NON_TARGET_PHYSICAL') return 'Delivery domain is physical construction / civil infrastructure rather than target technology delivery'
+  if(classification.domain==='NON_TARGET_FUNCTIONAL') return 'Delivery domain is function-specific rather than target technology delivery'
+  if(classification.domain==='EXCLUDED_SPECIALISM'){
+    if(classification.evidence?.includes('erp')) return 'ERP specialist role is outside the target delivery domain'
+    if(classification.evidence?.includes('r&d')) return 'R&D specialist role is outside the target delivery domain'
+    return 'Specialist domain is outside the target technology delivery scope'
+  }
+  return 'Delivery domain is outside the target technology delivery scope'
+}
+
 function withinFreshness(publishedAt,days,now){
   if(!publishedAt) return false
   const published=new Date(publishedAt)
@@ -193,6 +209,24 @@ export function evaluateProfileJob({candidate={},job,freshnessDays=7,exclusionRu
   if(!withinFreshness(job.publishedAt,days,now)) return {keep:false,evaluated:false,stage:'FRESHNESS_REJECT',decision:'REJECT',reason:`Vacancy is outside the selected ${days}-day window`,score:null,evaluation:null}
   const exclusion=deterministicExclusion(job,exclusionRules)
   if(exclusion) return {keep:false,evaluated:false,stage:'PROFILE_EXCLUSION_REJECT',decision:'REJECT',reason:exclusion,score:null,evaluation:null}
+
+  const domainClassification=classifyDeliveryDomain(job)
+  const semanticExclusion=semanticProfileExclusion(job,exclusionRules,domainClassification)
+  if(semanticExclusion) return {keep:false,evaluated:false,stage:'PROFILE_EXCLUSION_REJECT',decision:'REJECT',reason:semanticExclusion,score:null,evaluation:null}
+
+  const roleFamily=classifyProfileRoleFamily(job)
+  if(!TARGET_ROLE_FAMILIES.has(roleFamily.family)){
+    return {keep:false,evaluated:true,stage:'PROFILE_ROLE_FAMILY_REJECT',decision:'REJECT',reason:'Vacancy professional role family is not project/delivery/implementation/transformation management',score:0,evaluation:null}
+  }
+
+  if(['NON_TARGET_PHYSICAL','NON_TARGET_FUNCTIONAL','EXCLUDED_SPECIALISM'].includes(domainClassification.domain)){
+    return {keep:false,evaluated:true,stage:'PROFILE_DOMAIN_REJECT',decision:'REJECT',reason:domainRejectReason(domainClassification),score:0,evaluation:null}
+  }
+
+  if(domainClassification.domain==='AMBIGUOUS'){
+    return {keep:false,evaluated:true,stage:'PROFILE_DOMAIN_AMBIGUOUS',decision:'HOLD',reason:'Delivery domain is not sufficiently confirmed from the Full JD',score:null,evaluation:null}
+  }
+
   const result=profileEvaluation(job,candidate.foundBy)
   if(!result.pass) return {keep:false,evaluated:true,stage:'PROFILE_ROLE_REJECT',decision:'REJECT',reason:result.reason,score:0,evaluation:null}
   const evaluation=result.evaluation
