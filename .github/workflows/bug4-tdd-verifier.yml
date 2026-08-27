@@ -12,4 +12,4 @@ jobs:
         with:
           node-version: '24'
       - run: npm install
-      - run: node --test app/lib/profile-role-family.test.mjs app/lib/profile-delivery-domain.test.mjs app/lib/profile-semantic-exclusions.test.mjs
+      - run: node --test app/lib/profile-role-family.test.mjs app/lib/profile-delivery-domain.test.mjs app/lib/profile-semantic-exclusions.test.mjs app/lib/profile-eligibility-gate-regression.test.mjs app/lib/profile-role-confirmation-regression.test.mjs
