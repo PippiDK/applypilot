@@ -19,15 +19,15 @@ test('page wires the edited draft into a saved Union Search Plan preview',async(
   assert.match(source,/<SearchPlanPreview plan=\{draftUnionSearchPlan\}\/>/)
 })
 
-test('legacy LinkedIn request stays isolated while shadow receives the saved plan',async()=>{
+test('saved Union Search Plan drives profile LIVE while legacy fallback stays isolated',async()=>{
   const source=await readFile(pageUrl,'utf8')
   const searchStart=source.indexOf('async function search(){')
   const searchEnd=source.indexOf('\n  function startProfile()',searchStart)
   assert.ok(searchStart>=0&&searchEnd>searchStart,'search() block must be found')
   const searchBlock=source.slice(searchStart,searchEnd)
   const legacyLine=searchBlock.split('\n').find(line=>line.includes("fetch('/api/linkedin-search'"))||''
-  assert.match(searchBlock,/fetch\('\/api\/linkedin-shadow-search'/)
-  assert.match(searchBlock,/JSON\.stringify\(\{freshnessDays,unionSearchPlan:profile\.unionSearchPlan\}\)/)
+  assert.match(searchBlock,/fetch\('\/api\/linkedin-profile-search'/)
+  assert.match(searchBlock,/JSON\.stringify\(\{freshnessDays,unionSearchPlan:profile\.unionSearchPlan,exclusionRules:Array\.isArray\(profile\.exclusionRules\)\?profile\.exclusionRules:\[\]\}\)/)
   assert.match(legacyLine,/JSON\.stringify\(\{freshnessDays,cvText:cvData\.cvText\}\)/)
-  assert.doesNotMatch(legacyLine,/unionSearchPlan|primaryRoles|adjacentRoles/)
+  assert.doesNotMatch(legacyLine,/unionSearchPlan|primaryRoles|adjacentRoles|exclusionRules/)
 })
