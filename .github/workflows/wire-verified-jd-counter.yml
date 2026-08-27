@@ -1,0 +1,41 @@
+name: Wire Verified JD Counter
+
+on:
+  push:
+    branches:
+      - feature/cv-library-3-slots
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, 'wire verified JD counter') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch verified JD UI mapping exactly
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('app/page.js')
+          s=p.read_text()
+          old_progress="fullJdVerified:Number(progress.fullJdProcessed??current.stats?.fullJdVerified??0),"
+          new_progress="fullJdVerified:Number(progress.fullJdVerified??current.stats?.fullJdVerified??0),"
+          old_result="const stats={...(data.stats||{}),fullJdVerified:Number(data.stats?.fullJdVerified??data.stats?.fullJdProcessed??0)}"
+          new_result="const stats={...(data.stats||{}),fullJdVerified:Number(data.stats?.fullJdVerified??0)}"
+          assert old_progress in s
+          assert old_result in s
+          s=s.replace(old_progress,new_progress,1)
+          s=s.replace(old_result,new_result,1)
+          p.write_text(s)
+          PY
+      - name: Commit verified JD UI mapping
+        run: |
+          git config user.name "ApplyPilot CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add app/page.js
+          git commit -m "fix: wire verified JD counter"
+          git push origin HEAD:feature/cv-library-3-slots
