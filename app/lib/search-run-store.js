@@ -41,13 +41,14 @@ export function composeSearchRunResult(run={},candidateRows=[]){
     .sort((a,b)=>Number(b.evaluation?.score||0)-Number(a.evaluation?.score||0)||(new Date(b.job?.publishedAt||0)-new Date(a.job?.publishedAt||0)))
   const audit=rows.map(row=>({jobId:String(row.job_id??''),title:row.job?.title||row.candidate?.title||'',company:row.job?.company||row.candidate?.company||'',...(row.audit||{})}))
   const fullJdProcessed=rows.filter(row=>row.detail_status==='PROCESSED'||row.detail_status==='UNVERIFIED').length
+  const fullJdVerified=rows.filter(row=>row.detail_status==='PROCESSED').length
   return {
     runId:run.id,
     status:run.status,
     jobs,
     audit,
     coverage:run.coverage||{status:run.status==='ACCESS_LIMITED'?'ACCESS LIMITED':run.status==='COMPLETE'?'SEARCHED':'SEARCHING'},
-    stats:{...(run.stats||{}),discovered:Number(run.stats?.discovered??rows.length),fullJdProcessed,returned:jobs.length,evaluated:jobs.length},
+    stats:{...(run.stats||{}),discovered:Number(run.stats?.discovered??rows.length),fullJdProcessed,fullJdVerified,returned:jobs.length,evaluated:jobs.length},
     fetchedAt:run.updated_at||null,
   }
 }
@@ -61,7 +62,7 @@ export async function createPersistentSearchRun({supabase,userId,freshnessDays,u
     exclusion_rules:Array.isArray(exclusionRules)?exclusionRules:[],
     evaluation_version:evaluationVersion,
     discovery_state:discoveryState||{},
-    stats:{discovered:0,fullJdProcessed:0},
+    stats:{discovered:0,fullJdProcessed:0,fullJdVerified:0},
     coverage:{status:'SEARCHING',detail:null},
     updated_at:nowIso(),
   }
