@@ -1,233 +1,111 @@
-# LinkedIn Profile Search — Exhaustive Batched Pipeline Design
+# LinkedIn Profile Search — Persistent Resumable Search Run Design
 
 Date: 2026-08-27
 Branch: `feature/cv-library-3-slots`
-Status: Approved in chat; written design pending user review before implementation
-
-## Problem
-
-The profile-driven LinkedIn search currently attempts discovery and Full JD retrieval inside one server request.
-
-Two independent ceilings prevent complete 3/7/14-day coverage:
-
-1. The stable LinkedIn fetcher has one shared time budget for the whole request while pacing requests conservatively. Discovery and Full JD reads compete for the same budget.
-2. Discovery uses fixed `start` values, so pagination stops at predetermined offsets instead of continuing until LinkedIn itself reaches the end of accessible results.
-
-This causes large searches to return partial output: discovery may find many jobs, but later Full JD reads fail once the shared request budget is exhausted. The application can therefore silently miss otherwise valid matches.
+Status: Approved for implementation
 
 ## Goal
 
-Keep the user interaction as one Search action while changing the internal execution model to:
+Keep one user-visible **Search LinkedIn** action while replacing the single 300-second request with a resumable state machine:
 
-**Discovery → all accessible pages → Full JD batches → evaluation → one accumulated result**
+**Create Search Run → exhaustive observable discovery → adaptive Full JD batches → existing evaluation → COMPLETE / ACCESS LIMITED**
 
-The search must process all jobs that are accessible through LinkedIn's public endpoints during that run, subject only to explicit LinkedIn access failures. Access failures must be visible as `ACCESS LIMITED`; they must not be silently treated as a complete search.
+The run must survive browser refresh/close in production and must never silently claim full coverage when LinkedIn blocks required public pages.
 
-## Non-goals / frozen behavior
+## Frozen behavior
 
-This change must not alter:
+Do not change Search relevance scoring, Search Profile semantics, Union Search Plan semantics, BUG #3 multilingual role confirmation, role thresholds, exclusions, CV selection/comparison/tailoring, or job statuses. `main` and deployment remain untouched unless separately authorized.
 
-- Search relevance scoring
-- Search Profile semantics
-- Union Search Plan semantics
-- BUG #3 multilingual role-confirmation behavior
-- Role matching rules or thresholds
-- Exclusion rules
-- CV selection, CV comparison, or CV tailoring logic
-- Existing job status behavior
-- `main`
+## Persistence model
 
-The change is transport/orchestration only.
+Production persists Search Run state in Supabase with RLS ownership by `auth.uid()`:
 
-## Architecture
+- `search_runs`: run status, freshness window, immutable Search Profile snapshot, discovery cursor/state, stats, coverage, evaluation version, timestamps.
+- `search_candidates`: one row per `(run_id, LinkedIn job_id)`, deduplicated candidate metadata, merged `foundBy`, detail status, parsed JD, evaluation, audit/error.
 
-### 1. Client-orchestrated resumable search
+Preview uses the same state-machine contracts with a `sessionStorage` adapter because the existing preview auth bypass intentionally has no real Supabase user session. This keeps TEST safe without introducing a server secret or weakening RLS.
 
-The browser remains responsible for a single user-visible Search action, but internally performs multiple authenticated API calls.
+## Discovery state machine
 
-The UI owns the temporary run state while the search is active:
+For every Search Profile direction, pagination advances `start=0,25,50,75,100,...` with no predetermined ceiling.
 
-- discovered candidates keyed by LinkedIn job ID
-- per-candidate `foundBy` Search Profile directions
-- discovery progress
-- Full JD progress
-- accumulated audit rows
-- accumulated kept jobs
-- access-limit diagnostics
+A direction completes only on source-derived evidence:
 
-No persistent database is required for this step.
+1. empty page;
+2. exact repeated page fingerprint / repeated job-ID sequence; or
+3. two consecutive pages producing zero new job IDs.
 
-### 2. Resumable discovery batches
+A non-retryable/access failure marks that direction and the overall run `ACCESS LIMITED` rather than `COMPLETE`.
 
-Add a profile discovery batch API that accepts the current discovery cursor and returns the next bounded amount of work.
+Each server invocation processes a bounded number of page requests and returns a checkpoint. Candidate IDs are merged globally; duplicate vacancies preserve all `foundBy` directions.
 
-Conceptual request:
+Completeness means **all observable results returned by LinkedIn's public endpoint during this run**, not all jobs that may exist internally on LinkedIn.
 
-```json
-{
-  "freshnessDays": 7,
-  "unionSearchPlan": { "directions": [] },
-  "cursor": { ... }
-}
-```
+## Full JD processor
 
-Conceptual response:
+Full JD work is adaptive rather than a fixed mandatory batch size.
 
-```json
-{
-  "candidates": [],
-  "cursor": { ... },
-  "complete": false,
-  "stats": { ... },
-  "coverage": { ... }
-}
-```
+- maximum candidates per invocation: 30;
+- stop earlier when the invocation approaches its safe time budget;
+- preserve the existing stable fetcher pacing/retry behavior;
+- checkpoint every processed candidate;
+- candidate 31+ continues in the next invocation;
+- failures are `UNVERIFIED` and contribute to `ACCESS LIMITED`; later candidates continue.
 
-The cursor records enough state to resume without repeating already-completed pagination work, including the current direction and next `start` offset.
+The JD processor reuses the existing profile evaluation functions. Scoring and BUG #3 behavior are not reimplemented.
 
-Pagination for each Search Profile direction advances:
+## Idempotency
 
-`0 → 25 → 50 → 75 → 100 → ...`
+Every mutation is idempotent:
 
-There is no fixed 25/50/75 ceiling.
+- candidate uniqueness is `(run_id, job_id)`;
+- rediscovering a job only merges `foundBy`;
+- a processed JD is not processed again unless explicitly reset;
+- retrying the same discovery checkpoint cannot create duplicate jobs;
+- run status transitions are monotonic except explicit cancellation/retry actions.
 
-A direction stops only when one of these evidence-based terminal conditions occurs:
+## API boundaries
 
-- LinkedIn returns an empty page;
-- LinkedIn repeats a page already seen for that direction (page fingerprint / repeated job-ID sequence);
-- LinkedIn returns an explicit non-retryable access failure for that page, in which case coverage is marked `ACCESS LIMITED` and the failure is retained in diagnostics.
+- `POST /api/linkedin-profile-search/run` — create a run from the current Search Profile snapshot.
+- `POST /api/linkedin-profile-search/discover` — execute the next bounded discovery chunk and checkpoint it.
+- `POST /api/linkedin-profile-search/process` — process the next adaptive pending JD chunk and checkpoint results.
+- `GET /api/linkedin-profile-search/run?id=...` — load/resume a production run.
 
-A batch processes only a bounded number of LinkedIn search-page requests so each server invocation remains comfortably below the route/fetcher budget. If more work remains, the response returns `complete:false` plus the next cursor and the browser immediately requests the next batch.
+Preview may carry/checkpoint run state client-side while calling the same discovery/process batch logic.
 
-### 3. Candidate accumulation and deduplication
+## UI
 
-The browser merges discovery results by LinkedIn job ID.
-
-If the same vacancy is discovered by multiple role directions, it remains one candidate and its `foundBy` directions are merged exactly as today.
-
-Discovery progress can be presented as, for example:
-
-`Discovered 287 jobs · searching all available pages…`
-
-The user does not need to click again.
-
-### 4. Full JD batches
-
-After discovery completes, the client submits discovered candidates to a Full JD/evaluation batch API in bounded slices.
-
-Default target batch size: **32 candidates**.
-
-The batch size is an implementation constant, not a user setting. It can be tuned later without changing product semantics.
-
-Each batch:
-
-1. retrieves Full JD for each supplied candidate using the existing stable LinkedIn fetcher;
-2. parses the JD with existing parsing logic;
-3. runs the existing freshness, exclusion, role-confirmation, and Search Profile evaluation logic unchanged;
-4. returns kept jobs plus audit rows and diagnostics for that slice.
-
-Each Full JD batch gets a fresh fetcher/request budget, eliminating the current single-request exhaustion problem.
-
-The browser accumulates all slice results into one logical search result.
-
-Progress can be displayed as:
+The user still clicks once. UI automatically advances the run and displays progress such as:
 
 `Discovered 287 · Full JDs read 120 / 287`
 
-### 5. Search completion semantics
+Final states:
 
-A run is `SEARCHED` only when:
+- `COMPLETE` — all observable discovery directions reached a source-derived end and all candidates were processed;
+- `ACCESS LIMITED` — any required page/JD remained inaccessible or unverified;
+- `FAILED` — orchestration cannot safely continue;
+- `CANCELLED` — explicit user cancellation.
 
-- discovery reached an evidence-based terminal condition for every role direction; and
-- every discovered candidate was either fully processed or explicitly classified as inaccessible/unverified.
+Refresh/return in production reloads the active run and continues from the persisted checkpoint.
 
-A run is `ACCESS LIMITED` when any required public LinkedIn page or Full JD cannot be retrieved after the existing retry policy.
+## Security
 
-`ACCESS LIMITED` is not treated as zero relevance and does not silently imply complete source coverage.
+All public Supabase tables have RLS enabled. Authenticated users may only select/insert/update/delete rows owned through their `search_runs.user_id = auth.uid()`. No service-role/secret key is exposed to the browser. Supabase clients are created per request.
 
-The final accumulated result still exposes the existing jobs/audit/stats shapes as far as possible so current UI consumers do not need scoring or job-card changes.
+## Versioning
 
-### 6. Retry and rate-limit behavior
-
-Keep the existing conservative stable-fetcher behavior inside each API invocation.
-
-Do not solve this problem by aggressively increasing concurrency or reducing pacing. The design prefers additional safe server calls over higher pressure on LinkedIn public endpoints.
-
-A failed batch may be retried by the orchestration layer only where doing so preserves the existing retry/access semantics. Permanent failure must remain visible as `ACCESS LIMITED`.
-
-## API / module boundaries
-
-Implementation should preserve existing pure logic and separate orchestration from evaluation.
-
-Expected additions/changes:
-
-- new resumable discovery-batch module and API route;
-- new Full JD/evaluation-batch module and API route;
-- small client orchestration helper for the multi-call search run;
-- `app/page.js` search action updated to consume progress and accumulate final results;
-- existing `linkedin-profile-search.js` evaluation logic reused/extracted rather than rewritten;
-- `linkedin-profile-discovery.js` pagination logic reused/extracted where possible, with fixed-page planning removed from the live profile-driven path;
-- `linkedin-stable-fetcher.js` behavior unchanged unless a test proves a transport-only hook is required.
-
-The old single-request profile route may remain temporarily for compatibility/tests, but the live UI should use the batched path once verified.
-
-## Testing strategy
-
-TDD is required.
-
-### Discovery regression tests
-
-Prove that:
-
-- pages advance beyond `start=50`;
-- a 3-day search can reach `start=75/100+` when LinkedIn keeps returning unique rows;
-- a 7-day and 14-day search have no predetermined pagination ceiling;
-- empty page terminates a direction;
-- repeated page fingerprint terminates a direction without an infinite loop;
-- duplicates across pages/directions merge by job ID while preserving `foundBy` provenance;
-- access failure is reported as `ACCESS LIMITED`, not as successful complete coverage.
-
-### Full JD batch tests
-
-Prove that:
-
-- more candidates than one batch size are processed across multiple batches;
-- candidate 33+ is not lost when batch size is 32;
-- results and audit rows from all batches are accumulated;
-- a failed JD is visible as unverified/access-limited while later candidates still run in later batches;
-- existing profile evaluation output for the same JD remains unchanged.
-
-### Frozen-logic regression tests
-
-Re-run existing tests covering:
-
-- Search Profile / Union Search Plan;
-- multilingual BUG #3 cases: Atea, PET, Regionshospitalet keep; Energinet reject;
-- existing scoring/evaluation contracts;
-- CV-related contracts relevant to search wiring.
-
-### Build verification
-
-Run targeted new tests, relevant existing regression tests, full repository test suite with known unrelated legacy UI failures reported separately if still present, and `npm run build` on the same Node version used for current verification.
-
-## Rollout safety
-
-Implementation is only on `feature/cv-library-3-slots`.
-
-`vercel.json` deployment gate remains closed during development.
-
-No TEST deployment occurs without explicit user authorization.
-
-`main` remains untouched.
+Each run stores an evaluation version plus its Search Profile/Union Search Plan snapshot. Historical results therefore remain attributable to the rules used when the run was created.
 
 ## Acceptance criteria
 
-The change is accepted when all of the following are demonstrated:
-
-1. Discovery can paginate beyond all previous fixed offsets and stops only on source-derived terminal evidence or explicit access failure.
-2. A simulated candidate set larger than one Full JD batch is completely processed across multiple API calls.
-3. The final UI result is the union of all completed batches with no candidate loss at batch boundaries.
-4. Progress reports discovered count and Full JD processed count during the run.
-5. `ACCESS LIMITED` is shown whenever source coverage is incomplete.
-6. Existing Search relevance/scoring, Search Profile, role matching, BUG #3 behavior, and CV logic are unchanged.
-7. No deployment and no `main` changes occur as part of implementation unless separately authorized.
+1. Discovery reaches `start=75/100+` when unique rows continue.
+2. No fixed pagination ceiling exists for 3/7/14 days.
+3. Empty, exact repeat, or two consecutive no-new pages terminate a direction.
+4. Duplicate job IDs merge while preserving all `foundBy` provenance.
+5. More than 30 candidates are processed across multiple JD invocations without loss.
+6. Adaptive time budget may return fewer than 30 and resumes cleanly.
+7. Refresh/reload can resume a production run from Supabase.
+8. Preview executes the same state machine using session persistence.
+9. Any inaccessible discovery page or JD produces `ACCESS LIMITED`.
+10. Existing scoring, Search Profile, BUG #3, role matching, exclusions and CV behavior remain unchanged.
+11. No TEST deployment and no `main` changes occur without separate authorization.
