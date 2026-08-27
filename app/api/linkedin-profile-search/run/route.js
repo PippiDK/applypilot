@@ -3,7 +3,7 @@ import {randomUUID} from 'node:crypto'
 import {requireUser} from '../../../lib/auth/require-user.js'
 import {createServerSupabaseClient} from '../../../lib/supabase/server.js'
 import {createDiscoveryState} from '../../../lib/linkedin-profile-discovery-batch.js'
-import {createPersistentSearchRun,loadPersistentSearchRun,composeSearchRunResult} from '../../../lib/search-run-store.js'
+import {createPersistentSearchRun,loadPersistentSearchRun,loadLatestActiveSearchRun,composeSearchRunResult} from '../../../lib/search-run-store.js'
 
 export const runtime='nodejs'
 export const dynamic='force-dynamic'
@@ -39,11 +39,21 @@ export async function POST(request){
 export async function GET(request){
   const auth=await requireUser()
   if(!auth.user) return auth.response
-  if(isPreview()) return NextResponse.json({error:'Preview Search Runs resume from browser session state.'},{status:409})
   try{
-    const runId=new URL(request.url).searchParams.get('id')||''
-    if(!runId) return NextResponse.json({error:'Search Run id is required.'},{status:400})
+    const params=new URL(request.url).searchParams
+    const wantsActive=params.get('active')==='1'
+    if(isPreview()){
+      if(wantsActive) return NextResponse.json({active:false,mode:'preview'})
+      return NextResponse.json({error:'Preview Search Runs resume from browser session state.'},{status:409})
+    }
     const supabase=await createServerSupabaseClient()
+    if(wantsActive){
+      const snapshot=await loadLatestActiveSearchRun({supabase,userId:auth.user.id})
+      if(!snapshot) return NextResponse.json({active:false,mode:'persistent'})
+      return NextResponse.json({active:true,mode:'persistent',run:snapshot.run,candidates:[]})
+    }
+    const runId=params.get('id')||''
+    if(!runId) return NextResponse.json({error:'Search Run id is required.'},{status:400})
     const snapshot=await loadPersistentSearchRun({supabase,userId:auth.user.id,runId})
     return NextResponse.json({mode:'persistent',run:snapshot.run,candidates:snapshot.candidates,result:composeSearchRunResult(snapshot.run,snapshot.candidates)})
   }catch(error){
