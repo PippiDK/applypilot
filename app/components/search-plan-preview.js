@@ -6,14 +6,13 @@ export default function SearchPlanPreview({plan}){
     ?'MANUAL'
     :(Array.isArray(direction.cvSlots)&&direction.cvSlots.length?direction.cvSlots.map(slot=>`CV ${slot}`).join(' · '):'CV')
 
-  return <div className="truth searchPlanPreview">
-    <b>SEARCH PLAN PREVIEW · {directions.length} DIRECTIONS</b>
-    <span>{primaryCount} primary · {adjacentCount} adjacent</span>
-    <div>
+  return <details className="truth searchPlanPreview">
+    <summary><b>Search plan details</b><span>{directions.length} directions · {primaryCount} primary · {adjacentCount} adjacent</span></summary>
+    <div className="searchPlanDirections">
       {directions.map(direction=><div className="reviewRow" key={`${direction.tier}:${direction.key}`}>
         <span>{direction.role}</span>
         <b>{direction.tier==='primary'?'PRIMARY':'ADJACENT'} · {sourceLabel(direction)}</b>
       </div>)}
     </div>
-  </div>
+  </details>
 }
