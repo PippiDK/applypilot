@@ -5,14 +5,17 @@ function throwIf(error,message){
 }
 
 export function candidateRowsForUpsert(runId,candidates=[]){
-  return (Array.isArray(candidates)?candidates:[]).map(candidate=>({
-    run_id:runId,
-    job_id:String(candidate?.jobId??''),
-    candidate:{...candidate,foundBy:undefined},
-    found_by:Array.isArray(candidate?.foundBy)?candidate.foundBy:[],
-    detail_status:'PENDING',
-    updated_at:nowIso(),
-  })).filter(row=>row.job_id)
+  return (Array.isArray(candidates)?candidates:[]).map(candidate=>{
+    const {foundBy,...candidateData}=candidate||{}
+    return {
+      run_id:runId,
+      job_id:String(candidate?.jobId??''),
+      candidate:candidateData,
+      found_by:Array.isArray(foundBy)?foundBy:[],
+      detail_status:'PENDING',
+      updated_at:nowIso(),
+    }
+  }).filter(row=>row.job_id)
 }
 
 export function processedRowPatch(row={}){
