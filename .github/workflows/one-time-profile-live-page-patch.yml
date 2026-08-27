@@ -1,0 +1,65 @@
+name: One-time profile LIVE page patch
+
+on:
+  push:
+    branches:
+      - feature/cv-library-3-slots
+    paths:
+      - .github/workflows/one-time-profile-live-page-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch LIVE search wiring
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('app/page.js')
+          source = path.read_text()
+          start = source.index('  async function search(){')
+          end = source.index('\n  function startProfile()', start)
+          old = source[start:end]
+          assert "/api/linkedin-shadow-search" in old
+          assert "/api/linkedin-profile-search" not in old
+          new = '''  async function search(){
+            if(!resumeLoaded){
+              setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[]})
+              return
+            }
+            setJobs([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
+            setShadowState({status:'skipped',error:'',stats:null,coverage:null,comparison:null})
+            const hasProfilePlan=Array.isArray(profile?.unionSearchPlan?.directions)&&profile.unionSearchPlan.directions.length>0
+            try{
+              const res=hasProfilePlan
+                ? await fetch('/api/linkedin-profile-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,unionSearchPlan:profile.unionSearchPlan,exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[]})})
+                : await fetch('/api/linkedin-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,cvText:cvData.cvText})})
+              const data=await res.json()
+              if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
+              setJobs(Array.isArray(data.jobs)?data.jobs:[])
+              setState({loading:false,error:'',coverage:data.coverage||null,stats:data.stats||null,fetchedAt:data.fetchedAt||null,audit:Array.isArray(data.audit)?data.audit:[]})
+            }catch(error){ setState({loading:false,error:error.message||'LinkedIn search failed',coverage:null,stats:null,fetchedAt:null,audit:[]}) }
+          }'''
+          source = source[:start] + new + source[end:]
+          source = source.replace('Find Senior IT Project & Delivery roles in Denmark.','Find the right roles for your Search Profile in Denmark.')
+          source = source.replace('LinkedIn public search → full job description → CV evaluation → worthwhile matches only.','Search Profile → LinkedIn discovery → full job description → worthwhile matches only.')
+          source = source.replace('This saves your Search Profile for the next product step. The current LinkedIn search engine remains unchanged in this milestone.','This saves your Search Profile and activates profile-driven LinkedIn discovery for future searches.')
+          assert source.count('/api/linkedin-profile-search') == 1
+          assert source.count("fetch('/api/linkedin-shadow-search'") == 0
+          assert "JSON.stringify({freshnessDays,cvText:cvData.cvText})" in source
+          path.write_text(source)
+      - name: Commit page wiring
+        run: |
+          git config user.name "PippiDK"
+          git config user.email "133820767+PippiDK@users.noreply.github.com"
+          git add app/page.js
+          git diff --cached --check
+          git commit -m "feat: promote profile discovery to LIVE"
+          git push
