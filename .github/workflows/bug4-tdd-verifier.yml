@@ -12,4 +12,4 @@ jobs:
         with:
           node-version: '24'
       - run: npm install
-      - run: node --test app/lib/profile-role-family.test.mjs
+      - run: node --test app/lib/profile-role-family.test.mjs app/lib/profile-delivery-domain.test.mjs
