@@ -11,6 +11,12 @@ function detail(candidate){
   return `<html><head><script type="application/ld+json">${JSON.stringify(data)}</script></head><body><div class="show-more-less-html__markup">${description}</div></body></html>`
 }
 
+function genericDetail(candidate){
+  const description='Lead complex cross-functional initiatives, stakeholders, plans, risks, milestones, dependencies and delivery.'
+  const data={"@context":"https://schema.org","@type":"JobPosting",title:candidate.title,datePosted:'2026-08-27',validThrough:'2026-09-30',employmentType:'FULL_TIME',hiringOrganization:{"@type":"Organization",name:candidate.company},jobLocation:{"@type":"Place",address:{"@type":"PostalAddress",addressLocality:'Copenhagen',addressCountry:'Denmark'}},description}
+  return `<html><head><script type="application/ld+json">${JSON.stringify(data)}</script></head><body><div class="show-more-less-html__markup">${description}</div></body></html>`
+}
+
 test('candidate 31+ is preserved for a later invocation when max batch is 30',async()=>{
   const fetcher=async url=>detail(candidates.find(row=>url.endsWith(row.jobId)))
   const first=await runProfileJdBatch({candidates,fetcher,freshnessDays:3,now:new Date('2026-08-27T12:00:00Z'),maxCandidates:30,safeBudgetMs:999999,clock:()=>0})
@@ -46,4 +52,31 @@ test('one inaccessible JD is UNVERIFIED but later candidates still process',asyn
   assert.equal(result.accessLimited,true)
   const failed=result.processed.find(row=>row.candidate.jobId===subset[1].jobId)
   assert.equal(failed.detailStatus,'UNVERIFIED')
+})
+
+test('ambiguous HOLD is processed and audited but excluded from worthwhile jobs',async()=>{
+  const candidate={
+    jobId:'9200000001',
+    title:'Senior Project Manager',
+    company:'Example Co',
+    location:'Denmark',
+    publishedAt:'2026-08-27',
+    foundBy:[{key:'enterprise project manager',role:'Enterprise Project Manager',tier:'primary',origin:'cv',cvSlots:[1]}],
+  }
+  const result=await runProfileJdBatch({
+    candidates:[candidate],
+    fetcher:async()=>genericDetail(candidate),
+    freshnessDays:3,
+    now:new Date('2026-08-27T12:00:00Z'),
+    maxCandidates:30,
+    safeBudgetMs:999999,
+    clock:()=>0,
+  })
+  assert.equal(result.processed.length,1)
+  assert.equal(result.jobs.length,0)
+  assert.equal(result.stats.kept,0)
+  assert.equal(result.processed[0].detailStatus,'PROCESSED')
+  assert.equal(result.processed[0].audit.stage,'PROFILE_DOMAIN_AMBIGUOUS')
+  assert.equal(result.processed[0].audit.decision,'HOLD')
+  assert.equal('score' in result.processed[0].audit,false)
 })
