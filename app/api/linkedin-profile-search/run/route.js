@@ -25,7 +25,7 @@ export async function POST(request){
     const discoveryState=createDiscoveryState(unionSearchPlan)
     if(isPreview()){
       const now=new Date().toISOString()
-      return NextResponse.json({mode:'preview',run:{id:`preview-${randomUUID()}`,status:'DISCOVERING',freshness_days:freshnessDays,union_search_plan:unionSearchPlan,exclusion_rules:exclusionRules,evaluation_version:'profile-v1',discovery_state:discoveryState,stats:{discovered:0,fullJdProcessed:0},coverage:{status:'SEARCHING',detail:null},created_at:now,updated_at:now},candidates:[]})
+      return NextResponse.json({mode:'preview',run:{id:`preview-${randomUUID()}`,status:'DISCOVERING',freshness_days:freshnessDays,union_search_plan:unionSearchPlan,exclusion_rules:exclusionRules,evaluation_version:'profile-v1',discovery_state:discoveryState,stats:{discovered:0,fullJdProcessed:0,fullJdVerified:0},coverage:{status:'SEARCHING',detail:null},created_at:now,updated_at:now},candidates:[]})
     }
     const supabase=await createServerSupabaseClient()
     const run=await createPersistentSearchRun({supabase,userId:auth.user.id,freshnessDays,unionSearchPlan,exclusionRules,discoveryState})
