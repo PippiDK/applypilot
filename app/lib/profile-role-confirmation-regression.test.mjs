@@ -54,5 +54,5 @@ test('Energinet physical green-transition investment project stays rejected for 
   const description='Du driver investeringsprojekter i den grønne omstilling med fokus på elnet, anlægsprojekter, myndighedsprocesser, entreprenører, økonomi, kvalitet og fremdrift fra planlægning til fysisk udførelse. '.repeat(4)
   const result=await runCase({id:'8300000005',title,description})
   assert.equal(result.jobs.length,0)
-  assert.equal(result.audit.some(row=>row.jobId==='8300000005'&&row.stage==='PROFILE_ROLE_REJECT'),true)
+  assert.equal(result.audit.some(row=>row.jobId==='8300000005'&&row.stage==='PROFILE_DOMAIN_REJECT'),true)
 })
