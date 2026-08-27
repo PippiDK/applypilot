@@ -16,7 +16,7 @@ import {evaluateJobConditions} from './lib/job-conditions.js'
 import {fitLabel} from './lib/fit-label.js'
 import {compareShadowToLegacy} from './lib/shadow-search-compare.js'
 import {JOB_STATUS_OPTIONS,readJobStatuses,writeJobStatus} from './lib/job-statuses.js'
-import {runProfileSearchRun,readActiveSearchRun} from './lib/profile-search-run-client.js'
+import {runProfileSearchRun,resumeActiveProfileSearchRun} from './lib/profile-search-run-client.js'
 import SearchAudit from './components/search-audit.js'
 import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
@@ -91,11 +91,8 @@ export default function Home(){
   },[])
 
   useEffect(()=>{
-    if(!readActiveSearchRun(sessionStorage)) return
-    setJobs([])
-    setState({loading:true,error:'',coverage:{source:'LinkedIn Jobs',status:'SEARCHING'},stats:{discovered:0,fullJdVerified:0,evaluated:0},fetchedAt:null,audit:[]})
-    runProfileSearchRun({resume:true,storage:sessionStorage,onProgress:applySearchProgress})
-      .then(applySearchResult)
+    resumeActiveProfileSearchRun({storage:sessionStorage,onProgress:applySearchProgress})
+      .then(result=>{if(result) applySearchResult(result)})
       .catch(error=>setState({loading:false,error:error.message||'LinkedIn search failed',coverage:null,stats:null,fetchedAt:null,audit:[]}))
   },[])
 
