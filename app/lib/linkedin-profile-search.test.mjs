@@ -56,6 +56,64 @@ test('existing IT Project Manager profile still keeps a credible PM baseline vac
   assert.ok(result.jobs[0].evaluation.score>=7.5)
 })
 
+test('IT Project Manager direction rejects a finance project role when the full JD has no technology delivery evidence',async()=>{
+  const fetcher=scenarioFetcher({
+    searchHtml:card('8100000001','Senior Finance Project Manager'),
+    details:{'8100000001':detailHtml({title:'Senior Finance Project Manager',description:'Lead budgeting, forecasting, financial controls, month-end reporting, cost governance and finance stakeholder coordination. '.repeat(5)})}
+  })
+  const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:plan('Senior IT Project Manager'),fetcher,now:new Date('2026-08-27T12:00:00Z')})
+  assert.equal(result.jobs.length,0)
+  assert.ok(result.audit.some(row=>row.jobId==='8100000001'&&row.stage==='PROFILE_ROLE_REJECT'))
+})
+
+test('IT Project Manager direction rejects a construction project role when the full JD confirms physical construction delivery',async()=>{
+  const fetcher=scenarioFetcher({
+    searchHtml:card('8100000002','Project and Construction Manager'),
+    details:{'8100000002':detailHtml({title:'Project and Construction Manager',description:'Manage construction sites, contractors, building permits, fit-out schedules, civil works, handover and physical store openings. '.repeat(5)})}
+  })
+  const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:plan('Senior IT Project Manager'),fetcher,now:new Date('2026-08-27T12:00:00Z')})
+  assert.equal(result.jobs.length,0)
+  assert.ok(result.audit.some(row=>row.jobId==='8100000002'&&row.stage==='PROFILE_ROLE_REJECT'))
+})
+
+test('IT Program Manager direction rejects an IT Product Manager whose JD is product ownership rather than program delivery',async()=>{
+  const fetcher=scenarioFetcher({
+    searchHtml:card('8100000003','IT Product Manager - Manufacturing'),
+    details:{'8100000003':detailHtml({title:'IT Product Manager - Manufacturing',description:'Own the product vision, product roadmap, backlog prioritisation, user discovery, feature adoption and product lifecycle for a manufacturing application. '.repeat(5)})}
+  })
+  const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:plan('IT Program Manager'),fetcher,now:new Date('2026-08-27T12:00:00Z')})
+  assert.equal(result.jobs.length,0)
+  assert.ok(result.audit.some(row=>row.jobId==='8100000003'&&row.stage==='PROFILE_ROLE_REJECT'))
+})
+
+test('manager-level transformation direction rejects an explicit Head-of-division vacancy',async()=>{
+  const fetcher=scenarioFetcher({
+    searchHtml:card('8100000004','Head of Lending Technology & Applications Division'),
+    details:{'8100000004':detailHtml({title:'Head of Lending Technology & Applications Division',description:'Lead a technology division, own organisation design, people leadership, management layers and a multi-year technology transformation agenda. '.repeat(5)})}
+  })
+  const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:plan('Technology Transformation Manager'),fetcher,now:new Date('2026-08-27T12:00:00Z')})
+  assert.equal(result.jobs.length,0)
+  assert.ok(result.audit.some(row=>row.jobId==='8100000004'&&row.stage==='PROFILE_ROLE_REJECT'))
+})
+
+test('IT Project Manager direction keeps an atypical eCOA title when the full JD confirms digital system delivery',async()=>{
+  const fetcher=scenarioFetcher({
+    searchHtml:card('8100000005','eCOA Project Manager'),
+    details:{'8100000005':detailHtml({title:'eCOA Project Manager',description:'Lead implementation of an electronic clinical outcome assessment platform, coordinate software configuration, system integrations, validation, release readiness and go-live across client teams. '.repeat(5)})}
+  })
+  const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:plan('Senior IT Project Manager'),fetcher,now:new Date('2026-08-27T12:00:00Z')})
+  assert.equal(result.jobs.length,1)
+})
+
+test('IT Project Manager direction keeps an atypical SCADA and OT security project title when the full JD confirms technology delivery',async()=>{
+  const fetcher=scenarioFetcher({
+    searchHtml:card('8100000006','Senior SCADA & OT Security Package/Project Manager'),
+    details:{'8100000006':detailHtml({title:'Senior SCADA & OT Security Package/Project Manager',description:'Lead delivery of SCADA and OT cybersecurity systems, coordinate software and controls integration, technology suppliers, testing, deployment, risks and technical stakeholders. '.repeat(5)})}
+  })
+  const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:plan('Senior IT Project Manager'),fetcher,now:new Date('2026-08-27T12:00:00Z')})
+  assert.equal(result.jobs.length,1)
+})
+
 test('deterministic company exclusion rejects an otherwise relevant profile match',async()=>{
   const fetcher=scenarioFetcher({
     searchHtml:card('5555555555','Software Developer','NoGo Corp'),
