@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "node --test app/lib/profile-freshness-today.test.mjs && next build",
   "git": {
     "deploymentEnabled": {
       "feature/cv-library-3-slots": false
