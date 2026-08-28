@@ -506,6 +506,7 @@ export default function Home(){
             <div className="conditionCard"><small>Salary</small><b>{conditionScore(jobConditions?.salary.score)}</b><span>{jobConditions?.salary.value||'Not stated'}</span></div>
             <div className="conditionCard"><small>Employment type</small><b>{conditionScore(jobConditions?.employmentType.score)}</b><span>{jobConditions?.employmentType.value||'Not stated'}</span></div>
             <div className="conditionCard"><small>Work model</small><b>{conditionScore(jobConditions?.workModel.score)}</b><span>{jobConditions?.workModel.value||'Not stated'}</span></div>
+            <a className="secondary openLink" style={{gridColumn:'1 / -1',justifySelf:'start'}} href={job.originalUrl} target="_blank" rel="noreferrer">Open LinkedIn vacancy</a>
           </div>
 
           <BestCvPanel
@@ -516,7 +517,6 @@ export default function Home(){
             adaptationActions={<div className="actions reviewActions">
               <button className="primary" onClick={runCvAdaptationReview} disabled={!activeAdaptationBaseline||adaptationRun.loading||Boolean(currentAdaptationResult)}>{adaptationRun.loading&&adaptationRun.jobKey===jobKey?'Generating…':currentAdaptationResult?'Generated':'Generate CV update'}</button>
               <button className="secondary" onClick={()=>setReviewOpen(true)} disabled={!currentAdaptationResult}>View CV update</button>
-              <a className="secondary openLink" href={job.originalUrl} target="_blank" rel="noreferrer">Open LinkedIn vacancy</a>
               {job.officialUrl&&<a className="secondary openLink" href={job.officialUrl} target="_blank" rel="noreferrer">Employer link</a>}
             </div>}
           />
