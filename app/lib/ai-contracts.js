@@ -59,6 +59,27 @@ export const professionalSummaryDraftSchema={
   required:['tailoredText','claims','why']
 }
 
+export const roleOverviewDraftSchema={
+  type:'object',
+  additionalProperties:false,
+  properties:{
+    tailoredText:{type:'string',minLength:1},
+    claims:{
+      type:'array',minItems:1,maxItems:12,
+      items:{
+        type:'object',additionalProperties:false,
+        properties:{
+          text:{type:'string',minLength:1},
+          evidenceIds:{type:'array',minItems:1,maxItems:8,items:{type:'string',minLength:1}}
+        },
+        required:['text','evidenceIds']
+      }
+    },
+    why:{type:'string',minLength:1}
+  },
+  required:['tailoredText','claims','why']
+}
+
 export function validateJobAnalysis(value){
   if(!value||typeof value!=='object'||Array.isArray(value)) throw new Error('Invalid JD analysis.')
   if(!text(value.roleMission)||!text(value.candidatePositioning)) throw new Error('Invalid JD analysis text.')
@@ -95,6 +116,18 @@ export function validateProfessionalSummaryDraft(value){
     if(!claim||typeof claim!=='object'||!text(claim.text)) throw new Error('Invalid Professional Summary claim.')
     if(!Array.isArray(claim.evidenceIds)||claim.evidenceIds.length<1||claim.evidenceIds.some(id=>!text(id))) throw new Error('Every Professional Summary claim requires evidence IDs.')
     if(new Set(claim.evidenceIds.map(text)).size!==claim.evidenceIds.length) throw new Error('Professional Summary claim evidence IDs must be unique.')
+  }
+  return value
+}
+
+export function validateRoleOverviewDraft(value){
+  if(!value||typeof value!=='object'||Array.isArray(value)) throw new Error('Invalid role overview draft.')
+  if(!text(value.tailoredText)||!text(value.why)) throw new Error('Role overview draft requires tailored text and rationale.')
+  if(!Array.isArray(value.claims)||value.claims.length<1||value.claims.length>12) throw new Error('Role overview draft requires grounded claims.')
+  for(const claim of value.claims){
+    if(!claim||typeof claim!=='object'||!text(claim.text)) throw new Error('Invalid role overview claim.')
+    if(!Array.isArray(claim.evidenceIds)||claim.evidenceIds.length<1||claim.evidenceIds.some(id=>!text(id))) throw new Error('Every role overview claim requires evidence IDs.')
+    if(new Set(claim.evidenceIds.map(text)).size!==claim.evidenceIds.length) throw new Error('Role overview claim evidence IDs must be unique.')
   }
   return value
 }

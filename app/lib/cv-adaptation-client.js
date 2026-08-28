@@ -47,3 +47,29 @@ export async function requestProfessionalSummary({baseline,job,fetchImpl=fetch}=
   if(written?.stage!=='summary_written'||!written?.token||written?.block?.blockId!=='professional_summary') throw new Error('Professional Summary writing did not complete safely.')
   return written
 }
+
+export async function requestLatestRoleOverview({baseline,job,fetchImpl=fetch}={}){
+  const input=buildAdaptationInput({baseline,job})
+  const summary=await requestProfessionalSummary({baseline,job,fetchImpl})
+  const written=await postJson(fetchImpl,{
+    action:'write_latest_role_overview',
+    token:summary.token,
+    sourceCv:input.sourceCv,
+    job:input.job
+  })
+  if(written?.stage!=='latest_role_written'||!written?.token||written?.blocks?.latestRoleOverview?.blockId!=='latest_role_overview') throw new Error('Latest role overview writing did not complete safely.')
+  return written
+}
+
+export async function requestPreviousRoleOverview({baseline,job,fetchImpl=fetch}={}){
+  const input=buildAdaptationInput({baseline,job})
+  const latest=await requestLatestRoleOverview({baseline,job,fetchImpl})
+  const written=await postJson(fetchImpl,{
+    action:'write_previous_role_overview',
+    token:latest.token,
+    sourceCv:input.sourceCv,
+    job:input.job
+  })
+  if(written?.stage!=='previous_role_written'||!written?.token||written?.blocks?.previousRoleOverview?.blockId!=='previous_role_overview') throw new Error('Previous role overview writing did not complete safely.')
+  return written
+}
