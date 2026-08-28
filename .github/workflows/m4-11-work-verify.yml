@@ -20,6 +20,11 @@ jobs:
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
+      - name: Locate stale M4.7 review contracts
+        run: |
+          grep -R -n -F "CV review shows a neutral empty state" app/lib || true
+          grep -R -n -F "Version 2 Step 1 UI reviews Summary-only changes" app/lib || true
+          grep -R -n -F "merged UI restores Application Pack, CV Update Review and Truth Guard" app/lib || true
       - name: M4.11 targeted tests
         run: node --test app/lib/cv-adaptation-decisions.test.mjs app/lib/cv-adaptation-review-ui.contract.test.mjs
       - name: No new full-suite regressions vs M4.10
