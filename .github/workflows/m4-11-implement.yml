@@ -20,13 +20,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Apply M4.11 page and CSS patch
-        run: node scripts/m4-11-apply.mjs
-      - name: Commit M4.11 implementation
+      - name: Update superseded M4.7 review contracts
+        run: node scripts/m4-11-update-legacy-tests.mjs
+      - name: Commit M4.11 contract update
         run: |
           git config user.name "applypilot-ci"
           git config user.email "applypilot-ci@users.noreply.github.com"
-          git add app/page.js app/globals.css
+          git add app/lib/profile-review.test.mjs
           git diff --cached --exit-code && exit 1 || true
-          git commit -m "feat: wire M4.11 selected-CV review UI"
+          git commit -m "test: align legacy review contracts with M4.11"
           git push origin HEAD:work/m4-11-review-ui
