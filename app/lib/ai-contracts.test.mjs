@@ -45,7 +45,6 @@ test('requires exact JD evidence for every priority',async()=>{
   assert.throws(()=>validateJobAnalysis(broken),/JD evidence/i)
 })
 
-
 test('requires an explicit mustHaves array separate from hiring priorities',async()=>{
   const {validateJobAnalysis}=await load()
   assert.equal(typeof validateJobAnalysis,'function')
@@ -60,4 +59,25 @@ test('must-haves use their own qualification requirements and JD evidence',async
   const broken=structuredClone(validAnalysis)
   broken.mustHaves=[{id:'M1',requirement:'',jdEvidence:[]}]
   assert.throws(()=>validateJobAnalysis(broken),/must-have/i)
+})
+
+test('professional summary writer contract accepts grounded claims',async()=>{
+  const {validateProfessionalSummaryDraft}=await load()
+  assert.equal(typeof validateProfessionalSummaryDraft,'function')
+  const draft={
+    tailoredText:'Senior delivery leader with end-to-end platform delivery and stakeholder governance experience.',
+    claims:[
+      {text:'Led end-to-end platform delivery.',evidenceIds:['E1']},
+      {text:'Managed senior stakeholder governance.',evidenceIds:['E2']}
+    ],
+    why:'Moves the most relevant verified delivery evidence forward for this vacancy.'
+  }
+  assert.deepEqual(validateProfessionalSummaryDraft(draft),draft)
+})
+
+test('professional summary writer contract rejects claims without evidence IDs',async()=>{
+  const {validateProfessionalSummaryDraft}=await load()
+  assert.equal(typeof validateProfessionalSummaryDraft,'function')
+  const draft={tailoredText:'Senior delivery leader.',claims:[{text:'Senior delivery leader.',evidenceIds:[]}],why:'Relevant.'}
+  assert.throws(()=>validateProfessionalSummaryDraft(draft),/evidence/i)
 })
