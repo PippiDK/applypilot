@@ -8,6 +8,7 @@ import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfile
 import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'
 import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'
 import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'
+import {SEARCH_AREAS,WORK_MODELS,classifySearchArea,classifyWorkModel,filterJobItems} from './lib/job-list-filters.js'
 import {selectAdaptationCv,selectedAdaptationCv} from './lib/cv-adaptation-selection.js'
 import {buildAdaptationBaseline,baselineKey,baselineMatches} from './lib/cv-adaptation-baseline.js'
 import {requestCvAdaptation} from './lib/cv-adaptation-client.js'
@@ -24,6 +25,7 @@ import CvLibraryStep from './components/cv-library-step.js'
 import SearchProfileRolesStep from './components/search-profile-roles-step.js'
 import SearchPlanPreview from './components/search-plan-preview.js'
 import BestCvPanel from './components/best-cv-panel.js'
+import filterStyles from './components/job-filters.module.css'
 
 const WINDOWS=[1,3,7,14]
 const EMPTY_SEARCH_PROFILE={...DEFAULT_PROFILE,exclusions:''}
@@ -41,6 +43,8 @@ function workModelText(values=[]){return values.map(value=>value==='onsite'?'On-
 export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(7)
   const [jobs,setJobs]=useState([])
+  const [selectedAreas,setSelectedAreas]=useState(()=>SEARCH_AREAS.map(({id})=>id))
+  const [selectedWorkModels,setSelectedWorkModels]=useState(()=>WORK_MODELS.map(({id})=>id))
   const [selected,setSelected]=useState(null)
   const [jobStatuses,setJobStatuses]=useState({})
   const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
@@ -64,7 +68,8 @@ export default function Home(){
   const [editedUpdates,setEditedUpdates]=useState({})
   const [sourceDocxFiles,setSourceDocxFiles]=useState({})
   const [exportState,setExportState]=useState({loading:false,error:'',baselineKey:''})
-  const active=jobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||jobs[0]||null
+  const visibleJobs=useMemo(()=>filterJobItems(jobs,selectedAreas,selectedWorkModels),[jobs,selectedAreas,selectedWorkModels])
+  const active=visibleJobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||visibleJobs[0]||null
 
   useEffect(()=>{
     try{
@@ -100,6 +105,8 @@ export default function Home(){
   const resumeLoaded=isSourceCvReady(cvData)
   const readyCvs=useMemo(()=>Array.isArray(cvLibrary?.cvs)?cvLibrary.cvs.filter(isSourceCvReady):[],[cvLibrary])
   const cvReadyCount=readyCvs.length
+  const areaCounts=useMemo(()=>Object.fromEntries(SEARCH_AREAS.map(({id})=>[id,jobs.filter(item=>classifySearchArea(item.job)===id).length])),[jobs])
+  const workModelCounts=useMemo(()=>Object.fromEntries(WORK_MODELS.map(({id})=>[id,jobs.filter(item=>classifyWorkModel(item.job)===id).length])),[jobs])
   const savedUnionSearchPlan=profile?.unionSearchPlan
   const profileSearchPlanSummary=profileReady&&Array.isArray(savedUnionSearchPlan?.directions)&&savedUnionSearchPlan.directions.length
     ? `${savedUnionSearchPlan.directions.length} search directions · ${Number(savedUnionSearchPlan.primaryCount)||0} primary · ${Number(savedUnionSearchPlan.adjacentCount)||0} adjacent`
@@ -200,6 +207,10 @@ export default function Home(){
 
   function changeJobStatus(jobId,status){
     setJobStatuses(current=>writeJobStatus({storage:localStorage,statuses:current,jobId,status}))
+  }
+
+  function toggleJobFilter(setter,id){
+    setter(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id])
   }
 
   async function search(){
@@ -469,11 +480,19 @@ export default function Home(){
 
     <section className="grid">
       <div className="list">
-        <div className="listHead"><h2>Live matches</h2><small>Newest {freshnessDays} days</small></div>
+        <div className="listHead"><div><h2>Live matches</h2>{jobs.length>0&&<small className={filterStyles.resultCount}>{visibleJobs.length} of {jobs.length}</small>}</div><small>Newest {freshnessDays} days</small></div>
+        {jobs.length>0&&<details className={filterStyles.filters}>
+          <summary><span>FILTERS</span><span>{visibleJobs.length} of {jobs.length}</span></summary>
+          <div className={filterStyles.body}>
+            <div className={filterStyles.group}><small className={filterStyles.groupTitle}>SEARCH AREAS</small>{SEARCH_AREAS.map(area=><label className={filterStyles.option} key={area.id}><input type="checkbox" checked={selectedAreas.includes(area.id)} onChange={()=>toggleJobFilter(setSelectedAreas,area.id)}/><span>{area.label}</span><b>{areaCounts[area.id]||0}</b></label>)}</div>
+            <div className={filterStyles.group}><small className={filterStyles.groupTitle}>WORK MODEL</small>{WORK_MODELS.map(model=><label className={filterStyles.option} key={model.id}><input type="checkbox" checked={selectedWorkModels.includes(model.id)} onChange={()=>toggleJobFilter(setSelectedWorkModels,model.id)}/><span>{model.label}</span><b>{workModelCounts[model.id]||0}</b></label>)}</div>
+          </div>
+        </details>}
         {!state.loading&&!state.error&&!state.stats&&<div className="empty">Run the LinkedIn search. No other source is used in this milestone.</div>}
         {state.loading&&<div className="empty">Searching LinkedIn public pages and reading full job descriptions…</div>}
         {!state.loading&&state.stats&&jobs.length===0&&<div className="empty">NO STRONG NEW MATCHES FOUND.</div>}
-        {jobs.map(item=>{const {job,evaluation}=item; const score=Math.round(evaluation.score*10); const manualStatus=jobStatuses[job.sourceJobId]||''; return <div className="jobWrap" key={job.sourceJobId}>
+        {!state.loading&&state.stats&&jobs.length>0&&visibleJobs.length===0&&<div className="empty">NO MATCHES IN SELECTED FILTERS.</div>}
+        {visibleJobs.map(item=>{const {job,evaluation}=item; const score=Math.round(evaluation.score*10); const manualStatus=jobStatuses[job.sourceJobId]||''; return <div className="jobWrap" key={job.sourceJobId}>
           <button onClick={()=>setSelected(item)} className={'job '+(active?.job.sourceJobId===job.sourceJobId?'active':'')}>
             <span className="score">{fitLabel(score)}</span>
             <span><b>{job.title}</b><small>{job.company} · {job.location}</small><small className="sourceLine">LinkedIn · {dateText(job.publishedAt)}</small></span>
