@@ -80,6 +80,28 @@ export const roleOverviewDraftSchema={
   required:['tailoredText','claims','why']
 }
 
+export const truthGuardIssueCodes=['UNSUPPORTED','OVERCLAIM','UNDERSTATEMENT','WRONG_ROLE_SCOPE','METRIC_MISMATCH','UNKNOWN_EVIDENCE']
+
+export const truthGuardAssessmentSchema={
+  type:'object',
+  additionalProperties:false,
+  properties:{
+    verdict:{type:'string',enum:['PASS','FAIL']},
+    issues:{
+      type:'array',maxItems:12,
+      items:{
+        type:'object',additionalProperties:false,
+        properties:{
+          code:{type:'string',enum:truthGuardIssueCodes},
+          claim:{type:'string',minLength:1}
+        },
+        required:['code','claim']
+      }
+    }
+  },
+  required:['verdict','issues']
+}
+
 export function validateJobAnalysis(value){
   if(!value||typeof value!=='object'||Array.isArray(value)) throw new Error('Invalid JD analysis.')
   if(!text(value.roleMission)||!text(value.candidatePositioning)) throw new Error('Invalid JD analysis text.')
@@ -129,5 +151,18 @@ export function validateRoleOverviewDraft(value){
     if(!Array.isArray(claim.evidenceIds)||claim.evidenceIds.length<1||claim.evidenceIds.some(id=>!text(id))) throw new Error('Every role overview claim requires evidence IDs.')
     if(new Set(claim.evidenceIds.map(text)).size!==claim.evidenceIds.length) throw new Error('Role overview claim evidence IDs must be unique.')
   }
+  return value
+}
+
+export function validateTruthGuardAssessment(value){
+  if(!value||typeof value!=='object'||Array.isArray(value)) throw new Error('Invalid Truth Guard assessment.')
+  if(!['PASS','FAIL'].includes(value.verdict)) throw new Error('Invalid Truth Guard verdict.')
+  if(!Array.isArray(value.issues)||value.issues.length>12) throw new Error('Invalid Truth Guard issues list.')
+  for(const issue of value.issues){
+    if(!issue||typeof issue!=='object'||!truthGuardIssueCodes.includes(text(issue.code))) throw new Error('Invalid Truth Guard issue code.')
+    if(!text(issue.claim)) throw new Error('Truth Guard issue requires a claim.')
+  }
+  if(value.verdict==='PASS'&&value.issues.length) throw new Error('Truth Guard PASS cannot contain unresolved issues.')
+  if(value.verdict==='FAIL'&&!value.issues.length) throw new Error('Truth Guard FAIL requires at least one issue.')
   return value
 }

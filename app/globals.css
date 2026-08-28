@@ -34,3 +34,7 @@
 .auditLog summary strong{color:#8bb7b0}
 .auditLog table{color:#839492}
 .auditLog .muted{color:#627a79}
+
+
+/* M4.11 — selected-CV review */
+.reviewBaseline{margin:8px 0 0;color:#7ee2b8;font-size:12px;font-weight:750}.reviewScopeLine{margin:16px 0;color:#7f8c99;font-size:11px;letter-spacing:.03em}.adaptationLoading,.adaptationRunStatus,.reviewEmpty{margin:18px 0;padding:14px 16px;border-radius:12px;display:flex;flex-direction:column;gap:5px}.adaptationLoading{background:#151a20;border:1px solid #343d48}.adaptationLoading span,.reviewEmpty span{color:#9aa5b1;font-size:12px}.adaptationRunStatus{background:#132019;border:1px solid #285e4a}.adaptationRunStatus b{color:#7ee2b8}.adaptationRunStatus span{color:#aab5ae;font-size:12px}.reviewEmpty{background:#151a20;border:1px solid #2a323c}.reviewEmpty b{color:#dce2e8}

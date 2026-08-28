@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,buildReviewChanges,deriveReviewTerms,applicationPackState} from './lib/profile-review.js'
+import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,applicationPackState} from './lib/profile-review.js'
 import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'
 import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'
 import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'
@@ -8,8 +8,10 @@ import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfile
 import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'
 import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'
 import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'
-import {requestJobAnalysis} from './lib/jd-analysis-client.js'
-import {readJobAnalysisCache,writeJobAnalysisCache} from './lib/job-analysis-cache.js'
+import {selectAdaptationCv,selectedAdaptationCv} from './lib/cv-adaptation-selection.js'
+import {buildAdaptationBaseline,baselineKey,baselineMatches} from './lib/cv-adaptation-baseline.js'
+import {requestTruthGuard} from './lib/cv-adaptation-client.js'
+import {ADAPTATION_DECISION,readAdaptationDecision,setAdaptationDecision,safeAdaptationReviewBlocks} from './lib/cv-adaptation-decisions.js'
 import {requestExpertiseMatch} from './lib/expertise-match-client.js'
 import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'
 import {evaluateJobConditions} from './lib/job-conditions.js'
@@ -54,7 +56,9 @@ export default function Home(){
   const [profileRoleState,setProfileRoleState]=useState(EMPTY_ROLE_STATE)
   const [profileSaveState,setProfileSaveState]=useState({loading:false,error:''})
   const [reviewOpen,setReviewOpen]=useState(false)
-  const [jdAnalysisState,setJdAnalysisState]=useState({loading:false,error:'',analysis:null,token:'',jobKey:''})
+  const [adaptationSelections,setAdaptationSelections]=useState({})
+  const [adaptationBaselines,setAdaptationBaselines]=useState({})
+  const [adaptationRun,setAdaptationRun]=useState({loading:false,error:'',jobKey:'',baselineKey:'',result:null})
   const [expertiseState,setExpertiseState]=useState({loading:false,error:'',analysis:null,jobKey:''})
   const [decisions,setDecisions]=useState({})
   const active=jobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||jobs[0]||null
@@ -107,13 +111,16 @@ export default function Home(){
   const draftLocations=draftPreferences.locations
   const draftWorkModels=draftPreferences.workModels
   const pack=applicationPackState(resumeLoaded?cvData:null)
-  const reviewFacts=useMemo(()=>Array.isArray(cvData?.facts)?cvData.facts.filter(f=>f&&f.verified!==false):[],[cvData])
-  const proposedChanges=useMemo(()=>resumeLoaded&&active?buildReviewChanges(cvData,active):[],[cvData,active,resumeLoaded])
-  const alignedTerms=useMemo(()=>active?deriveReviewTerms(active):[],[active])
   const jobKey=active?.job?.sourceJobId||''
+  const selectedAdaptationCvRecord=selectedAdaptationCv(adaptationSelections,jobKey,readyCvs)
+  const storedAdaptationBaseline=adaptationBaselines[jobKey]||null
+  const activeAdaptationBaseline=storedAdaptationBaseline&&selectedAdaptationCvRecord&&baselineMatches({baseline:storedAdaptationBaseline,job:active?.job,cv:selectedAdaptationCvRecord})?storedAdaptationBaseline:null
+  const activeBaselineKey=activeAdaptationBaseline?baselineKey(activeAdaptationBaseline):''
+  const currentAdaptationResult=adaptationRun.jobKey===jobKey&&adaptationRun.baselineKey===activeBaselineKey?adaptationRun.result:null
+  const reviewChanges=safeAdaptationReviewBlocks({blocks:currentAdaptationResult?.blocks,truthGuard:currentAdaptationResult?.truthGuard})
   const conditionProfile=useMemo(()=>({...profile,acceptedWorkModels:acceptedWorkModels(profile.geography)}),[profile])
   const jobConditions=useMemo(()=>active?evaluateJobConditions(active.job,conditionProfile):null,[active,conditionProfile])
-  const reviewedCount=proposedChanges.filter(change=>decisions[`${jobKey}|${change.id}`]).length
+  const reviewedCount=activeAdaptationBaseline?reviewChanges.filter(change=>readAdaptationDecision(decisions,{jobId:activeAdaptationBaseline.jobId,cvId:activeAdaptationBaseline.cvId,sourceVersion:activeAdaptationBaseline.sourceVersion,blockId:change.blockId})).length:0
   const profileCompletion=useMemo(()=>{
     const fields=[resumeLoaded,draft.roles,(draftLocations.length&&draftWorkModels.length)]
     return Math.round(fields.filter(Boolean).length/fields.length*100)
@@ -339,32 +346,49 @@ export default function Home(){
     }
   }
 
-  async function runJobAnalysis(){
-    if(!active||!resumeLoaded) return
-    const runKey=active.job.sourceJobId||`${active.job.title}|${active.job.company}`
-    const cacheArgs={storage:localStorage,jobId:active.job.sourceJobId,sourceVersion:cvData?.sourceVersion}
+  function chooseAdaptationCv(cv){
+    if(!active||!jobKey||!cv) return
+    const baseline=buildAdaptationBaseline({job:active.job,cv})
+    setAdaptationSelections(current=>selectAdaptationCv(current,{jobKey,cvId:cv.id,readyCvs}))
+    setAdaptationBaselines(current=>({...current,[jobKey]:baseline}))
+    setAdaptationRun({loading:false,error:'',jobKey:'',baselineKey:'',result:null})
+    setReviewOpen(false)
+  }
+
+  async function runCvAdaptationReview(){
+    if(!active||!activeAdaptationBaseline||adaptationRun.loading) return
+    const runJobKey=jobKey
+    const runBaseline=activeAdaptationBaseline
+    const runBaselineKey=baselineKey(runBaseline)
     setReviewOpen(true)
-    const cached=readJobAnalysisCache(cacheArgs)
-    if(cached){
-      setJdAnalysisState({loading:false,error:'',analysis:cached.analysis,token:cached.token||'',jobKey:runKey})
-      return
-    }
-    setJdAnalysisState({loading:true,error:'',analysis:null,token:'',jobKey:runKey})
+    setAdaptationRun({loading:true,error:'',jobKey:runJobKey,baselineKey:runBaselineKey,result:null})
     try{
-      const result=await requestJobAnalysis({sourceVersion:cvData.sourceVersion,job:active.job})
-      writeJobAnalysisCache({...cacheArgs,analysis:result.analysis,token:result.token||''})
-      setJdAnalysisState({loading:false,error:'',analysis:result.analysis,token:result.token||'',jobKey:runKey})
+      const result=await requestTruthGuard({baseline:runBaseline,job:active.job})
+      setAdaptationRun({loading:false,error:'',jobKey:runJobKey,baselineKey:runBaselineKey,result})
     }catch(error){
-      setJdAnalysisState({loading:false,error:error.message||'Job analysis failed safely. Please try again.',analysis:null,token:'',jobKey:runKey})
+      setAdaptationRun({loading:false,error:error.message||'CV adaptation failed safely. Please try again.',jobKey:runJobKey,baselineKey:runBaselineKey,result:null})
     }
   }
 
-  function setDecision(id,value){setDecisions(current=>({...current,[`${jobKey}|${id}`]:value}))}
+  function decisionIdentity(blockId){
+    if(!activeAdaptationBaseline) return null
+    return {jobId:activeAdaptationBaseline.jobId,cvId:activeAdaptationBaseline.cvId,sourceVersion:activeAdaptationBaseline.sourceVersion,blockId}
+  }
+
+  function decisionFor(blockId){
+    const identity=decisionIdentity(blockId)
+    return identity?readAdaptationDecision(decisions,identity):null
+  }
+
+  function setDecision(blockId,value){
+    const identity=decisionIdentity(blockId)
+    if(!identity) return
+    setDecisions(current=>setAdaptationDecision(current,identity,value))
+  }
 
   function acceptAll(){
-    const next={...decisions}
-    proposedChanges.filter(change=>change.changed).forEach(change=>{next[`${jobKey}|${change.id}`]='accepted'})
-    setDecisions(next)
+    if(!activeAdaptationBaseline) return
+    setDecisions(current=>reviewChanges.reduce((next,change)=>setAdaptationDecision(next,decisionIdentity(change.blockId),ADAPTATION_DECISION.ACCEPTED),current))
   }
 
   return <main>
@@ -415,7 +439,7 @@ export default function Home(){
             <div className="conditionCard"><small>Work model</small><b>{conditionScore(jobConditions?.workModel.score)}</b><span>{jobConditions?.workModel.value||'Not stated'}</span></div>
           </div>
 
-          <BestCvPanel job={job} cvLibrary={cvLibrary}/>
+          <BestCvPanel job={job} cvLibrary={cvLibrary} selectedCvId={activeAdaptationBaseline?.cvId||''} onSelectCv={chooseAdaptationCv}/>
 
           <div className="expertiseHero">
             <div className="expertiseHeroHead"><div><p className="eyebrow">EXPERTISE MATCH</p><p className="expertiseIntro">Full JD ↔ Source CV professional expertise only</p></div><div className="expertiseScore">{expertiseState.loading&&expertiseState.jobKey===jobKey?'…':expertise?`${expertise.expertiseMatch}%`:'N/A'}</div></div>
@@ -438,7 +462,7 @@ export default function Home(){
 
 
           <div className="section"><h3>Application pack</h3><div className="docs"><div>{pack.cvReady?'✓':'○'} Tailored CV <span className={pack.cvReady?'ready':'pending'}>{pack.tailoredCvLabel}</span></div><div>○ Cover letter <span className="pending">{pack.coverLetterLabel}</span></div></div></div>
-          <div className="actions reviewActions">{pack.cvReady?<button className="primary" onClick={runJobAnalysis}>Review CV changes</button>:<button className="primary" onClick={startProfile}>Upload CV</button>}<a className="secondary openLink" href={job.originalUrl} target="_blank" rel="noreferrer">Open LinkedIn vacancy</a>{job.officialUrl&&<a className="secondary openLink" href={job.officialUrl} target="_blank" rel="noreferrer">Employer link</a>}</div>
+          <div className="actions reviewActions">{pack.cvReady?<button className="primary" onClick={runCvAdaptationReview} disabled={!activeAdaptationBaseline||adaptationRun.loading}>{adaptationRun.loading&&adaptationRun.jobKey===jobKey?'Adapting CV…':activeAdaptationBaseline?'Adapt & review CV':'Choose CV to adapt'}</button>:<button className="primary" onClick={startProfile}>Upload CV</button>}<a className="secondary openLink" href={job.originalUrl} target="_blank" rel="noreferrer">Open LinkedIn vacancy</a>{job.officialUrl&&<a className="secondary openLink" href={job.officialUrl} target="_blank" rel="noreferrer">Employer link</a>}</div>
         </>})():<div className="emptyPanel"><h2>No selected vacancy</h2><p>{state.loading?'Searching LinkedIn public pages…':'Run the LinkedIn search to see matching vacancies.'}</p></div>}
       </div>
     </section>
@@ -462,24 +486,22 @@ export default function Home(){
       <div className="modalActions"><button className="secondary" disabled={profileSaveState.loading} onClick={()=>profileStep===1?closeProfile():setProfileStep(step=>step-1)}>{profileStep===1?'Cancel':'Back'}</button>{profileStep<5?<button className="primary" disabled={(profileStep===1&&(Boolean(cvState.loadingSlot)||cvReadyCount===0))||(profileStep===2&&profileRoleState.status==='loading')} onClick={nextProfileStep}>Continue</button>:<button className="primary" disabled={profileSaveState.loading} onClick={saveProfile}>{profileSaveState.loading?'Saving profile…':'Save profile'}</button>}</div>
     </div></div>}
 
-    {reviewOpen&&active&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget)setReviewOpen(false)}}><div className="modal reviewModal"><div className="modalHead"><div><p className="eyebrow">CV UPDATE REVIEW</p><h2>{active.job.title}</h2><p className="muted">{active.job.company} · {active.job.location}</p></div><button className="close" onClick={()=>setReviewOpen(false)}>×</button></div>
-      <div className="jdPretest"><p className="eyebrow">JD ANALYSIS PRETEST · OPENAI</p>
-        {jdAnalysisState.jobKey!==jobKey?<div className="muted">Select Review CV changes to analyse this vacancy.</div>:jdAnalysisState.loading?<div className="jdLoading">Reading job description with OpenAI…</div>:jdAnalysisState.error?<div className="errorBox"><b>JD analysis failed safely</b><span>{jdAnalysisState.error}</span></div>:jdAnalysisState.analysis?<>
-          <div className="jdGrid"><div><small>Role mission</small><p>{jdAnalysisState.analysis.roleMission}</p></div><div><small>Candidate positioning</small><p>{jdAnalysisState.analysis.candidatePositioning}</p></div></div>
-          <div className="jdSection"><h3>Hiring priorities</h3>{jdAnalysisState.analysis.priorities.map(priority=><details className="jdPriority" key={priority.id}><summary><span>{priority.rank}. {priority.requirement}</span><b>{priority.kind.replace('_',' ')}</b></summary><p>{priority.why}</p><div className="jdEvidence"><small>View JD evidence</small>{priority.jdEvidence.map((evidence,index)=><blockquote key={index}>{evidence}</blockquote>)}</div></details>)}</div>
-          <div className="jdSection"><h3>Must-haves</h3>{jdAnalysisState.analysis.mustHaves?.length?jdAnalysisState.analysis.mustHaves.map(mustHave=><details className="jdMustHave" key={mustHave.id}><summary>✓ {mustHave.requirement}</summary><div className="jdEvidence"><small>View JD evidence</small>{mustHave.jdEvidence.map((evidence,index)=><blockquote key={index}>{evidence}</blockquote>)}</div></details>):<p className="muted">No explicit candidate qualification gate was found in the JD.</p>}</div>
-        </>:null}
-      </div>
-      <div className="muted">✓ Truth Guard active · 0 unsupported claims</div>
-      <div className="reviewToolbar"><div><h3>CV Summary update</h3></div>{proposedChanges.some(change=>change.changed)&&<button className="secondary" onClick={acceptAll}>Accept all safe changes</button>}</div>
-      {proposedChanges.map((change,index)=>{const decision=decisions[`${jobKey}|${change.id}`];return <div className={'changeCard '+(decision?'decided':'')} key={change.id}>
-        <div className="changeHead"><span>SUMMARY</span><b>{decision==='accepted'?'Accepted':decision==='original'?'Original kept':change.changed?'Review needed':'Already aligned'}</b></div>
-        <div className="compareGrid"><div className="compareBox"><small>ORIGINAL</small><p>{change.original}</p></div><div className="compareArrow">→</div><div className="compareBox updatedBox"><small>UPDATED</small><p>{change.updated}</p></div></div>
-        <div className="changeWhy"><div><small>WHY CHANGED</small><p>{change.why}</p></div></div>
-        <div className="evidenceActions"><button className={'secondary '+(decision==='original'?'chosen':'')} onClick={()=>setDecision(change.id,'original')}>Keep original</button><button className={'primary smallPrimary '+(decision==='accepted'?'chosenPrimary':'')} onClick={()=>setDecision(change.id,'accepted')} disabled={!change.changed}>{change.changed?'Accept change':'No change needed'}</button></div>
-      </div>})}
-      {!proposedChanges.length&&<div className="muted">No Summary change proposed.</div>}
-      <div className="reviewFooter"><button className="secondary" onClick={()=>setReviewOpen(false)}>Close review</button></div>
+    {reviewOpen&&active&&activeAdaptationBaseline&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget&&!adaptationRun.loading)setReviewOpen(false)}}><div className="modal reviewModal"><div className="modalHead"><div><p className="eyebrow">CV UPDATE REVIEW</p><h2>{active.job.title}</h2><p className="muted">{active.job.company} · {active.job.location}</p><p className="reviewBaseline">CV {selectedAdaptationCvRecord?.slot} · {activeAdaptationBaseline.fileName}</p></div><button className="close" onClick={()=>setReviewOpen(false)} disabled={adaptationRun.loading}>×</button></div>
+      <div className="reviewScopeLine">Professional Summary · Latest role overview · Previous role overview</div>
+      {adaptationRun.loading&&adaptationRun.jobKey===jobKey&&adaptationRun.baselineKey===activeBaselineKey&&<div className="adaptationLoading"><b>Adapting selected CV…</b><span>JD analysis → selected-CV evidence → three writers → Truth Guard.</span></div>}
+      {adaptationRun.error&&adaptationRun.jobKey===jobKey&&adaptationRun.baselineKey===activeBaselineKey&&<div className="errorBox"><b>CV adaptation failed safely</b><span>{adaptationRun.error}</span></div>}
+      {currentAdaptationResult&&<>
+        <div className="adaptationRunStatus"><b>✓ Truth Guard complete</b><span>{reviewChanges.length} safe change{reviewChanges.length===1?'':'s'} available for review · {reviewedCount}/{reviewChanges.length} decided</span></div>
+        <div className="reviewToolbar"><div><h3>Selected-CV changes</h3><p>Only Truth-Guard-safe UPDATED text is shown. Source CV remains unchanged.</p></div>{reviewChanges.length>0&&<button className="secondary" onClick={acceptAll}>Accept all safe changes</button>}</div>
+        {reviewChanges.map(change=>{const decision=decisionFor(change.blockId);return <div className={'changeCard '+(decision?'decided':'')} key={change.blockId}>
+          <div className="changeHead"><span>{change.label}</span><b>{decision===ADAPTATION_DECISION.ACCEPTED?'Accepted':decision===ADAPTATION_DECISION.ORIGINAL?'Original kept':'Review needed'}</b></div>
+          <div className="compareGrid"><div className="compareBox"><small>ORIGINAL</small><p>{change.original}</p></div><div className="compareArrow">→</div><div className="compareBox updatedBox"><small>UPDATED</small><p>{change.updated}</p></div></div>
+          <div className="changeWhy"><div><small>WHY CHANGED</small><p>{change.why}</p></div></div>
+          <div className="evidenceActions"><button className={'secondary '+(decision===ADAPTATION_DECISION.ORIGINAL?'chosen':'')} onClick={()=>setDecision(change.blockId,ADAPTATION_DECISION.ORIGINAL)}>Keep original</button><button className={'primary smallPrimary '+(decision===ADAPTATION_DECISION.ACCEPTED?'chosenPrimary':'')} onClick={()=>setDecision(change.blockId,ADAPTATION_DECISION.ACCEPTED)}>Accept change</button></div>
+        </div>})}
+        {!reviewChanges.length&&<div className="reviewEmpty"><b>No safe changes to review.</b><span>Truth Guard did not offer a changed block. The selected Source CV remains unchanged.</span></div>}
+      </>}
+      <div className="reviewFooter"><button className="secondary" onClick={()=>setReviewOpen(false)} disabled={adaptationRun.loading}>Close review</button></div>
     </div></div>}
   </main>
 }

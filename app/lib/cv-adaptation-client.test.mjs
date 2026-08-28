@@ -82,3 +82,32 @@ test('requestProfessionalSummary continues the selected-CV chain into Summary wr
   assert.equal(JSON.stringify(calls).includes('CV1_SENTINEL'),false)
   assert.equal(JSON.stringify(calls).includes('CV3_SENTINEL'),false)
 })
+
+test('requestTruthGuard continues through all three writers and then runs the bound Truth Guard stage',async()=>{
+  const {requestTruthGuard}=await load()
+  assert.equal(typeof requestTruthGuard,'function')
+  const baseline=buildAdaptationBaseline({job,cv})
+  const calls=[]
+  const blocks={
+    professionalSummary:{blockId:'professional_summary'},
+    latestRoleOverview:{blockId:'latest_role_overview'},
+    previousRoleOverview:{blockId:'previous_role_overview'}
+  }
+  const fetchImpl=async(_url,options)=>{
+    const body=JSON.parse(options.body)
+    calls.push(body)
+    if(body.action==='analyze_job') return {ok:true,json:async()=>({stage:'job_analyzed',token:'T1'})}
+    if(body.action==='map_selected_cv_evidence') return {ok:true,json:async()=>({stage:'evidence_mapped',token:'T2'})}
+    if(body.action==='write_professional_summary') return {ok:true,json:async()=>({stage:'summary_written',block:blocks.professionalSummary,token:'T3'})}
+    if(body.action==='write_latest_role_overview') return {ok:true,json:async()=>({stage:'latest_role_written',blocks:{professionalSummary:blocks.professionalSummary,latestRoleOverview:blocks.latestRoleOverview},token:'T4'})}
+    if(body.action==='write_previous_role_overview') return {ok:true,json:async()=>({stage:'previous_role_written',blocks,token:'T5'})}
+    if(body.action==='run_truth_guard') return {ok:true,json:async()=>({stage:'truth_guarded',blocks,truthGuard:{professionalSummary:{blockId:'professional_summary',verdict:'PASS',issues:[],safeText:'Safe'}},token:'T6'})}
+    throw new Error('Unexpected action')
+  }
+  const result=await requestTruthGuard({baseline,job,fetchImpl})
+  assert.deepEqual(calls.map(call=>call.action),['analyze_job','map_selected_cv_evidence','write_professional_summary','write_latest_role_overview','write_previous_role_overview','run_truth_guard'])
+  assert.equal(calls[5].token,'T5')
+  assert.deepEqual(calls[5].sourceCv,{cvId:'cv-2',sourceVersion:'sha256:cv2',fileName:'CV2.pdf',cvText})
+  assert.equal(result.stage,'truth_guarded')
+  assert.equal(result.truthGuard.professionalSummary.verdict,'PASS')
+})

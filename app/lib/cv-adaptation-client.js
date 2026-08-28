@@ -73,3 +73,16 @@ export async function requestPreviousRoleOverview({baseline,job,fetchImpl=fetch}
   if(written?.stage!=='previous_role_written'||!written?.token||written?.blocks?.previousRoleOverview?.blockId!=='previous_role_overview') throw new Error('Previous role overview writing did not complete safely.')
   return written
 }
+
+export async function requestTruthGuard({baseline,job,fetchImpl=fetch}={}){
+  const input=buildAdaptationInput({baseline,job})
+  const previous=await requestPreviousRoleOverview({baseline,job,fetchImpl})
+  const guarded=await postJson(fetchImpl,{
+    action:'run_truth_guard',
+    token:previous.token,
+    sourceCv:input.sourceCv,
+    job:input.job
+  })
+  if(guarded?.stage!=='truth_guarded'||!guarded?.token||!guarded?.truthGuard||typeof guarded.truthGuard!=='object') throw new Error('Truth Guard did not complete safely.')
+  return guarded
+}

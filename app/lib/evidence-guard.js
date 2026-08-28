@@ -68,3 +68,85 @@ export function verifyCvEvidenceGrounding(sourceCvText='',structure={},matches=[
   }
   return true
 }
+
+function numericTokens(value=''){
+  return (String(value??'').match(/\d+(?:[.,]\d+)?(?:%|\+)?/g)||[]).map(token=>token.replace(',','.'))
+}
+
+function truthIssue(code,claim){
+  return {code,claim:text(claim)||'Unverified claim.'}
+}
+
+function expectedRoleScope(blockId,structure={}){
+  if(blockId==='latest_role_overview') return text(structure?.latestRole?.id)
+  if(blockId==='previous_role_overview') return text(structure?.previousRole?.id)
+  return ''
+}
+
+export function deterministicTruthCheck({block,evidence,structure,baseline}={}){
+  const blockId=text(block?.blockId)
+  const originalText=text(block?.originalText)
+  const tailoredText=text(block?.tailoredText)
+  if(!blockId) return {blockId:'',verdict:'FAIL',issues:[truthIssue('UNSUPPORTED','Truth Guard received a block without an ID.')],safeText:originalText||null}
+  if(block?.status!=='generated'||!tailoredText) return {blockId,verdict:'PASS',issues:[],safeText:originalText||null}
+
+  const matches=Array.isArray(evidence?.matches)?evidence.matches:[]
+  const byId=new Map(matches.map(item=>[text(item?.id),item]).filter(([id])=>id))
+  const baselineCv=text(baseline?.cvText)
+  const baselineCvId=text(baseline?.cvId)
+  const baselineVersion=text(baseline?.sourceVersion)
+  const requiredScope=expectedRoleScope(blockId,structure)
+  const issues=[]
+  const referenced=[]
+
+  for(const claim of Array.isArray(block?.claims)?block.claims:[]){
+    const ids=Array.isArray(claim?.evidenceIds)?claim.evidenceIds.map(text).filter(Boolean):[]
+    if(!ids.length){
+      issues.push(truthIssue('UNKNOWN_EVIDENCE',claim?.text))
+      continue
+    }
+    const cited=[]
+    for(const id of ids){
+      const match=byId.get(id)
+      if(!match){
+        issues.push(truthIssue('UNKNOWN_EVIDENCE',claim?.text))
+        continue
+      }
+      if((text(match?.cvId)&&text(match.cvId)!==baselineCvId)||(text(match?.sourceVersion)&&text(match.sourceVersion)!==baselineVersion)){
+        issues.push(truthIssue('UNKNOWN_EVIDENCE',claim?.text))
+        continue
+      }
+      const excerpt=text(match?.excerpt)
+      if(!baselineCv||!excerpt||!normalizeEvidenceText(baselineCv).includes(normalizeEvidenceText(excerpt))){
+        issues.push(truthIssue('UNKNOWN_EVIDENCE',claim?.text))
+        continue
+      }
+      try{ verifyCvEvidenceGrounding(baselineCv,structure,[match]) }
+      catch{
+        issues.push(truthIssue('UNKNOWN_EVIDENCE',claim?.text))
+        continue
+      }
+      if(requiredScope&&text(match?.sectionId)!==requiredScope){
+        issues.push(truthIssue('WRONG_ROLE_SCOPE',claim?.text))
+        continue
+      }
+      cited.push(match)
+      referenced.push(match)
+    }
+    const available=new Set(numericTokens(cited.map(item=>item.excerpt).join(' ')))
+    for(const token of numericTokens(claim?.text)) if(!available.has(token)) issues.push(truthIssue('METRIC_MISMATCH',claim?.text))
+  }
+
+  const availableAll=new Set(numericTokens(referenced.map(item=>item.excerpt).join(' ')))
+  for(const token of numericTokens(tailoredText)) if(!availableAll.has(token)) issues.push(truthIssue('METRIC_MISMATCH',tailoredText))
+
+  const unique=[]
+  const seen=new Set()
+  for(const item of issues){
+    const key=`${item.code}|${item.claim}`
+    if(seen.has(key)) continue
+    seen.add(key)
+    unique.push(item)
+  }
+  return {blockId,verdict:unique.length?'FAIL':'PASS',issues:unique,safeText:unique.length?(originalText||null):tailoredText}
+}
