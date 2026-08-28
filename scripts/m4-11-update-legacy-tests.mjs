@@ -3,23 +3,16 @@ import {readFileSync,writeFileSync} from 'node:fs'
 const path='app/lib/profile-review.test.mjs'
 let source=readFileSync(path,'utf8')
 
-function replaceExact(oldText,newText,label){
-  if(!source.includes(oldText)) throw new Error(`M4.11 legacy-test patch failed: ${label} anchor not found`)
-  source=source.replace(oldText,newText)
+function replaceTest(title,newTest){
+  const start=source.indexOf(`test('${title}',()=>{`)
+  if(start<0) throw new Error(`M4.11 legacy-test patch failed: ${title} not found`)
+  const end=source.indexOf('\n})',start)
+  if(end<0) throw new Error(`M4.11 legacy-test patch failed: ${title} end not found`)
+  source=source.slice(0,start)+newTest+source.slice(end+3)
 }
 
-replaceExact(
-`test('merged UI restores Application Pack, CV Update Review and Truth Guard',()=>{
-  const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
-  assert.match(source,/Application pack/)
-  assert.match(source,/Review CV changes/)
-  assert.match(source,/CV UPDATE REVIEW/)
-  assert.match(source,/Truth Guard active/)
-  assert.match(source,/Truth Guard active · 0 unsupported claims/)
-  assert.match(source,/Accept all safe changes/)
-  assert.match(source,/Keep original/)
-  assert.match(source,/Accept change/)
-})`,
+replaceTest(
+  'merged UI restores Application Pack, CV Update Review and Truth Guard',
 `test('merged UI keeps Application Pack and exposes the M4.11 Truth-Guard review flow',()=>{
   const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
   assert.match(source,/Application pack/)
@@ -30,44 +23,30 @@ replaceExact(
   assert.match(source,/Accept all safe changes/)
   assert.match(source,/Keep original/)
   assert.match(source,/Accept change/)
-})`,
-'application pack review contract'
+})`
 )
 
-replaceExact(
-`test('CV review shows a neutral empty state when there are no actual wording changes',()=>{
-  const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
-  assert.match(source,/No Summary change proposed\./)
-  assert.doesNotMatch(source,/No usable CV evidence was found for this review/)
-})`,
+replaceTest(
+  'CV review shows a neutral empty state when there are no actual wording changes',
 `test('M4.11 CV review shows a neutral empty state when Truth Guard offers no changed safe block',()=>{
   const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
-  assert.match(source,/No safe changes to review\./)
-  assert.match(source,/The selected Source CV remains unchanged\./)
+  assert.match(source,/No safe changes to review\\./)
+  assert.match(source,/The selected Source CV remains unchanged\\./)
   assert.doesNotMatch(source,/No usable CV evidence was found for this review/)
-})`,
-'empty review contract'
+})`
 )
 
-replaceExact(
-`test('Version 2 Step 1 UI reviews Summary-only changes without inventing a bullet workflow',()=>{
-  const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
-  assert.match(source,/buildReviewChanges\(cvData,active\)/)
-  assert.doesNotMatch(source,/buildReviewChanges\(reviewFacts,active\)/)
-  assert.match(source,/CV Summary update/)
-  assert.match(source,/No Summary change proposed\./)
-  assert.match(source,/<span>SUMMARY<\/span>/)
-})`,
+replaceTest(
+  'Version 2 Step 1 UI reviews Summary-only changes without inventing a bullet workflow',
 `test('M4.11 UI supersedes the legacy Summary-only review with three Truth-Guard-safe blocks',()=>{
   const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
-  assert.doesNotMatch(source,/buildReviewChanges\(cvData,active\)/)
+  assert.doesNotMatch(source,/buildReviewChanges\\(cvData,active\\)/)
   assert.match(source,/safeAdaptationReviewBlocks/)
   assert.match(source,/Professional Summary/)
   assert.match(source,/Latest role overview/)
   assert.match(source,/Previous role overview/)
   assert.doesNotMatch(source,/bullet workflow/i)
-})`,
-'legacy summary-only UI contract'
+})`
 )
 
 writeFileSync(path,source)
