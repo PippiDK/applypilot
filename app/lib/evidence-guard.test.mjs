@@ -65,3 +65,57 @@ test('CV evidence must be an exact excerpt from the section it claims to come fr
   assert.equal(verifyCvEvidenceGrounding(sourceCvText,structure,[{id:'E1',requirementId:'P1',sectionId:'role:latest',excerpt:'Led end-to-end platform delivery and customer readiness.'}]),true)
   assert.throws(()=>verifyCvEvidenceGrounding(sourceCvText,structure,[{id:'E2',requirementId:'P2',sectionId:'role:latest',excerpt:'Led stakeholder governance and operational handover.'}]),/section|role-local|not found/i)
 })
+
+const truthStructure={
+  professionalSummary:{id:'professional_summary',eligible:true,text:'Senior delivery leader with regulated enterprise experience.'},
+  latestRole:{id:'role:latest'},
+  previousRole:{id:'role:previous'},
+  employmentSections:[
+    {id:'role:latest',sectionText:'Senior Project Manager\nLed end-to-end platform delivery for 12 markets and customer readiness.'},
+    {id:'role:previous',sectionText:'Senior IT Delivery Manager\nLed stakeholder governance and operational handover.'}
+  ]
+}
+const truthCvText=`Professional Summary\n${truthStructure.professionalSummary.text}\nProfessional Experience\n${truthStructure.employmentSections[0].sectionText}\n${truthStructure.employmentSections[1].sectionText}`
+const truthBaseline={cvId:'cv-2',sourceVersion:'sha256:cv2',cvText:truthCvText}
+const truthEvidence={matches:[
+  {id:'E1',requirementId:'P1',sectionId:'role:latest',excerpt:'Led end-to-end platform delivery for 12 markets and customer readiness.'},
+  {id:'E2',requirementId:'P2',sectionId:'role:previous',excerpt:'Led stakeholder governance and operational handover.'}
+],unsupportedRequirementIds:[]}
+
+test('deterministicTruthCheck rejects an invented metric',async()=>{
+  const {deterministicTruthCheck}=await load()
+  assert.equal(typeof deterministicTruthCheck,'function')
+  const block={blockId:'latest_role_overview',status:'generated',originalText:'Original latest role.',tailoredText:'Led delivery across 40 markets.',claims:[{text:'Led delivery across 40 markets.',evidenceIds:['E1']}]}
+  const result=deterministicTruthCheck({block,evidence:truthEvidence,structure:truthStructure,baseline:truthBaseline})
+  assert.equal(result.verdict,'FAIL')
+  assert.equal(result.issues.some(issue=>issue.code==='METRIC_MISMATCH'),true)
+  assert.equal(result.safeText,truthBaseline.cvText.includes(block.originalText)?block.originalText:block.originalText)
+})
+
+test('deterministicTruthCheck rejects evidence from the wrong role',async()=>{
+  const {deterministicTruthCheck}=await load()
+  assert.equal(typeof deterministicTruthCheck,'function')
+  const block={blockId:'latest_role_overview',status:'generated',originalText:'Original latest role.',tailoredText:'Led stakeholder governance.',claims:[{text:'Led stakeholder governance.',evidenceIds:['E2']}]}
+  const result=deterministicTruthCheck({block,evidence:truthEvidence,structure:truthStructure,baseline:truthBaseline})
+  assert.equal(result.verdict,'FAIL')
+  assert.equal(result.issues.some(issue=>issue.code==='WRONG_ROLE_SCOPE'),true)
+})
+
+test('deterministicTruthCheck rejects unknown evidence IDs',async()=>{
+  const {deterministicTruthCheck}=await load()
+  assert.equal(typeof deterministicTruthCheck,'function')
+  const block={blockId:'professional_summary',status:'generated',originalText:'Original summary.',tailoredText:'Senior leader.',claims:[{text:'Senior leader.',evidenceIds:['E99']}]}
+  const result=deterministicTruthCheck({block,evidence:truthEvidence,structure:truthStructure,baseline:truthBaseline})
+  assert.equal(result.verdict,'FAIL')
+  assert.equal(result.issues.some(issue=>issue.code==='UNKNOWN_EVIDENCE'),true)
+})
+
+test('deterministicTruthCheck rejects evidence not grounded in the selected baseline CV',async()=>{
+  const {deterministicTruthCheck}=await load()
+  assert.equal(typeof deterministicTruthCheck,'function')
+  const foreign={matches:[...truthEvidence.matches,{id:'E3',requirementId:'P3',sectionId:'cv_other',excerpt:'Owned a global ERP transformation across 25 countries.'}],unsupportedRequirementIds:[]}
+  const block={blockId:'professional_summary',status:'generated',originalText:'Original summary.',tailoredText:'Owned a global ERP transformation.',claims:[{text:'Owned a global ERP transformation.',evidenceIds:['E3']}]}
+  const result=deterministicTruthCheck({block,evidence:foreign,structure:truthStructure,baseline:truthBaseline})
+  assert.equal(result.verdict,'FAIL')
+  assert.equal(result.issues.some(issue=>issue.code==='UNKNOWN_EVIDENCE'),true)
+})
