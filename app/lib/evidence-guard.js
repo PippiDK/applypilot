@@ -14,6 +14,22 @@ export function normalizeEvidenceText(value=''){
     .toLowerCase()
 }
 
+function normalizeCvGroundingText(value=''){
+  return normalizeEvidenceText(value)
+    .replace(/[\uFFFE\uFFFF]/g,'')
+    .replace(/(?<=\p{L}{4})-(?=\p{L}{4})/gu,'')
+}
+
+function cvGroundingIncludes(source='',excerpt=''){
+  const normalizedSource=normalizeEvidenceText(source)
+  const normalizedExcerpt=normalizeEvidenceText(excerpt)
+  if(!normalizedExcerpt) return false
+  if(normalizedSource.includes(normalizedExcerpt)) return true
+  const artifactSource=normalizeCvGroundingText(source)
+  const artifactExcerpt=normalizeCvGroundingText(excerpt)
+  return Boolean(artifactExcerpt)&&artifactSource.includes(artifactExcerpt)
+}
+
 export function verifyJdGrounding(jobDescription='',priorities=[]){
   const normalizedJd=normalizeEvidenceText(jobDescription)
   if(!normalizedJd) throw new Error('Insufficient job description for safe tailoring.')
@@ -59,12 +75,11 @@ export function verifyCvEvidenceGrounding(sourceCvText='',structure={},matches=[
     const sectionId=text(match?.sectionId)
     const excerpt=text(match?.excerpt)
     if(!sectionId||!excerpt) throw new Error(`CV evidence ${id} is incomplete.`)
-    const normalizedExcerpt=normalizeEvidenceText(excerpt)
-    if(!normalizedExcerpt||!normalizedCv.includes(normalizedExcerpt)) throw new Error(`CV evidence ${id} was not found in the selected CV.`)
+    if(!cvGroundingIncludes(sourceCvText,excerpt)) throw new Error(`CV evidence ${id} was not found in the selected CV.`)
     if(sectionId==='cv_other') continue
     const sectionText=sections.get(sectionId)
     if(!sectionText) throw new Error(`CV evidence ${id} references an unknown CV section.`)
-    if(!normalizeEvidenceText(sectionText).includes(normalizedExcerpt)) throw new Error(`CV evidence ${id} was not found in its claimed CV section.`)
+    if(!cvGroundingIncludes(sectionText,excerpt)) throw new Error(`CV evidence ${id} was not found in its claimed CV section.`)
   }
   return true
 }
@@ -117,7 +132,7 @@ export function deterministicTruthCheck({block,evidence,structure,baseline}={}){
         continue
       }
       const excerpt=text(match?.excerpt)
-      if(!baselineCv||!excerpt||!normalizeEvidenceText(baselineCv).includes(normalizeEvidenceText(excerpt))){
+      if(!baselineCv||!excerpt||!cvGroundingIncludes(baselineCv,excerpt)){
         issues.push(truthIssue('UNKNOWN_EVIDENCE',claim?.text))
         continue
       }
