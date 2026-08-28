@@ -4,26 +4,30 @@ import fs from 'node:fs'
 
 const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
 
-test('Review CV changes runs the real JD Analyst before opening the preview review',()=>{
-  assert.match(source,/requestJobAnalysis/)
-  assert.match(source,/action.*analyze_job|openAiReview|runJobAnalysis/s)
-  assert.doesNotMatch(source,/onClick=\{\(\)=>setReviewOpen\(true\)\}>Review CV changes/)
+test('Adapt & review CV runs the selected-CV Truth Guard pipeline only on explicit user action',()=>{
+  assert.match(source,/requestTruthGuard/)
+  assert.match(source,/async function runCvAdaptationReview/)
+  assert.match(source,/onClick=\{runCvAdaptationReview\}/)
+  assert.doesNotMatch(source,/useEffect\([^)]*requestTruthGuard/s)
 })
 
-test('pretest review renders JD mission, priorities, must-haves and positioning',()=>{
-  assert.match(source,/JD ANALYSIS PRETEST/)
-  assert.match(source,/Role mission/)
-  assert.match(source,/Hiring priorities/)
-  assert.match(source,/Must-haves/)
-  assert.match(source,/Candidate positioning/)
+test('obsolete JD ANALYSIS PRETEST dashboard is removed from M4.11 review',()=>{
+  assert.doesNotMatch(source,/JD ANALYSIS PRETEST/)
+  assert.doesNotMatch(source,/Role mission/)
+  assert.doesNotMatch(source,/Hiring priorities/)
+  assert.doesNotMatch(source,/Must-haves/)
+  assert.doesNotMatch(source,/Candidate positioning/)
+  assert.match(source,/Truth Guard complete/)
 })
 
-test('review keeps the Summary update clearly separate from the JD pretest',()=>{
-  assert.match(source,/CV Summary update/)
+test('M4.11 review exposes all three approved CV blocks instead of Summary-only pretest UI',()=>{
+  assert.match(source,/Professional Summary/)
+  assert.match(source,/Latest role overview/)
+  assert.match(source,/Previous role overview/)
+  assert.match(source,/safeAdaptationReviewBlocks/)
 })
 
-
-test('Must-haves render from the dedicated analysis.mustHaves qualification list, not priority labels',()=>{
-  assert.match(source,/analysis\.mustHaves/)
-  assert.doesNotMatch(source,/priorities\.filter\(priority=>priority\.kind===['"]must_have['"]\)/)
+test('JD qualification detail stays inside the adaptation pipeline instead of being duplicated in review UI',()=>{
+  assert.doesNotMatch(source,/analysis\.mustHaves/)
+  assert.match(source,/JD analysis → selected-CV evidence → three writers → Truth Guard/)
 })
