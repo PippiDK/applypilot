@@ -1,0 +1,32 @@
+name: M4.11 Apply Work Patch
+
+on:
+  push:
+    branches:
+      - work/m4-11-review-ui
+    paths:
+      - .github/workflows/m4-11-implement.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply M4.11 page and CSS patch
+        run: node scripts/m4-11-apply.mjs
+      - name: Commit M4.11 implementation
+        run: |
+          git config user.name "applypilot-ci"
+          git config user.email "applypilot-ci@users.noreply.github.com"
+          git add app/page.js app/globals.css
+          git diff --cached --exit-code && exit 1 || true
+          git commit -m "feat: wire M4.11 selected-CV review UI"
+          git push origin HEAD:work/m4-11-review-ui
