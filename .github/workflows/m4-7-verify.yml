@@ -1,0 +1,23 @@
+name: M4.7 Professional Summary verification
+
+on:
+  push:
+    branches:
+      - work/m4-7-professional-summary
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: M4.4-M4.7 targeted tests
+        run: node --test app/lib/cv-adaptation-selection.test.mjs app/lib/cv-adaptation-baseline.test.mjs app/lib/cv-adaptation-input.test.mjs app/lib/cv-adaptation-client.test.mjs app/lib/evidence-guard.test.mjs app/lib/ai-contracts.test.mjs app/lib/tailoring-pipeline.test.mjs
+      - name: Build
+        run: npm run build
