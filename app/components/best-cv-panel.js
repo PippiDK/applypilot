@@ -3,6 +3,7 @@ import {useEffect,useMemo,useState} from 'react'
 import {isSourceCvReady} from '../lib/source-cv.js'
 import {requestBestCv} from '../lib/best-cv-client.js'
 import {readBestCvCache,writeBestCvCache} from '../lib/best-cv-cache.js'
+import {buildAdaptationBaseline,baselineMatches} from '../lib/cv-adaptation-baseline.js'
 import CvAdaptationChooser from './cv-adaptation-chooser.js'
 import styles from './best-cv-panel.module.css'
 
@@ -15,6 +16,7 @@ export default function BestCvPanel({job,cvLibrary}){
   const jobId=text(job?.sourceJobId)||`${text(job?.title)}|${text(job?.company)}`
   const description=text(job?.description)
   const [state,setState]=useState({loading:false,error:'',analysis:null,source:'idle'})
+  const [adaptationBaselines,setAdaptationBaselines]=useState({})
 
   useEffect(()=>{
     if(!jobId||!description||!readyCvs.length){
@@ -52,6 +54,14 @@ export default function BestCvPanel({job,cvLibrary}){
   const winner=analysis?readyCvs.find(cv=>cv.id===analysis.recommendedCvId):null
   const ranked=analysis?analysis.rankedCvIds.map(id=>readyCvs.find(cv=>cv.id===id)).filter(Boolean):[]
   const advice=analysis?.recommendation==='update_recommended'?'UPDATE RECOMMENDED':'USE AS IS'
+  const storedBaseline=adaptationBaselines[jobId]||null
+  const baselineCv=storedBaseline?readyCvs.find(cv=>cv.id===storedBaseline.cvId):null
+  const activeBaseline=storedBaseline&&baselineCv&&baselineMatches({baseline:storedBaseline,job,cv:baselineCv})?storedBaseline:null
+
+  function chooseAdaptationCv(cv){
+    const baseline=buildAdaptationBaseline({job,cv})
+    setAdaptationBaselines(current=>({...current,[jobId]:baseline}))
+  }
 
   return <>
     <section className={styles.card}>
@@ -78,6 +88,11 @@ export default function BestCvPanel({job,cvLibrary}){
         {analysis.recommendation==='update_recommended'&&analysis.updateFocus?.length>0&&<div className={styles.focus}><small>UPDATE FOCUS</small>{analysis.updateFocus.map((item,index)=><p key={index}>• {item}</p>)}</div>}
       </>}
     </section>
-    <CvAdaptationChooser jobKey={jobId} cvLibrary={cvLibrary} recommendedCvId={analysis?.recommendedCvId||''}/>
+    <CvAdaptationChooser
+      cvLibrary={cvLibrary}
+      recommendedCvId={analysis?.recommendedCvId||''}
+      selectedCvId={activeBaseline?.cvId||''}
+      onSelectCv={chooseAdaptationCv}
+    />
   </>
 }
