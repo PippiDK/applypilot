@@ -45,6 +45,8 @@ export default function Home(){
   const [jobs,setJobs]=useState([])
   const [selectedAreas,setSelectedAreas]=useState(()=>SEARCH_AREAS.map(({id})=>id))
   const [selectedWorkModels,setSelectedWorkModels]=useState(()=>WORK_MODELS.map(({id})=>id))
+  const allFiltersSelected=SEARCH_AREAS.every(({id})=>selectedAreas.includes(id))&&WORK_MODELS.every(({id})=>selectedWorkModels.includes(id))
+  const someFiltersSelected=selectedAreas.length>0||selectedWorkModels.length>0
   const [selected,setSelected]=useState(null)
   const [jobStatuses,setJobStatuses]=useState({})
   const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
@@ -211,6 +213,12 @@ export default function Home(){
 
   function toggleJobFilter(setter,id){
     setter(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id])
+  }
+
+  function toggleAllJobFilters(event){
+    const checked=event.target.checked
+    setSelectedAreas(checked?SEARCH_AREAS.map(({id})=>id):[])
+    setSelectedWorkModels(checked?WORK_MODELS.map(({id})=>id):[])
   }
 
   async function search(){
@@ -484,6 +492,7 @@ export default function Home(){
         {jobs.length>0&&<details className={filterStyles.filters}>
           <summary><span>FILTERS</span><span>{visibleJobs.length} of {jobs.length}</span></summary>
           <div className={filterStyles.body}>
+            <label className={filterStyles.option}><input type="checkbox" checked={allFiltersSelected} ref={node=>{if(node)node.indeterminate=someFiltersSelected&&!allFiltersSelected}} onChange={toggleAllJobFilters}/><span>All filters</span><b></b></label>
             <div className={filterStyles.group}><small className={filterStyles.groupTitle}>SEARCH AREAS</small>{SEARCH_AREAS.map(area=><label className={filterStyles.option} key={area.id}><input type="checkbox" checked={selectedAreas.includes(area.id)} onChange={()=>toggleJobFilter(setSelectedAreas,area.id)}/><span>{area.label}</span><b>{areaCounts[area.id]||0}</b></label>)}</div>
             <div className={filterStyles.group}><small className={filterStyles.groupTitle}>WORK MODEL</small>{WORK_MODELS.map(model=><label className={filterStyles.option} key={model.id}><input type="checkbox" checked={selectedWorkModels.includes(model.id)} onChange={()=>toggleJobFilter(setSelectedWorkModels,model.id)}/><span>{model.label}</span><b>{workModelCounts[model.id]||0}</b></label>)}</div>
           </div>

@@ -45,3 +45,18 @@ test('Area, Employment type and Work model render directly under the vacancy hea
   assert.match(conditionBlock,/>Employment type</)
   assert.match(conditionBlock,/>Work model</)
 })
+
+test('All filters is the first filter row and controls every existing filter checkbox',()=>{
+  const allFilters=page.indexOf('>All filters</span>')
+  const searchAreas=page.indexOf('>SEARCH AREAS</small>')
+  assert.ok(allFilters>=0,'All filters row is missing')
+  assert.ok(searchAreas>allFilters,'All filters must render before Search Areas')
+  assert.match(page,/checked=\{allFiltersSelected\}/)
+  assert.match(page,/node\.indeterminate=someFiltersSelected&&!allFiltersSelected/)
+  assert.match(page,/onChange=\{toggleAllJobFilters\}/)
+  const handlerStart=page.indexOf('function toggleAllJobFilters(')
+  const handlerEnd=page.indexOf('\n  }',handlerStart)+4
+  const handler=page.slice(handlerStart,handlerEnd)
+  assert.match(handler,/setSelectedAreas\(checked\?SEARCH_AREAS\.map\(\(\{id\}\)=>id\):\[\]\)/)
+  assert.match(handler,/setSelectedWorkModels\(checked\?WORK_MODELS\.map\(\(\{id\}\)=>id\):\[\]\)/)
+})
