@@ -10,21 +10,47 @@ test('maps representative Danish locations into agreed search areas',()=>{
   assert.equal(classifySearchArea({location:'Odense, Region of Southern Denmark'}),'funen')
 })
 
-test('classifies agreed work-model buckets',()=>{
+test('classifies existing filter buckets without changing search data',()=>{
   assert.equal(classifyWorkModel({location:'Copenhagen, Denmark',country:'Denmark',remoteType:'hybrid'}),'dk_hybrid')
   assert.equal(classifyWorkModel({location:'Ballerup, Denmark',country:'Denmark',remoteType:'onsite'}),'dk_onsite')
   assert.equal(classifyWorkModel({location:'Denmark',country:'Denmark',remoteType:'remote'}),'dk_remote')
   assert.equal(classifyWorkModel({location:'Europe',country:'',remoteType:'remote',remoteEligibility:'DENMARK CONFIRMED'}),'eu_remote_denmark')
 })
 
-test('filters only the already-found items and keeps selected remote buckets independent of physical area',()=>{
+test('exposes three work models plus two remote scopes in UI order',()=>{
+  assert.deepEqual(WORK_MODELS.map(({id,label})=>[id,label]),[
+    ['dk_hybrid','Hybrid'],
+    ['dk_onsite','On-site'],
+    ['remote','Remote'],
+    ['dk_remote','Denmark'],
+    ['eu_remote_denmark','EU / Europe — available from Denmark'],
+  ])
+})
+
+test('Remote is a separate work-model switch and remote scope ignores Search Areas',()=>{
   const items=[
-    {job:{sourceJobId:'1',location:'Nærum, Denmark',country:'Denmark',remoteType:'hybrid'}},
-    {job:{sourceJobId:'2',location:'Ballerup, Denmark',country:'Denmark',remoteType:'hybrid'}},
-    {job:{sourceJobId:'3',location:'Europe',remoteType:'remote',remoteEligibility:'DENMARK CONFIRMED'}},
+    {job:{sourceJobId:'hybrid-naerum',location:'Nærum, Denmark',country:'Denmark',remoteType:'hybrid'}},
+    {job:{sourceJobId:'hybrid-ballerup',location:'Ballerup, Denmark',country:'Denmark',remoteType:'hybrid'}},
+    {job:{sourceJobId:'remote-dk',location:'Odense, Denmark',country:'Denmark',remoteType:'remote'}},
+    {job:{sourceJobId:'remote-eu',location:'Europe',remoteType:'remote',remoteEligibility:'DENMARK CONFIRMED'}},
   ]
-  const result=filterJobItems(items,['copenhagen_north'],['dk_hybrid','eu_remote_denmark'])
-  assert.deepEqual(result.map(item=>item.job.sourceJobId),['1','3'])
+
+  assert.deepEqual(
+    filterJobItems(items,['copenhagen_north'],['dk_hybrid']).map(item=>item.job.sourceJobId),
+    ['hybrid-naerum']
+  )
+  assert.deepEqual(
+    filterJobItems(items,['copenhagen_north'],['remote','dk_remote']).map(item=>item.job.sourceJobId),
+    ['remote-dk']
+  )
+  assert.deepEqual(
+    filterJobItems(items,['copenhagen_north'],['remote','eu_remote_denmark']).map(item=>item.job.sourceJobId),
+    ['remote-eu']
+  )
+  assert.deepEqual(
+    filterJobItems(items,['copenhagen_north'],['remote','dk_remote','eu_remote_denmark']).map(item=>item.job.sourceJobId),
+    ['remote-dk','remote-eu']
+  )
 })
 
 test('all selected is a no-op for the existing pool, including unclassified jobs',()=>{

@@ -14,10 +14,11 @@ export const SEARCH_AREAS=[
 ]
 
 export const WORK_MODELS=[
-  {id:'dk_hybrid',label:'Denmark — Hybrid'},
-  {id:'dk_onsite',label:'Denmark — On-site'},
-  {id:'dk_remote',label:'Denmark — Remote'},
-  {id:'eu_remote_denmark',label:'EU — Remote from Denmark'},
+  {id:'dk_hybrid',label:'Hybrid'},
+  {id:'dk_onsite',label:'On-site'},
+  {id:'remote',label:'Remote'},
+  {id:'dk_remote',label:'Denmark'},
+  {id:'eu_remote_denmark',label:'EU / Europe — available from Denmark'},
 ]
 
 const AREA_ALIASES={
@@ -71,7 +72,7 @@ export function filterJobItems(items=[],selectedAreas=[],selectedWorkModels=[]){
   return items.filter(item=>{
     const job=item?.job||{}
     const workModel=classifyWorkModel(job)
-    if(workModel==='dk_remote'||workModel==='eu_remote_denmark') return allWorkModels||workSet.has(workModel)
+    if(workModel==='dk_remote'||workModel==='eu_remote_denmark') return allWorkModels||(workSet.has('remote')&&workSet.has(workModel))
 
     const area=classifySearchArea(job)
     const areaMatch=allAreas||(area&&areaSet.has(area))
