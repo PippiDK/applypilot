@@ -17,7 +17,21 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Test
+      - name: Evidence Guard tests
+        if: always()
+        run: node --test app/lib/evidence-guard.test.mjs
+      - name: AI contract tests
+        if: always()
+        run: node --test app/lib/ai-contracts.test.mjs
+      - name: Tailoring pipeline tests
+        if: always()
+        run: node --test app/lib/tailoring-pipeline.test.mjs
+      - name: Adaptation client tests
+        if: always()
+        run: node --test app/lib/cv-adaptation-client.test.mjs
+      - name: Full tests
+        if: always()
         run: npm test
       - name: Build
+        if: always()
         run: npm run build
