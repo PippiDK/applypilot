@@ -4,13 +4,15 @@ import {readFileSync} from 'node:fs'
 
 const route=readFileSync(new URL('../api/tailor-cv/route.js',import.meta.url),'utf8')
 
-test('tailor-cv POST accepts selected CV plus JD and exposes only the three direct writer actions',()=>{
-  assert.match(route,/write_professional_summary/)
-  assert.match(route,/write_latest_role_overview/)
-  assert.match(route,/write_previous_role_overview/)
+test('tailor-cv POST accepts selected CV plus JD through one direct adaptation action',()=>{
+  assert.match(route,/adapt_cv/)
+  assert.match(route,/writeCvAdaptation/)
   assert.match(route,/sourceVersion/)
   assert.match(route,/sourceCv/)
   assert.match(route,/job/)
+  assert.doesNotMatch(route,/write_professional_summary/)
+  assert.doesNotMatch(route,/write_latest_role_overview/)
+  assert.doesNotMatch(route,/write_previous_role_overview/)
   assert.doesNotMatch(route,/analyze_job/)
   assert.doesNotMatch(route,/map_selected_cv_evidence/)
   assert.doesNotMatch(route,/run_truth_guard/)

@@ -27,66 +27,56 @@ function block(blockId,originalText,tailoredText){
   return {blockId,status:'generated',originalText,tailoredText,why:'Updated for this vacancy.'}
 }
 
-test('requestCvAdaptation sends selected CV and JD directly to exactly the three writer actions',async()=>{
+test('requestCvAdaptation sends selected CV and JD in one adaptation request',async()=>{
   const {requestCvAdaptation}=await import('./cv-adaptation-client.js')
-  assert.equal(typeof requestCvAdaptation,'function')
   const baseline=buildAdaptationBaseline({job,cv})
   const calls=[]
+  const blocks={
+    professionalSummary:block('professional_summary','Original summary','Updated summary'),
+    latestRoleOverview:block('latest_role_overview','Original latest','Updated latest'),
+    previousRoleOverview:block('previous_role_overview','Original previous','Updated previous')
+  }
   const fetchImpl=async(_url,options)=>{
     const body=JSON.parse(options.body)
     calls.push(body)
-    if(body.action==='write_professional_summary') return {ok:true,json:async()=>({stage:'summary_written',block:block('professional_summary','Original summary','Updated summary')})}
-    if(body.action==='write_latest_role_overview') return {ok:true,json:async()=>({stage:'latest_role_written',block:block('latest_role_overview','Original latest','Updated latest')})}
-    if(body.action==='write_previous_role_overview') return {ok:true,json:async()=>({stage:'previous_role_written',block:block('previous_role_overview','Original previous','Updated previous')})}
-    throw new Error(`Unexpected action ${body.action}`)
+    return {ok:true,json:async()=>({stage:'adaptation_written',blocks})}
   }
 
   const result=await requestCvAdaptation({baseline,job,fetchImpl})
-  assert.deepEqual(calls.map(call=>call.action),['write_professional_summary','write_latest_role_overview','write_previous_role_overview'])
-  for(const call of calls){
-    assert.deepEqual(call.sourceCv,sourceCv)
-    assert.equal(call.job.sourceJobId,'JOB-1')
-    assert.equal(call.job.description,job.description)
-    assert.equal('token' in call,false)
-  }
-  const wire=JSON.stringify(calls)
-  assert.equal(wire.includes('map_selected_cv_evidence'),false)
-  assert.equal(wire.includes('run_truth_guard'),false)
-  assert.equal(wire.includes('analyze_job'),false)
+  assert.equal(calls.length,1)
+  assert.equal(calls[0].action,'adapt_cv')
+  assert.deepEqual(calls[0].sourceCv,sourceCv)
+  assert.equal(calls[0].job.sourceJobId,'JOB-1')
+  assert.equal(calls[0].job.description,job.description)
   assert.equal(result.stage,'adaptation_written')
   assert.deepEqual(Object.keys(result.blocks),['professionalSummary','latestRoleOverview','previousRoleOverview'])
 })
 
-test('all three writers receive the selected CV and JD directly and return AI text without evidence objects',async()=>{
-  const pipeline=await import('./tailoring-pipeline.js')
-  const previousModule=await import('./previous-role-overview.js')
+test('one AI call receives selected CV and JD and returns all three updated blocks',async()=>{
+  const {writeCvAdaptation}=await import('./direct-cv-adaptation.js')
   const structure=detectCvStructure(cvText)
   const requests=[]
   const modelCall=async request=>{
     requests.push(request)
-    return {tailoredText:`Updated ${request.stage}`,why:'Updated for this vacancy.'}
+    return {
+      professionalSummary:{tailoredText:'Updated summary',why:'Summary reason'},
+      latestRoleOverview:{tailoredText:'Updated latest',why:'Latest reason'},
+      previousRoleOverview:{tailoredText:'Updated previous',why:'Previous reason'}
+    }
   }
 
-  const summary=await pipeline.writeProfessionalSummary({job,sourceCv,structure},modelCall)
-  const latest=await pipeline.writeLatestRoleOverview({job,sourceCv,structure},modelCall)
-  const previous=await previousModule.writePreviousRoleOverview({job,sourceCv,structure},modelCall)
+  const blocks=await writeCvAdaptation({job,sourceCv,structure},modelCall)
 
-  assert.equal(summary.tailoredText,'Updated professional_summary_writer')
-  assert.equal(latest.tailoredText,'Updated latest_role_overview_writer')
-  assert.equal(previous.tailoredText,'Updated previous_role_overview_writer')
-  assert.equal(requests.length,3)
-  for(const request of requests){
-    assert.equal(request.input.sourceCv.cvText,cvText)
-    assert.equal(request.input.job.description,job.description)
-    assert.equal('analysis' in request.input,false)
-    assert.equal('evidence' in request.input,false)
-    assert.equal('supportedRequirements' in request.input,false)
-  }
+  assert.equal(requests.length,1)
+  assert.equal(requests[0].input.sourceCv.cvText,cvText)
+  assert.equal(requests[0].input.job.description,job.description)
+  assert.equal(blocks.professionalSummary.tailoredText,'Updated summary')
+  assert.equal(blocks.latestRoleOverview.tailoredText,'Updated latest')
+  assert.equal(blocks.previousRoleOverview.tailoredText,'Updated previous')
 })
 
-test('review shows writer tailoredText directly without Truth Guard',async()=>{
+test('review shows AI tailoredText directly without Truth Guard',async()=>{
   const {adaptationReviewBlocks}=await import('./cv-adaptation-decisions.js')
-  assert.equal(typeof adaptationReviewBlocks,'function')
   const blocks={
     professionalSummary:block('professional_summary','Original summary','AI summary'),
     latestRoleOverview:block('latest_role_overview','Original latest','AI latest'),

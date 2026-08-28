@@ -9,7 +9,7 @@ const routes=[
   ['open-job','../api/open-job/route.js',['NextResponse.json']],
   ['parse-cv','../api/parse-cv/route.js',['request.formData']],
   ['search-jobs','../api/search-jobs/route.js',['NextResponse.json']],
-  ['tailor-cv','../api/tailor-cv/route.js',['request.json','writeProfessionalSummary']]
+  ['tailor-cv','../api/tailor-cv/route.js',['request.json','writeCvAdaptation']]
 ]
 
 for(const [name,path,businessMarkers] of routes){

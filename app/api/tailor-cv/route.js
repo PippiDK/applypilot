@@ -1,6 +1,5 @@
 import {NextResponse} from 'next/server'
-import {writeProfessionalSummary,writeLatestRoleOverview} from '../../lib/tailoring-pipeline.js'
-import {writePreviousRoleOverview} from '../../lib/previous-role-overview.js'
+import {writeCvAdaptation} from '../../lib/direct-cv-adaptation.js'
 import {detectCvStructure} from '../../lib/cv-sections.js'
 import {requireUser} from '../../lib/auth/require-user.js'
 
@@ -32,37 +31,20 @@ export async function POST(request){
   const auth=await requireUser()
   if(!auth.user) return auth.response
 
-  let action=''
   try{
     const body=await request.json()
-    action=text(body?.action)
+    const action=text(body?.action)
+    if(action!=='adapt_cv') return NextResponse.json({error:'Unsupported tailoring action.'},{status:400})
+
     const job=requestJob(body?.job)
     const sourceCv=requestSourceCv(body?.sourceCv)
     const requestError=validateSelectedCvRequest({job,sourceCv})
     if(requestError) return NextResponse.json({error:requestError},{status:400})
-    const structure=detectCvStructure(sourceCv.cvText)
 
-    if(action==='write_professional_summary'){
-      const block=await writeProfessionalSummary({job,sourceCv,structure})
-      return NextResponse.json({stage:'summary_written',block})
-    }
-    if(action==='write_latest_role_overview'){
-      const block=await writeLatestRoleOverview({job,sourceCv,structure})
-      return NextResponse.json({stage:'latest_role_written',block})
-    }
-    if(action==='write_previous_role_overview'){
-      const block=await writePreviousRoleOverview({job,sourceCv,structure})
-      return NextResponse.json({stage:'previous_role_written',block})
-    }
-    return NextResponse.json({error:'Unsupported tailoring action.'},{status:400})
+    const structure=detectCvStructure(sourceCv.cvText)
+    const blocks=await writeCvAdaptation({job,sourceCv,structure})
+    return NextResponse.json({stage:'adaptation_written',blocks})
   }catch{
-    const error=action==='write_professional_summary'
-      ?'Professional Summary writing failed. Please try again.'
-      :action==='write_latest_role_overview'
-        ?'Latest role overview writing failed. Please try again.'
-        :action==='write_previous_role_overview'
-          ?'Previous role overview writing failed. Please try again.'
-          :'CV adaptation failed. Please try again.'
-    return NextResponse.json({error},{status:502})
+    return NextResponse.json({error:'CV adaptation failed. Please try again.'},{status:502})
   }
 }
