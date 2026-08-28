@@ -83,14 +83,14 @@ test('merged UI restores Search Profile persistence without wiring it into Linke
   assert.match(source,/Save profile/)
 })
 
-test('merged UI keeps Application Pack and exposes the M4.11 Truth-Guard review flow',()=>{
+test('merged UI keeps Application Pack and exposes the direct M4 review flow',()=>{
   const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
   assert.match(source,/Application pack/)
   assert.match(source,/Adapt & review CV/)
   assert.match(source,/CV UPDATE REVIEW/)
-  assert.match(source,/Truth Guard complete/)
-  assert.match(source,/Only Truth-Guard-safe UPDATED text is shown/)
-  assert.match(source,/Accept all safe changes/)
+  assert.match(source,/Adaptation complete/)
+  assert.match(source,/AI UPDATED text is shown directly/)
+  assert.match(source,/Accept all changes/)
   assert.match(source,/Keep original/)
   assert.match(source,/Accept change/)
 })
@@ -106,9 +106,9 @@ test('buildReviewChanges omits CV evidence when normalized original and updated 
   assert.deepEqual(changes,[])
 })
 
-test('M4.11 CV review shows a neutral empty state when Truth Guard offers no changed safe block',()=>{
+test('M4 CV review shows a neutral empty state when AI returns no changed block',()=>{
   const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
-  assert.match(source,/No safe changes to review\./)
+  assert.match(source,/No changes to review\./)
   assert.match(source,/The selected Source CV remains unchanged\./)
   assert.doesNotMatch(source,/No usable CV evidence was found for this review/)
 })
@@ -219,10 +219,10 @@ test('Version 2 Step 1 can read the Master CV summary from a complete saved prev
   assert.doesNotMatch(summary,/PROFESSIONAL EXPERIENCE/i)
 })
 
-test('M4.11 UI supersedes the legacy Summary-only review with three Truth-Guard-safe blocks',()=>{
+test('M4 UI supersedes the legacy Summary-only review with three direct AI blocks',()=>{
   const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
   assert.doesNotMatch(source,/buildReviewChanges\(cvData,active\)/)
-  assert.match(source,/safeAdaptationReviewBlocks/)
+  assert.match(source,/adaptationReviewBlocks/)
   assert.match(source,/Professional Summary/)
   assert.match(source,/Latest role overview/)
   assert.match(source,/Previous role overview/)

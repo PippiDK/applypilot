@@ -5,11 +5,11 @@ import {readFileSync} from 'node:fs'
 const page=readFileSync(new URL('../page.js',import.meta.url),'utf8')
 const bestCvPanel=readFileSync(new URL('../components/best-cv-panel.js',import.meta.url),'utf8')
 
-test('M4.11 page runs the real selected-CV Truth Guard pipeline before opening review',()=>{
-  assert.match(page,/requestTruthGuard/)
+test('M4 review runs direct selected-CV adaptation before opening review',()=>{
+  assert.match(page,/requestCvAdaptation/)
   assert.match(page,/buildAdaptationBaseline/)
   assert.match(page,/baselineMatches/)
-  assert.match(page,/safeAdaptationReviewBlocks/)
+  assert.match(page,/adaptationReviewBlocks/)
   assert.match(page,/Adapt & review CV/)
 })
 
@@ -37,7 +37,7 @@ test('Accept and Keep handlers mutate decision state only, not CV Library or Sou
   assert.doesNotMatch(handlers,/upsertCvSlot/)
 })
 
-test('review UI renders the three-block contract and WHY CHANGED from safe review blocks',()=>{
+test('review UI renders the three-block contract and WHY CHANGED from direct AI review blocks',()=>{
   assert.match(page,/Professional Summary/)
   assert.match(page,/Latest role overview/)
   assert.match(page,/Previous role overview/)

@@ -4,13 +4,17 @@ import {readFileSync} from 'node:fs'
 
 const route=readFileSync(new URL('../api/tailor-cv/route.js',import.meta.url),'utf8')
 
-test('tailor-cv POST revives analyze_job without reviving legacy tailoring',()=>{
-  assert.equal(route.includes("POST(){ return NextResponse.json({error:'Retired"),false)
-  assert.match(route,/action\s*!==\s*['"]analyze_job['"]/)
-  assert.match(route,/analyzeJob\(/)
+test('tailor-cv POST accepts selected CV plus JD and exposes only the three direct writer actions',()=>{
+  assert.match(route,/write_professional_summary/)
+  assert.match(route,/write_latest_role_overview/)
+  assert.match(route,/write_previous_role_overview/)
   assert.match(route,/sourceVersion/)
-  assert.match(route,/stage:'job_analyzed'/)
-  assert.match(route,/token/)
+  assert.match(route,/sourceCv/)
+  assert.match(route,/job/)
+  assert.doesNotMatch(route,/analyze_job/)
+  assert.doesNotMatch(route,/map_selected_cv_evidence/)
+  assert.doesNotMatch(route,/run_truth_guard/)
+  assert.doesNotMatch(route,/tailoringToken|signTailoringToken|verifyTailoringToken/)
 })
 
 test('tailor-cv route keeps GET retired and does not log CV or JD payloads',()=>{
