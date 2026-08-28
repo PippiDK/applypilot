@@ -11,39 +11,63 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Use Node 22
         uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Tests A-F
-        if: always()
+      - name: M4.10 targeted tests
+        run: node --test app/lib/evidence-guard.test.mjs app/lib/ai-contracts.test.mjs app/lib/tailoring-pipeline.test.mjs app/lib/cv-adaptation-client.test.mjs
+      - name: No new per-file regressions vs M4.9 baseline
         shell: bash
         run: |
-          files=$(find app/lib -maxdepth 1 -name '*.test.mjs' | sort | grep -Ei '/[a-f][^/]*\.test\.mjs$' || true)
-          if [ -n "$files" ]; then node --test $files; fi
-      - name: Tests G-L
-        if: always()
-        shell: bash
-        run: |
-          files=$(find app/lib -maxdepth 1 -name '*.test.mjs' | sort | grep -Ei '/[g-l][^/]*\.test\.mjs$' || true)
-          if [ -n "$files" ]; then node --test $files; fi
-      - name: Tests M-R
-        if: always()
-        shell: bash
-        run: |
-          files=$(find app/lib -maxdepth 1 -name '*.test.mjs' | sort | grep -Ei '/[m-r][^/]*\.test\.mjs$' || true)
-          if [ -n "$files" ]; then node --test $files; fi
-      - name: Tests S-Z
-        if: always()
-        shell: bash
-        run: |
-          files=$(find app/lib -maxdepth 1 -name '*.test.mjs' | sort | grep -Ei '/[s-z][^/]*\.test\.mjs$' || true)
-          if [ -n "$files" ]; then node --test $files; fi
-      - name: Full tests
+          set -u
+          BASE=3a9aefc697f0e615991a28aeb559f2e7aaeaba8c
+          HEAD_SHA="$GITHUB_SHA"
+          mapfile -t files < <(find app/lib -maxdepth 1 -name '*.test.mjs' | sort)
+          : > /tmp/baseline-status.txt
+          git checkout --detach "$BASE" >/dev/null 2>&1
+          for f in "${files[@]}"; do
+            if [ -f "$f" ]; then
+              if node --test "$f" >/tmp/baseline-one.log 2>&1; then code=0; else code=1; fi
+            else
+              code=2
+            fi
+            printf '%s\t%s\n' "$code" "$f" >> /tmp/baseline-status.txt
+          done
+          git checkout --detach "$HEAD_SHA" >/dev/null 2>&1
+          regressions=0
+          baseline_failures=0
+          while IFS=$'\t' read -r base_code f; do
+            if node --test "$f" >/tmp/head-one.log 2>&1; then head_code=0; else head_code=1; fi
+            if [ "$base_code" = "0" ] && [ "$head_code" != "0" ]; then
+              echo "NEW_REGRESSION: $f"
+              cat /tmp/head-one.log
+              regressions=$((regressions+1))
+            elif [ "$base_code" = "1" ]; then
+              baseline_failures=$((baseline_failures+1))
+            fi
+          done < /tmp/baseline-status.txt
+          echo "Pre-existing failing test files at baseline: $baseline_failures"
+          echo "New failing test files introduced by M4.10: $regressions"
+          test "$regressions" -eq 0
+      - name: Full tests current state
         if: always()
         run: npm test
       - name: Build
         if: always()
         run: npm run build
+      - name: Search freeze diff
+        if: always()
+        shell: bash
+        run: |
+          git diff --exit-code 3a9aefc697f0e615991a28aeb559f2e7aaeaba8c -- \
+            app/lib/linkedin-profile-search.js \
+            app/api/linkedin-profile-search/route.js \
+            app/lib/linkedin-shadow-discovery.js \
+            app/lib/linkedin-search.js \
+            app/api/linkedin-search/route.js \
+            app/lib/union-search-plan.js
