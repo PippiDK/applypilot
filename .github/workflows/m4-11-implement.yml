@@ -6,6 +6,7 @@ on:
       - work/m4-11-review-ui
     paths:
       - .github/workflows/m4-11-implement.yml
+      - scripts/m4-11-update-legacy-tests.mjs
 
 permissions:
   contents: write
