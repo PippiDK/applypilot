@@ -4,6 +4,8 @@ on:
     branches:
       - work/m4-direct-ai-adaptation
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -14,29 +16,24 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Update superseded M4 contracts
+        run: python .github/scripts/m4_update_direct_spec_tests.py
+      - name: Commit updated contracts when needed
+        shell: bash
+        run: |
+          git config user.name "applypilot-ci"
+          git config user.email "applypilot-ci@users.noreply.github.com"
+          git add app/lib/auth-private-api-guard.test.mjs app/lib/cv-adaptation-review-ui.contract.test.mjs app/lib/v16-cv-review.contract.test.mjs app/lib/jd-analysis-ui.contract.test.mjs app/lib/profile-review.test.mjs app/lib/tailor-cv-api.contract.test.mjs
+          if ! git diff --cached --quiet; then
+            git commit -m "test: align M4 contracts with direct AI adaptation"
+            git push origin HEAD:work/m4-direct-ai-adaptation
+          fi
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Direct adaptation contract
         run: node --test app/lib/direct-cv-adaptation.test.mjs
-      - name: Locate superseded Truth Guard tests
-        shell: bash
-        run: |
-          set -euo pipefail
-          for title in \
-            "Adapt & review CV runs the selected-CV Truth Guard pipeline only on explicit user action" \
-            "CV Update Review is driven by explicit selected-CV adaptation rather than a standalone JD cache pretest" \
-            "CV Update Review keeps a focused review instead of the obsolete dashboard-style Truth Guard panel" \
-            "JD qualification detail stays inside the adaptation pipeline instead of being duplicated in review UI" \
-            "M4.11 CV review shows a neutral empty state when Truth Guard offers no changed safe block" \
-            "M4.11 UI supersedes the legacy Summary-only review with three Truth-Guard-safe blocks" \
-            "M4.11 page runs the real selected-CV Truth Guard pipeline before opening review" \
-            "M4.11 review exposes all three approved CV blocks instead of Summary-only pretest UI" \
-            "merged UI keeps Application Pack and exposes the M4.11 Truth-Guard review flow" \
-            "obsolete JD ANALYSIS PRETEST dashboard is removed from M4.11 review" \
-            "tailor-cv authorizes before request parsing or provider/business work"; do
-            echo "=== $title ==="
-            grep -RFl -- "$title" app/lib || true
-          done
+      - name: Full suite
+        run: npm test
       - name: Active M4 path has no Evidence Mapping or Truth Guard
         shell: bash
         run: |
