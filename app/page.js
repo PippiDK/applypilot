@@ -10,8 +10,8 @@ import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search
 import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'
 import {selectAdaptationCv,selectedAdaptationCv} from './lib/cv-adaptation-selection.js'
 import {buildAdaptationBaseline,baselineKey,baselineMatches} from './lib/cv-adaptation-baseline.js'
-import {requestTruthGuard} from './lib/cv-adaptation-client.js'
-import {ADAPTATION_DECISION,readAdaptationDecision,setAdaptationDecision,safeAdaptationReviewBlocks} from './lib/cv-adaptation-decisions.js'
+import {requestCvAdaptation} from './lib/cv-adaptation-client.js'
+import {ADAPTATION_DECISION,readAdaptationDecision,setAdaptationDecision,adaptationReviewBlocks} from './lib/cv-adaptation-decisions.js'
 import {requestExpertiseMatch} from './lib/expertise-match-client.js'
 import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'
 import {evaluateJobConditions} from './lib/job-conditions.js'
@@ -117,7 +117,7 @@ export default function Home(){
   const activeAdaptationBaseline=storedAdaptationBaseline&&selectedAdaptationCvRecord&&baselineMatches({baseline:storedAdaptationBaseline,job:active?.job,cv:selectedAdaptationCvRecord})?storedAdaptationBaseline:null
   const activeBaselineKey=activeAdaptationBaseline?baselineKey(activeAdaptationBaseline):''
   const currentAdaptationResult=adaptationRun.jobKey===jobKey&&adaptationRun.baselineKey===activeBaselineKey?adaptationRun.result:null
-  const reviewChanges=safeAdaptationReviewBlocks({blocks:currentAdaptationResult?.blocks,truthGuard:currentAdaptationResult?.truthGuard})
+  const reviewChanges=adaptationReviewBlocks({blocks:currentAdaptationResult?.blocks})
   const conditionProfile=useMemo(()=>({...profile,acceptedWorkModels:acceptedWorkModels(profile.geography)}),[profile])
   const jobConditions=useMemo(()=>active?evaluateJobConditions(active.job,conditionProfile):null,[active,conditionProfile])
   const reviewedCount=activeAdaptationBaseline?reviewChanges.filter(change=>readAdaptationDecision(decisions,{jobId:activeAdaptationBaseline.jobId,cvId:activeAdaptationBaseline.cvId,sourceVersion:activeAdaptationBaseline.sourceVersion,blockId:change.blockId})).length:0
@@ -363,7 +363,7 @@ export default function Home(){
     setReviewOpen(true)
     setAdaptationRun({loading:true,error:'',jobKey:runJobKey,baselineKey:runBaselineKey,result:null})
     try{
-      const result=await requestTruthGuard({baseline:runBaseline,job:active.job})
+      const result=await requestCvAdaptation({baseline:runBaseline,job:active.job})
       setAdaptationRun({loading:false,error:'',jobKey:runJobKey,baselineKey:runBaselineKey,result})
     }catch(error){
       setAdaptationRun({loading:false,error:error.message||'CV adaptation failed safely. Please try again.',jobKey:runJobKey,baselineKey:runBaselineKey,result:null})
@@ -488,18 +488,18 @@ export default function Home(){
 
     {reviewOpen&&active&&activeAdaptationBaseline&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget&&!adaptationRun.loading)setReviewOpen(false)}}><div className="modal reviewModal"><div className="modalHead"><div><p className="eyebrow">CV UPDATE REVIEW</p><h2>{active.job.title}</h2><p className="muted">{active.job.company} · {active.job.location}</p><p className="reviewBaseline">CV {selectedAdaptationCvRecord?.slot} · {activeAdaptationBaseline.fileName}</p></div><button className="close" onClick={()=>setReviewOpen(false)} disabled={adaptationRun.loading}>×</button></div>
       <div className="reviewScopeLine">Professional Summary · Latest role overview · Previous role overview</div>
-      {adaptationRun.loading&&adaptationRun.jobKey===jobKey&&adaptationRun.baselineKey===activeBaselineKey&&<div className="adaptationLoading"><b>Adapting selected CV…</b><span>JD analysis → selected-CV evidence → three writers → Truth Guard.</span></div>}
+      {adaptationRun.loading&&adaptationRun.jobKey===jobKey&&adaptationRun.baselineKey===activeBaselineKey&&<div className="adaptationLoading"><b>Adapting selected CV…</b><span>Selected CV + JD → three AI updates.</span></div>}
       {adaptationRun.error&&adaptationRun.jobKey===jobKey&&adaptationRun.baselineKey===activeBaselineKey&&<div className="errorBox"><b>CV adaptation failed safely</b><span>{adaptationRun.error}</span></div>}
       {currentAdaptationResult&&<>
-        <div className="adaptationRunStatus"><b>✓ Truth Guard complete</b><span>{reviewChanges.length} safe change{reviewChanges.length===1?'':'s'} available for review · {reviewedCount}/{reviewChanges.length} decided</span></div>
-        <div className="reviewToolbar"><div><h3>Selected-CV changes</h3><p>Only Truth-Guard-safe UPDATED text is shown. Source CV remains unchanged.</p></div>{reviewChanges.length>0&&<button className="secondary" onClick={acceptAll}>Accept all safe changes</button>}</div>
+        <div className="adaptationRunStatus"><b>✓ Adaptation complete</b><span>{reviewChanges.length} change{reviewChanges.length===1?'':'s'} available for review · {reviewedCount}/{reviewChanges.length} decided</span></div>
+        <div className="reviewToolbar"><div><h3>Selected-CV changes</h3><p>AI UPDATED text is shown directly. Source CV remains unchanged.</p></div>{reviewChanges.length>0&&<button className="secondary" onClick={acceptAll}>Accept all changes</button>}</div>
         {reviewChanges.map(change=>{const decision=decisionFor(change.blockId);return <div className={'changeCard '+(decision?'decided':'')} key={change.blockId}>
           <div className="changeHead"><span>{change.label}</span><b>{decision===ADAPTATION_DECISION.ACCEPTED?'Accepted':decision===ADAPTATION_DECISION.ORIGINAL?'Original kept':'Review needed'}</b></div>
           <div className="compareGrid"><div className="compareBox"><small>ORIGINAL</small><p>{change.original}</p></div><div className="compareArrow">→</div><div className="compareBox updatedBox"><small>UPDATED</small><p>{change.updated}</p></div></div>
           <div className="changeWhy"><div><small>WHY CHANGED</small><p>{change.why}</p></div></div>
           <div className="evidenceActions"><button className={'secondary '+(decision===ADAPTATION_DECISION.ORIGINAL?'chosen':'')} onClick={()=>setDecision(change.blockId,ADAPTATION_DECISION.ORIGINAL)}>Keep original</button><button className={'primary smallPrimary '+(decision===ADAPTATION_DECISION.ACCEPTED?'chosenPrimary':'')} onClick={()=>setDecision(change.blockId,ADAPTATION_DECISION.ACCEPTED)}>Accept change</button></div>
         </div>})}
-        {!reviewChanges.length&&<div className="reviewEmpty"><b>No safe changes to review.</b><span>Truth Guard did not offer a changed block. The selected Source CV remains unchanged.</span></div>}
+        {!reviewChanges.length&&<div className="reviewEmpty"><b>No changes to review.</b><span>AI returned no changed block. The selected Source CV remains unchanged.</span></div>}
       </>}
       <div className="reviewFooter"><button className="secondary" onClick={()=>setReviewOpen(false)} disabled={adaptationRun.loading}>Close review</button></div>
     </div></div>}

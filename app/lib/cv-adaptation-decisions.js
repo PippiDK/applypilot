@@ -42,6 +42,19 @@ export function readAdaptationDecision(current={},identity={}){
   }
 }
 
+export function adaptationReviewBlocks({blocks={}}={}){
+  const review=[]
+  for(const definition of REVIEW_BLOCKS){
+    const block=blocks?.[definition.key]
+    if(block?.status!=='generated'||text(block?.blockId)!==definition.blockId) continue
+    const original=text(block.originalText)
+    const updated=text(block.tailoredText)
+    if(!original||!updated||original===updated) continue
+    review.push({blockId:definition.blockId,label:definition.label,original,updated,why:text(block.why)||'Updated for this vacancy.'})
+  }
+  return review
+}
+
 export function safeAdaptationReviewBlocks({blocks={},truthGuard={}}={}){
   const review=[]
   for(const definition of REVIEW_BLOCKS){
