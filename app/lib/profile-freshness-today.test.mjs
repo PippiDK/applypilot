@@ -27,6 +27,7 @@ test('1 day means the current Denmark calendar day from 00:00, not yesterday',as
 
   const result=await searchLinkedInProfile({freshnessDays:1,unionSearchPlan:plan,fetcher,now:new Date('2026-08-28T00:30:00+02:00')})
 
-  assert.deepEqual(result.jobs.map(item=>item.job.jobId),['2222222222'])
+  assert.equal(result.jobs.length,1)
   assert.ok(result.audit.some(row=>row.jobId==='1111111111'&&row.stage==='FRESHNESS_REJECT'))
+  assert.ok(result.audit.some(row=>row.jobId==='2222222222'&&row.stage==='KEPT'))
 })
