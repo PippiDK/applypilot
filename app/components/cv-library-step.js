@@ -20,7 +20,7 @@ export default function CvLibraryStep({library,loadingSlot=null,error='',primary
 
   return <div className="wizard">
     <h3>Upload your CVs</h3>
-    <p>Upload up to three CVs for later vacancy-specific selection. CV 1 remains the active Search CV for now. Uploaded source files remain unchanged.</p>
+    <p>Upload up to three Word CVs for vacancy-specific selection and tailored DOCX download. CV 1 remains the active Search CV for now. Source files remain unchanged and are not stored in the database.</p>
 
     <div className={styles.slotList}>
       {slots.map(({slot,cv})=><div className={styles.slot} key={slot}>
@@ -31,7 +31,7 @@ export default function CvLibraryStep({library,loadingSlot=null,error='',primary
         <div className={styles.fileName}>{cv?.fileName||'No CV uploaded'}</div>
         <div className={`${styles.slotActions} ${cv?'':styles.singleAction}`}>
           <label className={styles.slotAction}>
-            <input type="file" accept=".pdf,.docx" onChange={event=>{const file=event.target.files?.[0]; if(file) onUpload?.(file,slot); event.target.value=''}} disabled={Boolean(loadingSlot)}/>
+            <input type="file" accept=".docx" onChange={event=>{const file=event.target.files?.[0]; if(file) onUpload?.(file,slot); event.target.value=''}} disabled={Boolean(loadingSlot)}/>
             {loadingSlot===slot?'Analysing…':cv?'Replace':'Upload CV'}
           </label>
           {cv&&<button type="button" className={styles.removeAction} onClick={()=>setConfirmSlot(slot)} disabled={Boolean(loadingSlot)}>Remove</button>}

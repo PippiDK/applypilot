@@ -62,6 +62,8 @@ export default function Home(){
   const [adaptationRun,setAdaptationRun]=useState({loading:false,error:'',jobKey:'',baselineKey:''})
   const [expertiseState,setExpertiseState]=useState({loading:false,error:'',analysis:null,jobKey:''})
   const [decisions,setDecisions]=useState({})
+  const [sourceDocxFiles,setSourceDocxFiles]=useState({})
+  const [exportState,setExportState]=useState({loading:false,error:'',baselineKey:''})
   const active=jobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||jobs[0]||null
 
   useEffect(()=>{
@@ -122,6 +124,8 @@ export default function Home(){
   const conditionProfile=useMemo(()=>({...profile,acceptedWorkModels:acceptedWorkModels(profile.geography)}),[profile])
   const jobConditions=useMemo(()=>active?evaluateJobConditions(active.job,conditionProfile):null,[active,conditionProfile])
   const reviewedCount=activeAdaptationBaseline?reviewChanges.filter(change=>readAdaptationDecision(decisions,{jobId:activeAdaptationBaseline.jobId,cvId:activeAdaptationBaseline.cvId,sourceVersion:activeAdaptationBaseline.sourceVersion,blockId:change.blockId})).length:0
+  const allReviewDecisionsMade=Boolean(currentAdaptationResult)&&reviewedCount===reviewChanges.length
+  const selectedSourceDocx=activeAdaptationBaseline?sourceDocxFiles[activeAdaptationBaseline.sourceVersion]||null:null
   const profileCompletion=useMemo(()=>{
     const fields=[resumeLoaded,draft.roles,(draftLocations.length&&draftWorkModels.length)]
     return Math.round(fields.filter(Boolean).length/fields.length*100)
@@ -136,6 +140,7 @@ export default function Home(){
 
   async function parseCv(file,slot=1){
     if(!file) return
+    if(!String(file.name||'').toLowerCase().endsWith('.docx')){ setCvState({loadingSlot:null,error:'Please upload a Word DOCX file.'}); return }
     setCvState({loadingSlot:slot,error:''})
     try{
       const form=new FormData()
@@ -145,6 +150,7 @@ export default function Home(){
       if(!res.ok) throw new Error(data.error||'CV parsing failed.')
       const saved=buildSourceCvRecord(data,new Date().toISOString())
       const nextLibrary=upsertCvSlot(cvLibrary,slot,saved)
+      setSourceDocxFiles(current=>({...current,[saved.sourceVersion]:file}))
       localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(nextLibrary))
       setCvLibrary(nextLibrary)
       setProfileRoleState(EMPTY_ROLE_STATE)
@@ -165,7 +171,7 @@ export default function Home(){
       }
       setCvState({loadingSlot:null,error:''})
     }catch(error){
-      setCvState({loadingSlot:null,error:error.message||'CV parsing failed. Please try another PDF or DOCX.'})
+      setCvState({loadingSlot:null,error:error.message||'CV parsing failed. Please try another DOCX.'})
     }
   }
 
@@ -175,6 +181,8 @@ export default function Home(){
     setCvLibrary(nextLibrary)
     setCvState({loadingSlot:null,error:''})
     setProfileRoleState(EMPTY_ROLE_STATE)
+    const removed=cvLibrary?.cvs?.[slot-1]||null
+    if(removed?.sourceVersion) setSourceDocxFiles(current=>{const next={...current};delete next[removed.sourceVersion];return next})
     if(slot!==1) return
 
     localStorage.removeItem(SOURCE_CV_STORAGE_KEY)
@@ -353,6 +361,7 @@ export default function Home(){
     setAdaptationSelections(current=>selectAdaptationCv(current,{jobKey,cvId:cv.id,readyCvs}))
     setAdaptationBaselines(current=>({...current,[jobKey]:baseline}))
     setAdaptationRun({loading:false,error:'',jobKey:'',baselineKey:''})
+    setExportState({loading:false,error:'',baselineKey:''})
     setReviewOpen(false)
   }
 
@@ -391,6 +400,48 @@ export default function Home(){
   function acceptAll(){
     if(!activeAdaptationBaseline) return
     setDecisions(current=>reviewChanges.reduce((next,change)=>setAdaptationDecision(next,decisionIdentity(change.blockId),ADAPTATION_DECISION.ACCEPTED),current))
+  }
+
+  function attachSourceDocx(file){
+    if(!file||!activeAdaptationBaseline) return
+    if(!String(file.name||'').toLowerCase().endsWith('.docx')){ setExportState({loading:false,error:'Please choose the matching source DOCX file.',baselineKey:activeBaselineKey}); return }
+    setSourceDocxFiles(current=>({...current,[activeAdaptationBaseline.sourceVersion]:file}))
+    setExportState({loading:false,error:'',baselineKey:activeBaselineKey})
+  }
+
+  async function downloadTailoredCv(){
+    if(!active||!activeAdaptationBaseline||!selectedSourceDocx||!allReviewDecisionsMade||exportState.loading) return
+    const replacements=reviewChanges
+      .filter(change=>decisionFor(change.blockId)===ADAPTATION_DECISION.ACCEPTED)
+      .map(change=>({blockId:change.blockId,originalText:change.original,newText:change.updated}))
+    const company=String(active.job.company||'tailored').replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'')||'tailored'
+    const base=String(activeAdaptationBaseline.fileName||'CV').replace(/\.docx$/i,'')
+    const outputName=`${base}_${company}_TAILORED.docx`
+    setExportState({loading:true,error:'',baselineKey:activeBaselineKey})
+    try{
+      const form=new FormData()
+      form.append('file',selectedSourceDocx)
+      form.append('replacements',JSON.stringify(replacements))
+      form.append('outputName',outputName)
+      const res=await fetch('/api/export-tailored-cv',{method:'POST',body:form})
+      if(!res.ok){
+        let message='Tailored DOCX could not be created.'
+        try{const data=await res.json();message=data.error||message}catch{}
+        throw new Error(message)
+      }
+      const blob=await res.blob()
+      const url=URL.createObjectURL(blob)
+      const anchor=document.createElement('a')
+      anchor.href=url
+      anchor.download=outputName
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+      setExportState({loading:false,error:'',baselineKey:activeBaselineKey})
+    }catch(error){
+      setExportState({loading:false,error:error.message||'Tailored DOCX could not be created.',baselineKey:activeBaselineKey})
+    }
   }
 
   return <main>
@@ -513,7 +564,8 @@ export default function Home(){
         </div>})}
         {!reviewChanges.length&&<div className="reviewEmpty"><b>No changes to review.</b><span>AI returned no changed block. The selected Source CV remains unchanged.</span></div>}
       </>}
-      <div className="reviewFooter"><button className="secondary" onClick={()=>setReviewOpen(false)} disabled={adaptationRun.loading}>Close review</button></div>
+      {exportState.error&&exportState.baselineKey===activeBaselineKey&&<div className="errorBox"><b>DOCX update failed</b><span>{exportState.error}</span></div>}
+      <div className="reviewFooter"><button className="secondary" onClick={()=>setReviewOpen(false)} disabled={adaptationRun.loading||exportState.loading}>Close review</button>{allReviewDecisionsMade&&(selectedSourceDocx?<button className="primary" onClick={downloadTailoredCv} disabled={exportState.loading}>{exportState.loading?'Creating DOCX…':'Download tailored DOCX'}</button>:<label className="secondary">Re-upload source DOCX<input type="file" accept=".docx" hidden onChange={event=>{const file=event.target.files?.[0];if(file)attachSourceDocx(file);event.target.value=''}}/></label>)}</div>
     </div></div>}
   </main>
 }

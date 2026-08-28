@@ -26,7 +26,7 @@ test('parse-cv endpoint accepts resume uploads instead of being retired', () => 
 
 test('Feature 2 UI persists the complete active Source CV and supports legacy migration', () => {
   assert.match(page, /\/api\/parse-cv/)
-  assert.match(cvLibraryStep, /accept="\.pdf,\.docx"/)
+  assert.match(cvLibraryStep, /accept="\.docx"/)
   assert.match(page, /SOURCE_CV_STORAGE_KEY/)
   assert.match(page, /LEGACY_CV_STORAGE_KEY/)
   assert.match(page, /buildSourceCvRecord/)
@@ -37,7 +37,6 @@ test('Feature 2 UI persists the complete active Source CV and supports legacy mi
   assert.match(page, /localStorage\.setItem\(SOURCE_CV_STORAGE_KEY/)
   assert.match(page, /localStorage\.removeItem\(LEGACY_CV_STORAGE_KEY\)/)
 })
-
 
 
 test('Feature 2 retains the extracted Professional Summary separately from the short preview', () => {
