@@ -11,6 +11,17 @@ async function postJson(fetchImpl,body){
   return data
 }
 
+export async function requestCvAdaptation({baseline,job,fetchImpl=fetch}={}){
+  const input=buildAdaptationInput({baseline,job})
+  const summary=await postJson(fetchImpl,{action:'write_professional_summary',sourceCv:input.sourceCv,job:input.job})
+  if(summary?.stage!=='summary_written'||summary?.block?.blockId!=='professional_summary') throw new Error('Professional Summary writing did not complete.')
+  const latest=await postJson(fetchImpl,{action:'write_latest_role_overview',sourceCv:input.sourceCv,job:input.job})
+  if(latest?.stage!=='latest_role_written'||latest?.block?.blockId!=='latest_role_overview') throw new Error('Latest role overview writing did not complete.')
+  const previous=await postJson(fetchImpl,{action:'write_previous_role_overview',sourceCv:input.sourceCv,job:input.job})
+  if(previous?.stage!=='previous_role_written'||previous?.block?.blockId!=='previous_role_overview') throw new Error('Previous role overview writing did not complete.')
+  return {stage:'adaptation_written',blocks:{professionalSummary:summary.block,latestRoleOverview:latest.block,previousRoleOverview:previous.block}}
+}
+
 async function runEvidenceStages({input,fetchImpl}){
   const analysed=await postJson(fetchImpl,{
     action:'analyze_job',
