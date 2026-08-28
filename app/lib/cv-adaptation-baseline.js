@@ -56,6 +56,7 @@ export function buildAdaptationBaseline({job,cv}={}){
     summary:raw(cv?.summary),
     facts:cloneValue(Array.isArray(cv?.facts)?cv.facts:[]),
     skills:cloneValue(Array.isArray(cv?.skills)?cv.skills:[]),
+    updateFocus:cloneValue(Array.isArray(cv?.updateFocus)?cv.updateFocus:[]),
     createdAt:new Date().toISOString()
   }
 }

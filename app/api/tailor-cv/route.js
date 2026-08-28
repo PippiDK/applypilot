@@ -41,8 +41,9 @@ export async function POST(request){
     const requestError=validateSelectedCvRequest({job,sourceCv})
     if(requestError) return NextResponse.json({error:requestError},{status:400})
 
+    const updateFocus=Array.isArray(body?.updateFocus)?body.updateFocus:[]
     const structure=detectCvStructure(sourceCv.cvText)
-    const blocks=await writeCvAdaptation({job,sourceCv,structure})
+    const blocks=await writeCvAdaptation({job,sourceCv,structure,updateFocus})
     return NextResponse.json({stage:'adaptation_written',blocks})
   }catch{
     return NextResponse.json({error:'CV adaptation failed. Please try again.'},{status:502})

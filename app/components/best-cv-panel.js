@@ -92,7 +92,7 @@ export default function BestCvPanel({job,cvLibrary,selectedCvId='',onSelectCv=()
       cvLibrary={cvLibrary}
       recommendedCvId={analysis?.recommendedCvId||''}
       selectedCvId={selectedCvId}
-      onSelectCv={onSelectCv}
+      onSelectCv={cv=>onSelectCv({...cv,updateFocus:cv?.id===analysis?.recommendedCvId&&analysis?.recommendation==='update_recommended'&&Array.isArray(analysis?.updateFocus)?analysis.updateFocus:[]})}
     />
   </>
 }

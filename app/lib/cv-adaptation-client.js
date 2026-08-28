@@ -13,7 +13,7 @@ async function postJson(fetchImpl,body){
 
 export async function requestCvAdaptation({baseline,job,fetchImpl=fetch}={}){
   const input=buildAdaptationInput({baseline,job})
-  const written=await postJson(fetchImpl,{action:'adapt_cv',sourceCv:input.sourceCv,job:input.job})
+  const written=await postJson(fetchImpl,{action:'adapt_cv',sourceCv:input.sourceCv,job:input.job,updateFocus:Array.isArray(baseline?.updateFocus)?baseline.updateFocus:[]})
   const blocks=written?.blocks
   if(written?.stage!=='adaptation_written'
     ||blocks?.professionalSummary?.blockId!=='professional_summary'

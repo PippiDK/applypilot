@@ -27,6 +27,7 @@ Rewrite these three existing CV blocks so they are better aligned with the suppl
 2. Overview text for the latest employment role
 3. Overview text for the previous employment role
 Use the selected CV and the job description as context.
+Use the supplied updateFocus recommendations as guidance when they are present.
 Return updated text and a short explanation for each block.`
 
 function sourceCvInput(sourceCv={}){
@@ -54,7 +55,7 @@ function blockResult({blockId,originalText,draft,role}={}){
   return {...base,status:'generated',tailoredText:raw(draft?.tailoredText),why:raw(draft?.why)}
 }
 
-export async function writeCvAdaptation({job,sourceCv,structure}={},modelCall){
+export async function writeCvAdaptation({job,sourceCv,structure,updateFocus=[]}={},modelCall){
   const summaryOriginal=text(structure?.professionalSummary?.text)
   const latestRole=structure?.latestRole||null
   const previousRole=structure?.previousRole||null
@@ -64,6 +65,7 @@ export async function writeCvAdaptation({job,sourceCv,structure}={},modelCall){
     input:{
       sourceCv:sourceCvInput(sourceCv),
       job:jobInput(job),
+      updateFocus:Array.isArray(updateFocus)?updateFocus:[],
       blocks:{
         professionalSummary:{originalText:summaryOriginal},
         latestRoleOverview:roleInput(latestRole),
