@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "node --test app/lib/cv-adaptation-baseline.test.mjs && next build",
   "git": {
     "deploymentEnabled": {
       "feature/cv-library-3-slots": false
