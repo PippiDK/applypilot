@@ -3,7 +3,8 @@
   "git": {
     "deploymentEnabled": {
       "feature/cv-library-3-slots": false,
-      "work/m4-8-latest-role-overview": false
+      "work/m4-8-latest-role-overview": false,
+      "work/m4-9-previous-role-overview": false
     }
   }
 }
