@@ -17,18 +17,30 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Evidence Guard tests
+      - name: Tests A-F
         if: always()
-        run: node --test app/lib/evidence-guard.test.mjs
-      - name: AI contract tests
+        shell: bash
+        run: |
+          files=$(find app/lib -maxdepth 1 -name '*.test.mjs' | sort | grep -Ei '/[a-f][^/]*\.test\.mjs$' || true)
+          if [ -n "$files" ]; then node --test $files; fi
+      - name: Tests G-L
         if: always()
-        run: node --test app/lib/ai-contracts.test.mjs
-      - name: Tailoring pipeline tests
+        shell: bash
+        run: |
+          files=$(find app/lib -maxdepth 1 -name '*.test.mjs' | sort | grep -Ei '/[g-l][^/]*\.test\.mjs$' || true)
+          if [ -n "$files" ]; then node --test $files; fi
+      - name: Tests M-R
         if: always()
-        run: node --test app/lib/tailoring-pipeline.test.mjs
-      - name: Adaptation client tests
+        shell: bash
+        run: |
+          files=$(find app/lib -maxdepth 1 -name '*.test.mjs' | sort | grep -Ei '/[m-r][^/]*\.test\.mjs$' || true)
+          if [ -n "$files" ]; then node --test $files; fi
+      - name: Tests S-Z
         if: always()
-        run: node --test app/lib/cv-adaptation-client.test.mjs
+        shell: bash
+        run: |
+          files=$(find app/lib -maxdepth 1 -name '*.test.mjs' | sort | grep -Ei '/[s-z][^/]*\.test\.mjs$' || true)
+          if [ -n "$files" ]; then node --test $files; fi
       - name: Full tests
         if: always()
         run: npm test
