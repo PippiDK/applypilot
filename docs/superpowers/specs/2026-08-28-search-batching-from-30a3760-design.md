@@ -4,7 +4,9 @@ Date: 2026-08-28
 
 ## Goal
 
-Use commit `30a37606bc5b2c29437333ba154a8547eaa626db` as the exact product baseline for Search and add only one capability: resumable batching so a large LinkedIn search can continue reading and evaluating candidates until the discovered set is exhausted, instead of stopping when one long request reaches its retry/time budget.
+Use commit `30a37606bc5b2c29437333ba154a8547eaa626db` as the exact whole-product baseline and add only one capability: resumable batching so a large LinkedIn search can continue reading and evaluating candidates until the discovered set is exhausted, instead of stopping when one long request reaches its retry/time budget.
+
+The implementation branch is created directly from `30a3760`. No later product behavior is retained by default. Later code may be copied only when it is strictly required to implement the batching transport described in this spec; later Search evaluation, UI behavior, language fixes and unrelated features must not be transplanted.
 
 The live control run on `30a3760` proved the target behavior:
 
@@ -15,23 +17,23 @@ The intended change is infrastructure only. Search intelligence and KEEP/REJECT 
 
 ## In scope
 
-1. Start from the `30a3760` product behavior.
+1. Start from the exact `30a3760` whole-product tree.
 2. Split large profile-driven LinkedIn Search into resumable phases:
    - discovery/pagination;
    - persisted candidate queue;
    - bounded Full JD processing batches;
    - checkpoint after each batch;
    - resume until no pending candidates remain.
-3. Preserve candidate provenance (`foundBy`) and the Search Profile that existed in `30a3760`.
-4. Reuse the proven Search Run transport pattern from the later implementation where possible, but adapt it to the `30a3760` evaluator instead of importing later evaluation logic.
+3. Preserve candidate provenance (`foundBy`) and the Search Profile behavior that exists in `30a3760`.
+4. Reuse only the proven Search Run transport pattern from the later implementation where it reduces risk, adapting it to the `30a3760` evaluator instead of importing later evaluation logic or unrelated product changes.
 5. Keep Full JD retrieval failures isolated: one inaccessible JD becomes `UNVERIFIED` and must not stop later candidates.
 6. Keep processing bounded per server invocation. Initial target: up to 30 candidates per processing invocation, subject to the existing safe time budget.
-7. Preserve the existing user-facing progress model sufficiently to show discovered/read progress and final completion/access limitation.
+7. Preserve the `30a3760` user-facing Search behavior, adding only the progress/resume wiring strictly necessary for batching.
 8. No OpenAI/LLM call is introduced by this feature.
 
 ## Explicitly out of scope
 
-This task must NOT add or change:
+This task must NOT add or change, relative to the `30a3760` baseline:
 
 - BUG3 Danish-language normalization/fix;
 - semantic/LLM Search evaluation;
@@ -45,8 +47,8 @@ This task must NOT add or change:
 - Primary/Adjacent role generation;
 - geography behavior;
 - work-model filtering;
-- Best CV / Expertise Match / MATCH CV AND JD / tailoring behavior;
-- scoring thresholds or KEEP/REJECT semantics from `30a3760`;
+- Best CV / Expertise Match / right-panel / tailoring behavior;
+- scoring thresholds or KEEP/REJECT semantics;
 - the old cosmetic `worthwhile after evaluation` counter wording/meaning;
 - `main`;
 - deployment.
@@ -69,7 +71,7 @@ A Search Run owns the state for one user-triggered search. It persists:
 - candidate queue and processing state;
 - final run status.
 
-Candidate processing states remain transport states, not relevance decisions: `PENDING`, `PROCESSING`, `PROCESSED`, `UNVERIFIED` (or the equivalent existing persisted names if the transplanted implementation already defines them).
+Candidate processing states remain transport states, not relevance decisions: `PENDING`, `PROCESSING`, `PROCESSED`, `UNVERIFIED` (or the equivalent existing persisted names if the transplanted transport implementation already defines them).
 
 ### Full JD processing
 
@@ -113,9 +115,10 @@ The implementation is accepted only if all of the following hold:
 3. A resume test proves an interrupted run continues from persisted state.
 4. A failure test proves one Full JD fetch failure becomes `UNVERIFIED` and later candidates are still processed.
 5. A 30+ candidate test proves the invocation cap/checkpoint behavior.
-6. Search Profile generation, BUG3, geography and right-panel protected areas have no production diff attributable to this task.
-7. Build and relevant/full tests run before any deployment.
-8. Live acceptance test on a separate Preview uses the same Search Profile and 7-day window and checks that the run goes materially beyond the previous 107/212 boundary, ideally processing all readable candidates.
+6. Diff against `30a3760` contains only batching/resume infrastructure, its minimal wiring, tests, migration/config strictly required for persistence, and this documentation. No unrelated later product files are restored.
+7. Search Profile generation, BUG3, geography and right-panel behavior remain the `30a3760` versions.
+8. Build and relevant/full tests run before any deployment.
+9. Live acceptance test on a separate Preview uses the same Search Profile and 7-day window and checks that the run goes materially beyond the previous 107/212 boundary, ideally processing all readable candidates.
 
 ## Deployment boundary
 
