@@ -58,7 +58,8 @@ export default function Home(){
   const [reviewOpen,setReviewOpen]=useState(false)
   const [adaptationSelections,setAdaptationSelections]=useState({})
   const [adaptationBaselines,setAdaptationBaselines]=useState({})
-  const [adaptationRun,setAdaptationRun]=useState({loading:false,error:'',jobKey:'',baselineKey:'',result:null})
+  const [adaptationResults,setAdaptationResults]=useState({})
+  const [adaptationRun,setAdaptationRun]=useState({loading:false,error:'',jobKey:'',baselineKey:''})
   const [expertiseState,setExpertiseState]=useState({loading:false,error:'',analysis:null,jobKey:''})
   const [decisions,setDecisions]=useState({})
   const active=jobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||jobs[0]||null
@@ -116,7 +117,7 @@ export default function Home(){
   const storedAdaptationBaseline=adaptationBaselines[jobKey]||null
   const activeAdaptationBaseline=storedAdaptationBaseline&&selectedAdaptationCvRecord&&baselineMatches({baseline:storedAdaptationBaseline,job:active?.job,cv:selectedAdaptationCvRecord})?storedAdaptationBaseline:null
   const activeBaselineKey=activeAdaptationBaseline?baselineKey(activeAdaptationBaseline):''
-  const currentAdaptationResult=adaptationRun.jobKey===jobKey&&adaptationRun.baselineKey===activeBaselineKey?adaptationRun.result:null
+  const currentAdaptationResult=activeBaselineKey?adaptationResults[activeBaselineKey]||null:null
   const reviewChanges=adaptationReviewBlocks({blocks:currentAdaptationResult?.blocks})
   const conditionProfile=useMemo(()=>({...profile,acceptedWorkModels:acceptedWorkModels(profile.geography)}),[profile])
   const jobConditions=useMemo(()=>active?evaluateJobConditions(active.job,conditionProfile):null,[active,conditionProfile])
@@ -351,22 +352,23 @@ export default function Home(){
     const baseline=buildAdaptationBaseline({job:active.job,cv})
     setAdaptationSelections(current=>selectAdaptationCv(current,{jobKey,cvId:cv.id,readyCvs}))
     setAdaptationBaselines(current=>({...current,[jobKey]:baseline}))
-    setAdaptationRun({loading:false,error:'',jobKey:'',baselineKey:'',result:null})
+    setAdaptationRun({loading:false,error:'',jobKey:'',baselineKey:''})
     setReviewOpen(false)
   }
 
   async function runCvAdaptationReview(){
-    if(!active||!activeAdaptationBaseline||adaptationRun.loading) return
+    if(!active||!activeAdaptationBaseline||adaptationRun.loading||currentAdaptationResult) return
     const runJobKey=jobKey
     const runBaseline=activeAdaptationBaseline
     const runBaselineKey=baselineKey(runBaseline)
     setReviewOpen(true)
-    setAdaptationRun({loading:true,error:'',jobKey:runJobKey,baselineKey:runBaselineKey,result:null})
+    setAdaptationRun({loading:true,error:'',jobKey:runJobKey,baselineKey:runBaselineKey})
     try{
       const result=await requestCvAdaptation({baseline:runBaseline,job:active.job})
-      setAdaptationRun({loading:false,error:'',jobKey:runJobKey,baselineKey:runBaselineKey,result})
+      setAdaptationResults(current=>({...current,[runBaselineKey]:result}))
+      setAdaptationRun({loading:false,error:'',jobKey:runJobKey,baselineKey:runBaselineKey})
     }catch(error){
-      setAdaptationRun({loading:false,error:error.message||'CV adaptation failed safely. Please try again.',jobKey:runJobKey,baselineKey:runBaselineKey,result:null})
+      setAdaptationRun({loading:false,error:error.message||'CV adaptation failed safely. Please try again.',jobKey:runJobKey,baselineKey:runBaselineKey})
     }
   }
 
@@ -439,7 +441,18 @@ export default function Home(){
             <div className="conditionCard"><small>Work model</small><b>{conditionScore(jobConditions?.workModel.score)}</b><span>{jobConditions?.workModel.value||'Not stated'}</span></div>
           </div>
 
-          <BestCvPanel job={job} cvLibrary={cvLibrary} selectedCvId={activeAdaptationBaseline?.cvId||''} onSelectCv={chooseAdaptationCv}/>
+          <BestCvPanel
+            job={job}
+            cvLibrary={cvLibrary}
+            selectedCvId={activeAdaptationBaseline?.cvId||''}
+            onSelectCv={chooseAdaptationCv}
+            adaptationActions={<div className="actions reviewActions">
+              <button className="primary" onClick={runCvAdaptationReview} disabled={!activeAdaptationBaseline||adaptationRun.loading||Boolean(currentAdaptationResult)}>{adaptationRun.loading&&adaptationRun.jobKey===jobKey?'Generating…':currentAdaptationResult?'Generated':'Generate CV update'}</button>
+              <button className="secondary" onClick={()=>setReviewOpen(true)} disabled={!currentAdaptationResult}>View CV update</button>
+              <a className="secondary openLink" href={job.originalUrl} target="_blank" rel="noreferrer">Open LinkedIn vacancy</a>
+              {job.officialUrl&&<a className="secondary openLink" href={job.officialUrl} target="_blank" rel="noreferrer">Employer link</a>}
+            </div>}
+          />
 
           <div className="expertiseHero">
             <div className="expertiseHeroHead"><div><p className="eyebrow">EXPERTISE MATCH</p><p className="expertiseIntro">Full JD ↔ Source CV professional expertise only</p></div><div className="expertiseScore">{expertiseState.loading&&expertiseState.jobKey===jobKey?'…':expertise?`${expertise.expertiseMatch}%`:'N/A'}</div></div>
@@ -462,7 +475,6 @@ export default function Home(){
 
 
           <div className="section"><h3>Application pack</h3><div className="docs"><div>{pack.cvReady?'✓':'○'} Tailored CV <span className={pack.cvReady?'ready':'pending'}>{pack.tailoredCvLabel}</span></div><div>○ Cover letter <span className="pending">{pack.coverLetterLabel}</span></div></div></div>
-          <div className="actions reviewActions">{pack.cvReady?<button className="primary" onClick={runCvAdaptationReview} disabled={!activeAdaptationBaseline||adaptationRun.loading}>{adaptationRun.loading&&adaptationRun.jobKey===jobKey?'Adapting CV…':activeAdaptationBaseline?'Adapt & review CV':'Choose CV to adapt'}</button>:<button className="primary" onClick={startProfile}>Upload CV</button>}<a className="secondary openLink" href={job.originalUrl} target="_blank" rel="noreferrer">Open LinkedIn vacancy</a>{job.officialUrl&&<a className="secondary openLink" href={job.officialUrl} target="_blank" rel="noreferrer">Employer link</a>}</div>
         </>})():<div className="emptyPanel"><h2>No selected vacancy</h2><p>{state.loading?'Searching LinkedIn public pages…':'Run the LinkedIn search to see matching vacancies.'}</p></div>}
       </div>
     </section>

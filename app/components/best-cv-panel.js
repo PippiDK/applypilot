@@ -9,7 +9,7 @@ import styles from './best-cv-panel.module.css'
 const text=value=>String(value??'').trim()
 function cvLabel(cv){return cv?.slot?`CV ${cv.slot}`:'CV'}
 
-export default function BestCvPanel({job,cvLibrary,selectedCvId='',onSelectCv=()=>{},onAnalysisChange}){
+export default function BestCvPanel({job,cvLibrary,selectedCvId='',onSelectCv=()=>{},onAnalysisChange,adaptationActions=null}){
   const readyCvs=useMemo(()=>Array.isArray(cvLibrary?.cvs)?cvLibrary.cvs.filter(isSourceCvReady):[],[cvLibrary])
   const librarySignature=readyCvs.map(cv=>`${cv.id}:${cv.sourceVersion}`).join('|')
   const jobId=text(job?.sourceJobId)||`${text(job?.title)}|${text(job?.company)}`
@@ -93,6 +93,7 @@ export default function BestCvPanel({job,cvLibrary,selectedCvId='',onSelectCv=()
       recommendedCvId={analysis?.recommendedCvId||''}
       selectedCvId={selectedCvId}
       onSelectCv={cv=>onSelectCv({...cv,updateFocus:cv?.id===analysis?.recommendedCvId&&analysis?.recommendation==='update_recommended'&&Array.isArray(analysis?.updateFocus)?analysis.updateFocus:[]})}
+      actions={adaptationActions}
     />
   </>
 }

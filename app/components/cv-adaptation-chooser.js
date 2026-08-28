@@ -6,7 +6,7 @@ import styles from './cv-adaptation-chooser.module.css'
 const text=value=>String(value??'').trim()
 const cvLabel=cv=>cv?.slot?`CV ${cv.slot}`:'CV'
 
-export default function CvAdaptationChooser({cvLibrary,recommendedCvId='',selectedCvId='',onSelectCv}){
+export default function CvAdaptationChooser({cvLibrary,recommendedCvId='',selectedCvId='',onSelectCv,actions=null}){
   const choices=useMemo(()=>readyAdaptationChoices(cvLibrary),[cvLibrary])
   const recommended=text(recommendedCvId)
   const selected=text(selectedCvId)
@@ -31,5 +31,6 @@ export default function CvAdaptationChooser({cvLibrary,recommendedCvId='',select
         <span className={styles.badges}>{isRecommended&&<em>RECOMMENDED</em>}{isSelected&&<strong>SELECTED</strong>}</span>
       </button>})}
     </div>
+    {actions}
   </section>
 }

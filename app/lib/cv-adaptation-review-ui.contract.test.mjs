@@ -10,7 +10,8 @@ test('M4 review runs direct selected-CV adaptation before opening review',()=>{
   assert.match(page,/buildAdaptationBaseline/)
   assert.match(page,/baselineMatches/)
   assert.match(page,/adaptationReviewBlocks/)
-  assert.match(page,/Adapt & review CV/)
+  assert.match(page,/Generate CV update/)
+  assert.match(page,/View CV update/)
 })
 
 test('review decisions use exact baseline identity and original or accepted values',()=>{
@@ -23,7 +24,7 @@ test('review decisions use exact baseline identity and original or accepted valu
 
 test('switching vacancy or selected CV cannot expose a stale adaptation result',()=>{
   assert.match(page,/baselineMatches\(\{baseline:storedAdaptationBaseline,job:active\?\.job,cv:selectedAdaptationCvRecord\}\)/)
-  assert.match(page,/adaptationRun\.jobKey===jobKey&&adaptationRun\.baselineKey===activeBaselineKey/)
+  assert.match(page,/const currentAdaptationResult=activeBaselineKey\?adaptationResults\[activeBaselineKey\]\|\|null:null/)
 })
 
 test('Accept and Keep handlers mutate decision state only, not CV Library or Source CV',()=>{
