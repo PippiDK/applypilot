@@ -4,8 +4,6 @@ on:
     branches:
       - work/m4-direct-ai-adaptation
   workflow_dispatch:
-permissions:
-  contents: write
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -16,23 +14,49 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Apply direct adaptation simplification
-        run: python .github/scripts/m4_direct_ai_adaptation.py
-      - name: Commit simplification when needed
-        shell: bash
-        run: |
-          git config user.name "applypilot-ci"
-          git config user.email "applypilot-ci@users.noreply.github.com"
-          git add app/lib/tailoring-pipeline.js app/lib/previous-role-overview.js app/lib/cv-adaptation-client.js app/lib/cv-adaptation-decisions.js app/api/tailor-cv/route.js app/page.js
-          if ! git diff --cached --quiet; then
-            git commit -m "refactor: simplify M4 to direct AI adaptation"
-            git push origin HEAD:work/m4-direct-ai-adaptation
-          fi
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Direct adaptation contract
         run: node --test app/lib/direct-cv-adaptation.test.mjs
-      - name: Legacy M4 contracts still compile
-        run: node --test app/lib/cv-adaptation-client.test.mjs app/lib/cv-adaptation-decisions.test.mjs app/lib/tailoring-pipeline.test.mjs app/lib/previous-role-overview.test.mjs
+      - name: No new full-suite failures vs released M4.11
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach /tmp/m411-base ae4a1b705744612ff8e21a754645fffa83767a56
+          ln -s "$GITHUB_WORKSPACE/node_modules" /tmp/m411-base/node_modules
+          set +e
+          (cd /tmp/m411-base && npm test > /tmp/base.log 2>&1)
+          npm test > /tmp/head.log 2>&1
+          set -e
+          grep '^not ok ' /tmp/base.log | sed -E 's/^not ok [0-9]+ - //' | sort > /tmp/base.failures || true
+          grep '^not ok ' /tmp/head.log | sed -E 's/^not ok [0-9]+ - //' | sort > /tmp/head.failures || true
+          echo '=== BASE FAILURES ==='
+          cat /tmp/base.failures
+          echo '=== HEAD FAILURES ==='
+          cat /tmp/head.failures
+          diff -u /tmp/base.failures /tmp/head.failures
+      - name: Active M4 path has no Evidence Mapping or Truth Guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -q "map_selected_cv_evidence\|run_truth_guard\|analyze_job" app/api/tailor-cv/route.js
+          ! grep -q "requestTruthGuard\|safeAdaptationReviewBlocks\|Truth Guard complete\|selected-CV evidence" app/page.js
+      - name: Search freeze
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only ae4a1b705744612ff8e21a754645fffa83767a56...HEAD > /tmp/changed
+          for path in \
+            app/lib/linkedin-profile-search.js \
+            app/api/linkedin-profile-search/route.js \
+            app/lib/linkedin-shadow-discovery.js \
+            app/lib/linkedin-search.js \
+            app/api/linkedin-search/route.js \
+            app/lib/union-search-plan.js; do
+            if grep -Fxq "$path" /tmp/changed; then
+              echo "Frozen Search file changed: $path"
+              exit 1
+            fi
+          done
       - name: Production build
         run: npm run build
