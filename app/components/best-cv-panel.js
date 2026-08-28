@@ -3,41 +3,47 @@ import {useEffect,useMemo,useState} from 'react'
 import {isSourceCvReady} from '../lib/source-cv.js'
 import {requestBestCv} from '../lib/best-cv-client.js'
 import {readBestCvCache,writeBestCvCache} from '../lib/best-cv-cache.js'
-import {buildAdaptationBaseline,baselineMatches} from '../lib/cv-adaptation-baseline.js'
 import CvAdaptationChooser from './cv-adaptation-chooser.js'
 import styles from './best-cv-panel.module.css'
 
 const text=value=>String(value??'').trim()
 function cvLabel(cv){return cv?.slot?`CV ${cv.slot}`:'CV'}
 
-export default function BestCvPanel({job,cvLibrary}){
+export default function BestCvPanel({job,cvLibrary,selectedCvId='',onSelectCv=()=>{},onAnalysisChange}){
   const readyCvs=useMemo(()=>Array.isArray(cvLibrary?.cvs)?cvLibrary.cvs.filter(isSourceCvReady):[],[cvLibrary])
   const librarySignature=readyCvs.map(cv=>`${cv.id}:${cv.sourceVersion}`).join('|')
   const jobId=text(job?.sourceJobId)||`${text(job?.title)}|${text(job?.company)}`
   const description=text(job?.description)
   const [state,setState]=useState({loading:false,error:'',analysis:null,source:'idle'})
-  const [adaptationBaselines,setAdaptationBaselines]=useState({})
+
+  function notifyAnalysis(analysis){
+    if(typeof onAnalysisChange==='function') onAnalysisChange({jobId,analysis:analysis||null})
+  }
 
   useEffect(()=>{
     if(!jobId||!description||!readyCvs.length){
       setState({loading:false,error:'',analysis:null,source:'idle'})
+      notifyAnalysis(null)
       return
     }
     const args={storage:localStorage,jobId,description,cvs:readyCvs}
     const cached=readBestCvCache(args)
     setState({loading:false,error:'',analysis:cached,source:cached?'cache':'idle'})
+    notifyAnalysis(cached)
   },[jobId,description,librarySignature])
 
   async function runBestCv(){
     if(state.loading||!jobId||!description) return
     if(!readyCvs.length){
       setState({loading:false,error:'Upload at least one CV before Best CV analysis.',analysis:null,source:'idle'})
+      notifyAnalysis(null)
       return
     }
     const cacheArgs={storage:localStorage,jobId,description,cvs:readyCvs}
     const cached=readBestCvCache(cacheArgs)
     if(cached){
       setState({loading:false,error:'',analysis:cached,source:'cache'})
+      notifyAnalysis(cached)
       return
     }
     setState({loading:true,error:'',analysis:null,source:'idle'})
@@ -45,8 +51,10 @@ export default function BestCvPanel({job,cvLibrary}){
       const analysis=await requestBestCv({job,cvs:readyCvs})
       writeBestCvCache({...cacheArgs,analysis})
       setState({loading:false,error:'',analysis,source:'ai'})
+      notifyAnalysis(analysis)
     }catch(error){
       setState({loading:false,error:error.message||'Best CV analysis failed safely. Please try again.',analysis:null,source:'idle'})
+      notifyAnalysis(null)
     }
   }
 
@@ -54,14 +62,6 @@ export default function BestCvPanel({job,cvLibrary}){
   const winner=analysis?readyCvs.find(cv=>cv.id===analysis.recommendedCvId):null
   const ranked=analysis?analysis.rankedCvIds.map(id=>readyCvs.find(cv=>cv.id===id)).filter(Boolean):[]
   const advice=analysis?.recommendation==='update_recommended'?'UPDATE RECOMMENDED':'USE AS IS'
-  const storedBaseline=adaptationBaselines[jobId]||null
-  const baselineCv=storedBaseline?readyCvs.find(cv=>cv.id===storedBaseline.cvId):null
-  const activeBaseline=storedBaseline&&baselineCv&&baselineMatches({baseline:storedBaseline,job,cv:baselineCv})?storedBaseline:null
-
-  function chooseAdaptationCv(cv){
-    const baseline=buildAdaptationBaseline({job,cv})
-    setAdaptationBaselines(current=>({...current,[jobId]:baseline}))
-  }
 
   return <>
     <section className={styles.card}>
@@ -91,8 +91,8 @@ export default function BestCvPanel({job,cvLibrary}){
     <CvAdaptationChooser
       cvLibrary={cvLibrary}
       recommendedCvId={analysis?.recommendedCvId||''}
-      selectedCvId={activeBaseline?.cvId||''}
-      onSelectCv={chooseAdaptationCv}
+      selectedCvId={selectedCvId}
+      onSelectCv={onSelectCv}
     />
   </>
 }
