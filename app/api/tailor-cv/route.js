@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto'
 import {NextResponse} from 'next/server'
-import {analyzeJob,mapSelectedCvEvidence,writeProfessionalSummary,writeLatestRoleOverview} from '../../lib/tailoring-pipeline.js'
+import {analyzeJob,mapSelectedCvEvidence,writeProfessionalSummary,writeLatestRoleOverview,runTruthGuard} from '../../lib/tailoring-pipeline.js'
 import {writePreviousRoleOverview} from '../../lib/previous-role-overview.js'
 import {detectCvStructure} from '../../lib/cv-sections.js'
 import {verifySelectedCvBinding} from '../../lib/evidence-guard.js'
@@ -194,6 +194,43 @@ export async function POST(request){
       return NextResponse.json({stage:'previous_role_written',blocks,token})
     }
 
+    if(action==='run_truth_guard'){
+      const job=requestJob(body?.job)
+      const sourceCv=requestSourceCv(body?.sourceCv)
+      const requestError=validateSelectedCvRequest({job,sourceCv})
+      if(requestError) return NextResponse.json({error:requestError},{status:400})
+
+      let tokenPayload
+      try{ tokenPayload=verifyTailoringToken(body?.token,secret) }
+      catch(error){ return NextResponse.json({error:error.message||'Invalid tailoring token.'},{status:400}) }
+      if(tokenPayload?.stage!=='previous_role_written') return NextResponse.json({error:'Tailoring stage is not ready for Truth Guard.'},{status:400})
+      if(text(tokenPayload?.jobId)&&text(tokenPayload.jobId)!==jobId(job)) return NextResponse.json({error:'Selected CV binding does not match the analysed vacancy.'},{status:400})
+      try{ verifySelectedCvBinding({tokenPayload,sourceCv,jobHash:hash(job.description)}) }
+      catch(error){ return NextResponse.json({error:error.message||'Selected CV binding failed safely.'},{status:400}) }
+
+      const structure=detectCvStructure(sourceCv.cvText)
+      const baseline={
+        jobId:jobId(job),
+        cvId:sourceCv.cvId,
+        sourceVersion:sourceCv.sourceVersion,
+        fileName:sourceCv.fileName,
+        cvText:sourceCv.cvText
+      }
+      const truthGuard=await runTruthGuard({blocks:tokenPayload.blocks,evidence:tokenPayload.evidence,structure,baseline})
+      const token=signTailoringToken({
+        stage:'truth_guarded',
+        cvId:sourceCv.cvId,
+        sourceVersion:sourceCv.sourceVersion,
+        jobId:jobId(job),
+        jobHash:hash(job.description),
+        analysis:tokenPayload.analysis,
+        evidence:tokenPayload.evidence,
+        blocks:tokenPayload.blocks,
+        truthGuard
+      },secret)
+      return NextResponse.json({stage:'truth_guarded',blocks:tokenPayload.blocks,truthGuard,token})
+    }
+
     return NextResponse.json({error:'Unsupported tailoring action.'},{status:400})
   }catch{
     const error=action==='map_selected_cv_evidence'
@@ -204,7 +241,9 @@ export async function POST(request){
           ?'Latest role overview writing failed safely. Please try again.'
           :action==='write_previous_role_overview'
             ?'Previous role overview writing failed safely. Please try again.'
-            :'Job analysis failed safely. Please try again.'
+            :action==='run_truth_guard'
+              ?'Truth Guard failed safely. Please try again.'
+              :'Job analysis failed safely. Please try again.'
     return NextResponse.json({error},{status:502})
   }
 }
