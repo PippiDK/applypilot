@@ -136,10 +136,19 @@ function deterministicExclusion(job,rules=[]){
   return null
 }
 
+function denmarkDateKey(value){
+  const date=value instanceof Date?value:new Date(value)
+  if(!Number.isFinite(date.getTime())) return null
+  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Copenhagen',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date)
+  const part=type=>parts.find(item=>item.type===type)?.value
+  return `${part('year')}-${part('month')}-${part('day')}`
+}
+
 function withinFreshness(publishedAt,days,now){
   if(!publishedAt) return false
   const published=new Date(publishedAt)
   if(!Number.isFinite(published.getTime())) return false
+  if(Number(days)===1) return denmarkDateKey(published)===denmarkDateKey(now)
   const today=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate())
   const posted=Date.UTC(published.getUTCFullYear(),published.getUTCMonth(),published.getUTCDate())
   const ageDays=Math.floor((today-posted)/86400000)
