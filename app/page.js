@@ -62,6 +62,7 @@ export default function Home(){
   const [adaptationRun,setAdaptationRun]=useState({loading:false,error:'',jobKey:'',baselineKey:''})
   const [expertiseState,setExpertiseState]=useState({loading:false,error:'',analysis:null,jobKey:''})
   const [decisions,setDecisions]=useState({})
+  const [editedUpdates,setEditedUpdates]=useState({})
   const [sourceDocxFiles,setSourceDocxFiles]=useState({})
   const [exportState,setExportState]=useState({loading:false,error:'',baselineKey:''})
   const active=jobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||jobs[0]||null
@@ -391,6 +392,21 @@ export default function Home(){
     return identity?readAdaptationDecision(decisions,identity):null
   }
 
+  function editedUpdateKey(blockId){
+    return activeBaselineKey&&blockId?`${activeBaselineKey}|${blockId}`:''
+  }
+
+  function editedUpdateFor(change){
+    const key=editedUpdateKey(change?.blockId)
+    return key&&Object.prototype.hasOwnProperty.call(editedUpdates,key)?editedUpdates[key]:change?.updated||''
+  }
+
+  function setEditedUpdate(blockId,value){
+    const key=editedUpdateKey(blockId)
+    if(!key) return
+    setEditedUpdates(current=>({...current,[key]:value}))
+  }
+
   function setDecision(blockId,value){
     const identity=decisionIdentity(blockId)
     if(!identity) return
@@ -413,7 +429,7 @@ export default function Home(){
     if(!active||!activeAdaptationBaseline||!selectedSourceDocx||!allReviewDecisionsMade||exportState.loading) return
     const replacements=reviewChanges
       .filter(change=>decisionFor(change.blockId)===ADAPTATION_DECISION.ACCEPTED)
-      .map(change=>({blockId:change.blockId,originalText:change.original,newText:change.updated}))
+      .map(change=>({blockId:change.blockId,originalText:change.original,newText:editedUpdateFor(change)}))
     const company=String(active.job.company||'tailored').replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'')||'tailored'
     const base=String(activeAdaptationBaseline.fileName||'CV').replace(/\.docx$/i,'')
     const outputName=`${base}_${company}_TAILORED.docx`
@@ -558,7 +574,7 @@ export default function Home(){
         <div className="reviewToolbar"><div><h3>Selected-CV changes</h3><p>AI UPDATED text is shown directly. Source CV remains unchanged.</p></div>{reviewChanges.length>0&&<button className="secondary" onClick={acceptAll}>Accept all changes</button>}</div>
         {reviewChanges.map(change=>{const decision=decisionFor(change.blockId);return <div className={'changeCard '+(decision?'decided':'')} key={change.blockId}>
           <div className="changeHead"><span>{change.label}</span><b>{decision===ADAPTATION_DECISION.ACCEPTED?'Accepted':decision===ADAPTATION_DECISION.ORIGINAL?'Original kept':'Review needed'}</b></div>
-          <div className="compareGrid"><div className="compareBox"><small>ORIGINAL</small><p>{change.original}</p></div><div className="compareArrow">→</div><div className="compareBox updatedBox"><small>UPDATED</small><p>{change.updated}</p></div></div>
+          <div className="compareGrid"><div className="compareBox"><small>ORIGINAL</small><p>{change.original}</p></div><div className="compareArrow">→</div><div className="compareBox updatedBox"><small>UPDATED · EDITABLE</small><textarea className="updatedTextEditor" value={editedUpdateFor(change)} onChange={event=>setEditedUpdate(change.blockId,event.target.value)} rows="8"/></div></div>
           <div className="changeWhy"><div><small>WHY CHANGED</small><p>{change.why}</p></div></div>
           <div className="evidenceActions"><button className={'secondary '+(decision===ADAPTATION_DECISION.ORIGINAL?'chosen':'')} onClick={()=>setDecision(change.blockId,ADAPTATION_DECISION.ORIGINAL)}>Keep original</button><button className={'primary smallPrimary '+(decision===ADAPTATION_DECISION.ACCEPTED?'chosenPrimary':'')} onClick={()=>setDecision(change.blockId,ADAPTATION_DECISION.ACCEPTED)}>Accept change</button></div>
         </div>})}
