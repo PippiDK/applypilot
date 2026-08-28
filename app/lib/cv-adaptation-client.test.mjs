@@ -58,3 +58,27 @@ test('requestSelectedCvEvidence fails safely when the server rejects the selecte
   }
   await assert.rejects(()=>requestSelectedCvEvidence({baseline,job,fetchImpl}),/selected cv binding/i)
 })
+
+test('requestProfessionalSummary continues the selected-CV chain into Summary writing only',async()=>{
+  const {requestProfessionalSummary}=await load()
+  assert.equal(typeof requestProfessionalSummary,'function')
+  const baseline=buildAdaptationBaseline({job,cv})
+  const calls=[]
+  const fetchImpl=async(_url,options)=>{
+    const body=JSON.parse(options.body)
+    calls.push(body)
+    if(body.action==='analyze_job') return {ok:true,json:async()=>({stage:'job_analyzed',analysis:{roleMission:'Mission'},token:'TOKEN-1'})}
+    if(body.action==='map_selected_cv_evidence') return {ok:true,json:async()=>({stage:'evidence_mapped',analysis:{roleMission:'Mission'},evidence:{matches:[{id:'E1'}],unsupportedRequirementIds:[]},token:'TOKEN-2'})}
+    if(body.action==='write_professional_summary') return {ok:true,json:async()=>({stage:'summary_written',block:{blockId:'professional_summary',status:'generated',originalText:'Original',tailoredText:'Tailored',claims:[{text:'Claim',evidenceIds:['E1']}],why:'Why'},token:'TOKEN-3'})}
+    throw new Error('Unexpected action')
+  }
+  const result=await requestProfessionalSummary({baseline,job,fetchImpl})
+  assert.equal(calls.length,3)
+  assert.equal(calls[2].action,'write_professional_summary')
+  assert.equal(calls[2].token,'TOKEN-2')
+  assert.deepEqual(calls[2].sourceCv,{cvId:'cv-2',sourceVersion:'sha256:cv2',fileName:'CV2.pdf',cvText})
+  assert.equal(calls[2].job.sourceJobId,'JOB-1')
+  assert.equal(result.block.blockId,'professional_summary')
+  assert.equal(JSON.stringify(calls).includes('CV1_SENTINEL'),false)
+  assert.equal(JSON.stringify(calls).includes('CV3_SENTINEL'),false)
+})

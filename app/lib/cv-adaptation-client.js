@@ -11,8 +11,7 @@ async function postJson(fetchImpl,body){
   return data
 }
 
-export async function requestSelectedCvEvidence({baseline,job,fetchImpl=fetch}={}){
-  const input=buildAdaptationInput({baseline,job})
+async function runEvidenceStages({input,fetchImpl}){
   const analysed=await postJson(fetchImpl,{
     action:'analyze_job',
     cvId:input.sourceCv.cvId,
@@ -29,4 +28,22 @@ export async function requestSelectedCvEvidence({baseline,job,fetchImpl=fetch}={
   })
   if(mapped?.stage!=='evidence_mapped'||!mapped?.token) throw new Error('Selected CV evidence mapping did not complete safely.')
   return mapped
+}
+
+export async function requestSelectedCvEvidence({baseline,job,fetchImpl=fetch}={}){
+  const input=buildAdaptationInput({baseline,job})
+  return runEvidenceStages({input,fetchImpl})
+}
+
+export async function requestProfessionalSummary({baseline,job,fetchImpl=fetch}={}){
+  const input=buildAdaptationInput({baseline,job})
+  const mapped=await runEvidenceStages({input,fetchImpl})
+  const written=await postJson(fetchImpl,{
+    action:'write_professional_summary',
+    token:mapped.token,
+    sourceCv:input.sourceCv,
+    job:input.job
+  })
+  if(written?.stage!=='summary_written'||!written?.token||written?.block?.blockId!=='professional_summary') throw new Error('Professional Summary writing did not complete safely.')
+  return written
 }
