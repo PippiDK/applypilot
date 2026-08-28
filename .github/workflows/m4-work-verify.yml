@@ -54,9 +54,27 @@ jobs:
           echo "Pre-existing failing test files at baseline: $baseline_failures"
           echo "New failing test files introduced by M4.10: $regressions"
           test "$regressions" -eq 0
-      - name: Full tests current state
-        if: always()
-        run: npm test
+      - name: Full-suite failure signature unchanged from M4.9
+        shell: bash
+        run: |
+          set +e
+          BASE=3a9aefc697f0e615991a28aeb559f2e7aaeaba8c
+          HEAD_SHA="$GITHUB_SHA"
+          git checkout --detach "$BASE" >/dev/null 2>&1
+          npm test > /tmp/base-full.log 2>&1
+          base_code=$?
+          grep -E '^not ok [0-9]+ - ' /tmp/base-full.log | sed -E 's/^not ok [0-9]+ - //' | sort > /tmp/base-failures.txt || true
+          git checkout --detach "$HEAD_SHA" >/dev/null 2>&1
+          npm test > /tmp/head-full.log 2>&1
+          head_code=$?
+          grep -E '^not ok [0-9]+ - ' /tmp/head-full.log | sed -E 's/^not ok [0-9]+ - //' | sort > /tmp/head-failures.txt || true
+          echo "Baseline npm test exit: $base_code"
+          echo "M4.10 npm test exit: $head_code"
+          echo "Baseline failure signature:"
+          cat /tmp/base-failures.txt
+          echo "M4.10 failure signature:"
+          cat /tmp/head-failures.txt
+          diff -u /tmp/base-failures.txt /tmp/head-failures.txt
       - name: Build
         if: always()
         run: npm run build
