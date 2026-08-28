@@ -81,3 +81,18 @@ test('professional summary writer contract rejects claims without evidence IDs',
   const draft={tailoredText:'Senior delivery leader.',claims:[{text:'Senior delivery leader.',evidenceIds:[]}],why:'Relevant.'}
   assert.throws(()=>validateProfessionalSummaryDraft(draft),/evidence/i)
 })
+
+test('truth guard assessment contract accepts only declared M4.10 issue codes',async()=>{
+  const {validateTruthGuardAssessment}=await load()
+  assert.equal(typeof validateTruthGuardAssessment,'function')
+  const valid={verdict:'FAIL',issues:[{code:'OVERCLAIM',claim:'Owned the programme.'}]}
+  assert.deepEqual(validateTruthGuardAssessment(valid),valid)
+  assert.throws(()=>validateTruthGuardAssessment({verdict:'FAIL',issues:[{code:'MADE_UP_CODE',claim:'Claim'}]}),/issue code/i)
+})
+
+test('truth guard PASS cannot contain unresolved issues and FAIL must contain at least one issue',async()=>{
+  const {validateTruthGuardAssessment}=await load()
+  assert.equal(typeof validateTruthGuardAssessment,'function')
+  assert.throws(()=>validateTruthGuardAssessment({verdict:'PASS',issues:[{code:'UNSUPPORTED',claim:'Claim'}]}),/pass.*issues|issues.*pass/i)
+  assert.throws(()=>validateTruthGuardAssessment({verdict:'FAIL',issues:[]}),/fail.*issue|issue.*fail/i)
+})
