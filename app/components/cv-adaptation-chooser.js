@@ -14,9 +14,9 @@ export default function CvAdaptationChooser({cvLibrary,recommendedCvId='',select
 
   if(!choices.length) return null
 
-  return <section className={styles.card}>
+  return <section className={`${styles.card} cvWorkflowChooser`}>
     <div className={styles.head}>
-      <div><p className="eyebrow">CHOOSE CV TO ADAPT</p><p className={styles.intro}>Best CV is a recommendation. You choose which ready CV to adapt.</p></div>
+      <div><p className="eyebrow">SELECT CV TO ADAPT</p><p className={styles.intro}>Choose one of your ready CVs. Best CV remains a recommendation.</p></div>
       <span className={styles.status}>{selectedCv?`${cvLabel(selectedCv)} selected`:'Not selected'}</span>
     </div>
     <div className={styles.choices}>

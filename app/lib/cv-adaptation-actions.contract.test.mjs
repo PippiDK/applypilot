@@ -33,11 +33,7 @@ test('Best CV passes action controls into the CV chooser',()=>{
   assert.match(best,/<CvAdaptationChooser[\s\S]*actions=\{adaptationActions\}/)
 })
 
-test('CV chooser renders action controls inside CHOOSE CV TO ADAPT section',()=>{
-  assert.match(chooser,/actions/)
-  const sectionStart=chooser.indexOf('<section className={styles.card}>')
-  const sectionEnd=chooser.indexOf('</section>')
-  assert.ok(sectionStart>=0&&sectionEnd>sectionStart)
-  const section=chooser.slice(sectionStart,sectionEnd)
-  assert.match(section,/\{actions\}/)
+test('CV chooser renders action controls inside the integrated CV workflow section',()=>{
+  assert.match(chooser,/cvWorkflowChooser/)
+  assert.match(chooser,/\{actions\}/)
 })

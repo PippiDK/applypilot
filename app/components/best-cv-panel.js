@@ -64,15 +64,15 @@ export default function BestCvPanel({job,cvLibrary,selectedCvId='',onSelectCv=()
   const advice=analysis?.recommendation==='update_recommended'?'UPDATE RECOMMENDED':'USE AS IS'
 
   return <>
-    <section className={styles.card}>
+    <section className={`${styles.card} cvWorkflowBest`} data-best-cv-ready={Boolean(analysis)}>
       <div className={styles.head}>
-        <div><p className="eyebrow">BEST CV FOR THIS JOB</p><p className={styles.intro}>Compare the ready CVs as they are written. No merging.</p></div>
+        <div><p className="eyebrow">CV FOR THIS JOB</p><p className={styles.intro}>Compare the ready CVs, then choose the one to adapt. No merging.</p></div>
         <span className={styles.status}>{state.loading?'Analysing…':analysis?(state.source==='cache'?'Cached':'Recommended'):'Not analysed'}</span>
       </div>
 
       {!analysis&&!state.loading&&<>
         <p className={styles.empty}>{readyCvs.length?`${readyCvs.length} CV${readyCvs.length===1?'':'s'} ready for recruiter-style comparison.`:'Upload at least one CV to compare it with this job.'}</p>
-        <button className={`primary ${styles.action}`} onClick={runBestCv} disabled={!readyCvs.length}>Find best CV</button>
+        <button className={`primary bestCvAction ${styles.action}`} onClick={runBestCv} disabled={!readyCvs.length}>Find best CV</button>
       </>}
 
       {state.loading&&<div className={styles.loading}>Comparing {readyCvs.map(cv=>cvLabel(cv)).join(' · ')} against the Full JD…</div>}
