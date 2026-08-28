@@ -17,7 +17,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - name: M4.11 targeted tests
         run: node --test app/lib/cv-adaptation-decisions.test.mjs app/lib/cv-adaptation-review-ui.contract.test.mjs
