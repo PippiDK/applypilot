@@ -24,3 +24,4 @@ jobs:
         run: node --test app/lib/cv-adaptation-selection.test.mjs app/lib/cv-adaptation-baseline.test.mjs app/lib/cv-adaptation-input.test.mjs app/lib/cv-adaptation-client.test.mjs app/lib/evidence-guard.test.mjs app/lib/ai-contracts.test.mjs app/lib/cv-sections.test.mjs app/lib/tailoring-pipeline.test.mjs app/lib/latest-role-overview.test.mjs app/lib/latest-role-client.test.mjs app/lib/previous-role-overview.test.mjs app/lib/previous-role-client.test.mjs
       - name: Build
         run: npm run build
+# release verification rerun
