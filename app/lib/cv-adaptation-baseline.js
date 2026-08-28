@@ -1,6 +1,7 @@
 import {isSourceCvReady} from './source-cv.js'
 
 const text=value=>String(value??'').trim()
+const raw=value=>String(value??'')
 
 function jobId(job={}){
   const sourceJobId=text(job?.sourceJobId)
@@ -51,8 +52,8 @@ export function buildAdaptationBaseline({job,cv}={}){
     cvSlot:Number(cv?.slot)||null,
     fileName:text(cv?.fileName),
     sourceVersion:text(cv?.sourceVersion),
-    cvText:text(cv?.cvText),
-    summary:text(cv?.summary),
+    cvText:raw(cv?.cvText),
+    summary:raw(cv?.summary),
     facts:cloneValue(Array.isArray(cv?.facts)?cv.facts:[]),
     skills:cloneValue(Array.isArray(cv?.skills)?cv.skills:[]),
     createdAt:new Date().toISOString()
