@@ -2,11 +2,30 @@
 
 import {usePathname} from 'next/navigation'
 
+const controlStyle={
+  border:'1px solid rgba(255,255,255,.14)',
+  borderRadius:8,
+  background:'rgba(15,15,15,.88)',
+  color:'#cfcfcf',
+  padding:'7px 10px',
+  fontSize:12,
+  fontWeight:700,
+  cursor:'pointer',
+  backdropFilter:'blur(8px)',
+  textDecoration:'none',
+  lineHeight:1.4
+}
+
 export default function SignOutButton(){
   const pathname=usePathname()
   if(pathname==='/login'||pathname.startsWith('/auth/')) return null
 
-  return <form action="/auth/signout" method="post" style={{position:'fixed',top:12,right:14,zIndex:1000}}>
-    <button type="submit" style={{border:'1px solid rgba(255,255,255,.14)',borderRadius:8,background:'rgba(15,15,15,.88)',color:'#cfcfcf',padding:'7px 10px',fontSize:12,fontWeight:700,cursor:'pointer',backdropFilter:'blur(8px)'}}>Sign out</button>
-  </form>
+  return <div style={{position:'fixed',top:12,right:14,zIndex:1000,display:'flex',gap:8,alignItems:'center'}}>
+    {pathname==='/help'
+      ? <a href="/" style={controlStyle}>BACK TO APP</a>
+      : <a href="/help" style={controlStyle}>HELP</a>}
+    <form action="/auth/signout" method="post" style={{margin:0}}>
+      <button type="submit" style={controlStyle}>Sign out</button>
+    </form>
+  </div>
 }
