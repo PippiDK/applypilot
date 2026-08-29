@@ -4,10 +4,13 @@ import {readFile} from 'node:fs/promises'
 
 const read=url=>readFile(new URL(url,import.meta.url),'utf8')
 
-test('Help is reachable from the authenticated app utility navigation',async()=>{
+test('Help opens in a separate tab from the authenticated app utility navigation',async()=>{
   const source=await read('../components/sign-out-button.js')
   assert.match(source,/href=["']\/help["']/)
+  assert.match(source,/target=["']_blank["']/)
+  assert.match(source,/rel=["']noopener noreferrer["']/)
   assert.match(source,/>HELP</)
+  assert.doesNotMatch(source,/BACK TO APP/)
   assert.match(source,/pathname==='\/login'/)
 })
 
