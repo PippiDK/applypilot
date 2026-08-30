@@ -55,14 +55,15 @@ test('calls only selected source',async()=>{
   assert.equal(result.sourceStatuses.linkedin,undefined)
 })
 
-test('limited-data vacancy is retained without pretending it was fully evaluated',async()=>{
+test('limited-data vacancy stays auditable but is excluded from worthwhile live matches',async()=>{
   const limited=job('jobindex','h3',{title:'',company:'',location:'',publishedAt:null,postedDate:null,description:'',fullJd:'',sourceRecords:[{source:'jobindex',sourceJobId:'h3',limitedData:true}]})
   const result=await runMultiSourceSearch({...input,enabledSources:['jobindex']},{
     jobindex:async()=>({source:'jobindex',status:'partial',jobs:[limited],stats:{returned:1}}),
   })
-  assert.equal(result.jobs.length,1)
-  assert.equal(result.jobs[0].evaluation,null)
-  assert.equal(result.jobs[0].limitedData,true)
+  assert.equal(result.jobs.length,0)
+  assert.equal(result.stats.returned,0)
+  assert.equal(result.stats.unverified,1)
+  assert.ok(result.audit.some(item=>item.jobId==='jobindex:h3'&&item.stage==='LIMITED_DATA'&&item.decision==='UNVERIFIED'))
 })
 
 test('common Areas and work-model filters are applied after normalization across all sources',async()=>{
