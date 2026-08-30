@@ -1,0 +1,61 @@
+import { bestFullJd, normalizeFoundBy, normalizeJob } from './normalized-job.js'
+
+function text(value){return String(value??'').trim().toLowerCase().replace(/\s+/g,' ')}
+function companyKey(value){return text(value).replace(/\b(a\/s|as)\b/g,'as').replace(/[.,]/g,'').trim()}
+function urlKey(value){return String(value??'').trim().toLowerCase().replace(/\/+$/,'')}
+function sources(job){return new Set((job?.sourceRecords||[]).map(record=>String(record?.source||'').toLowerCase()).filter(Boolean))}
+function crossSource(a,b){const left=sources(a),right=sources(b);return [...left].some(source=>!right.has(source))||[...right].some(source=>!left.has(source))}
+
+function datesCompatible(a,b){
+  if(!a||!b) return true
+  const left=new Date(a).getTime(),right=new Date(b).getTime()
+  if(!Number.isFinite(left)||!Number.isFinite(right)) return true
+  return Math.abs(left-right)<=3*86400000
+}
+
+export function isHighConfidenceDuplicate(a,b){
+  if(!crossSource(a,b)) return false
+  const aUrl=urlKey(a?.applicationUrl),bUrl=urlKey(b?.applicationUrl)
+  if(aUrl&&bUrl&&aUrl===bUrl) return true
+  return Boolean(
+    companyKey(a?.company)&&companyKey(a?.company)===companyKey(b?.company)&&
+    text(a?.title)&&text(a?.title)===text(b?.title)&&
+    text(a?.location)&&text(a?.location)===text(b?.location)&&
+    datesCompatible(a?.postedDate||a?.publishedAt,b?.postedDate||b?.publishedAt)
+  )
+}
+
+function sourceIdentity(record){return [record?.source,record?.sourceJobId,record?.detailUrl,record?.applicationUrl].map(value=>String(value??'').trim().toLowerCase()).join('|')}
+function nonEmpty(value){return value!==null&&value!==undefined&&String(value).trim()!==''}
+
+function mergeJobs(a,b){
+  const richer=(String(b?.fullJd||'').length>String(a?.fullJd||'').length)?b:a
+  const poorer=richer===a?b:a
+  const merged={...poorer,...richer}
+  for(const [key,value] of Object.entries(poorer||{})) if(!nonEmpty(merged[key])&&nonEmpty(value)) merged[key]=value
+  const records=[]
+  const seen=new Set()
+  for(const record of [...(a?.sourceRecords||[]),...(b?.sourceRecords||[])]){
+    const id=sourceIdentity(record)
+    if(seen.has(id)) continue
+    seen.add(id);records.push(record)
+  }
+  merged.sourceRecords=records
+  merged.fullJd=bestFullJd(records,merged.fullJd)
+  merged.description=merged.description||merged.fullJd
+  merged.foundBy=normalizeFoundBy([...(a?.foundBy||[]),...(b?.foundBy||[])])
+  merged.jobId=a?.jobId||b?.jobId||''
+  merged.sourceJobId=a?.sourceJobId||b?.sourceJobId||''
+  return normalizeJob(merged)
+}
+
+export function dedupeJobs(jobs=[]){
+  const output=[]
+  for(const raw of Array.isArray(jobs)?jobs:[]){
+    const job=normalizeJob(raw)
+    const index=output.findIndex(existing=>isHighConfidenceDuplicate(existing,job))
+    if(index<0) output.push(job)
+    else output[index]=mergeJobs(output[index],job)
+  }
+  return output
+}
