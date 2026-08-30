@@ -14,17 +14,19 @@ function normalizeLinkedInJobs(jobs=[]){
   return (Array.isArray(jobs)?jobs:[]).map(job=>normalizeJob({...job,sourceRecords:[...(Array.isArray(job.sourceRecords)?job.sourceRecords:[]),linkedinRecord(job)]}))
 }
 
-export async function searchLinkedInSource({freshnessDays=7,unionSearchPlan,exclusionRules=[],cvText='',dependencies={}}={}){
+export async function searchLinkedInSource({freshnessDays=7,unionSearchPlan,exclusionRules=[],cvText='',filters={},dependencies={}}={}){
   try{
     const fetcher=dependencies.createLinkedInStableFetcher?.()
     let result
     if(hasProfilePlan(unionSearchPlan)){
-      if(typeof dependencies.buildDiscoverySearchPlan!=='function'||typeof dependencies.searchLinkedInProfile!=='function') throw new Error('LinkedIn profile dependencies unavailable')
+      if(typeof dependencies.buildDiscoverySearchPlan!=='function'||typeof dependencies.acquireLinkedInProfileJobs!=='function') throw new Error('LinkedIn profile acquisition dependencies unavailable')
       const discoverySearchPlan=await dependencies.buildDiscoverySearchPlan({unionSearchPlan})
-      result=await dependencies.searchLinkedInProfile({freshnessDays,unionSearchPlan:discoverySearchPlan,exclusionRules,fetcher})
+      result=await dependencies.acquireLinkedInProfileJobs({freshnessDays,unionSearchPlan:discoverySearchPlan,fetcher})
     }else{
       if(typeof dependencies.searchLinkedInStable!=='function') throw new Error('LinkedIn legacy search dependency unavailable')
       result=await dependencies.searchLinkedInStable({freshnessDays,resume:String(cvText??''),fetcher})
+      const legacyJobs=(Array.isArray(result?.jobs)?result.jobs:[]).map(item=>({...(item?.job||item),legacyEvaluation:item?.evaluation||null}))
+      result={...result,jobs:legacyJobs}
     }
     return {
       source:'linkedin',
@@ -33,7 +35,9 @@ export async function searchLinkedInSource({freshnessDays=7,unionSearchPlan,excl
       coverage:result?.coverage??null,
       stats:result?.stats??null,
       audit:Array.isArray(result?.audit)?result.audit:[],
-      error:'',
+      error:String(result?.error||''),
+      filters,
+      exclusionRules,
     }
   }catch(error){
     return {source:'linkedin',status:'failed',jobs:[],coverage:null,stats:null,audit:[],error:String(error?.message||'LinkedIn search failed')}
