@@ -15,9 +15,22 @@ function detail(id,{title='Senior Project Manager',company='Acme A/S',location='
     hiringOrganization:{name:company},
     jobLocation:{address:{addressLocality:location}},
     datePosted:date,
-    description:`Lead project delivery for ${id}`,
+    description:`Lead project delivery for ${id}. Own scope, risks, dependencies, stakeholders and implementation outcomes across complex technology change. `.repeat(8),
     url:`https://www.jobindex.dk/vis-job/${id}`,
   })}</script>`
+}
+
+function currentJobindexDetail({id='h1001',title='Senior Delivery Manager',company='Acme A/S',location='Copenhagen',external='https://acme.example/jobs/42'}={}){
+  return `<html><head><meta content="${title}" property="og:title"></head><body>
+    <div class="jix-toolbar-top__company"><a href="https://recruiter.example">Recruiter ApS</a> søger for ${company}</div>
+    <div class="PaidJob-inner"><h4><a href="${external}">${title}</a></h4><div class="jobad-element-area"><span class="jix_robotjob--area">${location}</span></div><p>Short Jobindex teaser only.</p></div>
+    <div class="jix_toolbar jix_appetizer_toolbar"><div class="jix-toolbar__pubdate"><time datetime="2026-08-30">30-08-2026</time></div></div>
+  </body></html>`
+}
+
+function externalFullJd(){
+  const body='Lead end-to-end delivery, scope, risks, dependencies and senior stakeholders across complex enterprise technology change. '.repeat(12)
+  return `<html><body><section class="full-detail-description full-detail"><div><h2>Job description</h2><p>${body}</p></div></section></body></html>`
 }
 
 test('uses Jobindex RSS feed for discovery',async()=>{
@@ -59,6 +72,54 @@ test('paginates Jobindex, accumulates unique ids and preserves discovery directi
   assert.deepEqual(result.jobs[0].foundBy,[{role:'Senior Project Manager',tier:'primary',query:'Project Manager'}])
   assert.ok(seen.some(url=>url.includes('page=2')))
   assert.ok(seen.some(url=>url.includes('/vis-job/h1003')))
+})
+
+test('fetches external employer page when current Jobindex detail only has a teaser',async()=>{
+  const seen=[]
+  const fetcher=async url=>{
+    seen.push(String(url))
+    if(String(url).includes('jobsoegning.rss')) return response('<a href="/vis-job/h1001">one</a>')
+    if(String(url).includes('/vis-job/h1001')) return response(currentJobindexDetail())
+    if(String(url)==='https://acme.example/jobs/42') return response(externalFullJd())
+    throw new Error(`unexpected ${url}`)
+  }
+  const result=await searchJobindexSource({
+    unionSearchPlan:{directions:[{role:'Senior Delivery Manager',tier:'primary'}]},
+    fetcher,
+    maxPages:1,
+  })
+  assert.equal(result.jobs.length,1)
+  assert.equal(result.jobs[0].title,'Senior Delivery Manager')
+  assert.equal(result.jobs[0].company,'Acme A/S')
+  assert.equal(result.jobs[0].location,'Copenhagen')
+  assert.match(result.jobs[0].fullJd,/end-to-end delivery/i)
+  assert.equal(result.jobs[0].sourceRecords[0].limitedData,false)
+  assert.equal(result.stats.externalDetailRequests,1)
+  assert.equal(result.stats.fullJdVerified,1)
+  assert.ok(seen.includes('https://acme.example/jobs/42'))
+})
+
+test('keeps basic Jobindex vacancy as limited when external full JD cannot be verified',async()=>{
+  const fetcher=async url=>{
+    if(String(url).includes('jobsoegning.rss')) return response('<a href="/vis-job/h1001">one</a>')
+    if(String(url).includes('/vis-job/h1001')) return response(currentJobindexDetail())
+    if(String(url)==='https://acme.example/jobs/42') return response('<html><body><p>Employer home page only.</p></body></html>')
+    throw new Error(`unexpected ${url}`)
+  }
+  const result=await searchJobindexSource({
+    unionSearchPlan:{directions:[{role:'Senior Delivery Manager',tier:'primary'}]},
+    fetcher,
+    maxPages:1,
+  })
+  assert.equal(result.jobs.length,1)
+  assert.equal(result.jobs[0].title,'Senior Delivery Manager')
+  assert.equal(result.jobs[0].company,'Acme A/S')
+  assert.equal(result.jobs[0].fullJd,'')
+  assert.equal(result.jobs[0].sourceRecords[0].limitedData,true)
+  assert.equal(result.stats.externalDetailRequests,1)
+  assert.equal(result.stats.externalDetailFailures,1)
+  assert.equal(result.stats.fullJdVerified,0)
+  assert.equal(result.status,'partial')
 })
 
 test('retains limited-data record when one detail request fails',async()=>{
