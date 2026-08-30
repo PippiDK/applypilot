@@ -1,0 +1,70 @@
+name: Jobindex diagnostic
+
+on:
+  push:
+    branches:
+      - feature/jobindex-multisource-search
+
+jobs:
+  diagnose-jobindex:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect real Jobindex pipeline
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { extractJobindexDetail, extractJobindexExternalDetail } from './app/lib/jobindex-parser.js'
+
+          const decode=s=>String(s||'').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,'$1').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()
+          const field=(item,tag)=>decode(item.match(new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`,'i'))?.[1]||'')
+          const host=u=>{try{return new URL(u).hostname}catch{return ''}}
+          const idFrom=s=>String(s||'').match(/\/vis-job\/(h\d+)/i)?.[1]||''
+          const query='Project Manager'
+          const rssUrl=`https://www.jobindex.dk/jobsoegning.rss?q=${encodeURIComponent(query)}`
+          const rss=await fetch(rssUrl)
+          const rssText=await rss.text()
+          console.log('RSS_META',JSON.stringify({status:rss.status,url:rss.url,contentType:rss.headers.get('content-type'),length:rssText.length}))
+
+          const items=[...rssText.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].map(m=>m[1])
+          const rows=items.slice(0,20).map((item,index)=>{
+            const title=field(item,'title')
+            const link=field(item,'link')||field(item,'guid')
+            const description=field(item,'description')
+            return {index:index+1,id:idFrom(link)||idFrom(item),title,link,description:description.slice(0,180),titleHasProject:/\bproject\b/i.test(title),titleHasManager:/\bmanager\b/i.test(title)}
+          })
+          console.log('RSS_ITEMS',JSON.stringify(rows,null,2))
+          console.log('RSS_TITLE_COUNTS',JSON.stringify({items:items.length,projectTitle:rows.filter(x=>x.titleHasProject).length,managerTitle:rows.filter(x=>x.titleHasManager).length,neither:rows.filter(x=>!x.titleHasProject&&!x.titleHasManager).length}))
+
+          for(const row of rows.slice(0,12)){
+            if(!row.id) continue
+            const detailUrl=`https://www.jobindex.dk/vis-job/${row.id}`
+            let detailResponse,detailHtml=''
+            try{
+              detailResponse=await fetch(detailUrl)
+              detailHtml=await detailResponse.text()
+            }catch(error){
+              console.log('DETAIL',JSON.stringify({id:row.id,rssTitle:row.title,error:String(error)}))
+              continue
+            }
+            const detail=extractJobindexDetail(detailHtml,{jobId:row.id})
+            const base={id:row.id,rssTitle:row.title,status:detailResponse.status,length:detailHtml.length,title:detail.title,company:detail.company,applicationUrl:detail.applicationUrl,applicationHost:host(detail.applicationUrl),jobindexFullJdLength:String(detail.fullJd||'').length,teaserLength:String(detail.teaser||'').length}
+            if(!detail.applicationUrl||String(detail.fullJd||'').length>=500){
+              console.log('DETAIL',JSON.stringify({...base,external:'not-needed-or-missing'}))
+              continue
+            }
+            try{
+              const ext=await fetch(detail.applicationUrl)
+              const extHtml=await ext.text()
+              const parsed=extractJobindexExternalDetail(extHtml,{url:detail.applicationUrl})
+              console.log('DETAIL',JSON.stringify({...base,external:{status:ext.status,finalUrl:ext.url,finalHost:host(ext.url),contentType:ext.headers.get('content-type'),length:extHtml.length,fullJdLength:String(parsed.fullJd||'').length,hasJobPosting:/["']JobPosting["']/i.test(extHtml),looksBlocked:/access denied|forbidden|captcha|cloudflare|bot detection|request blocked/i.test(extHtml.slice(0,12000))}}))
+            }catch(error){
+              console.log('DETAIL',JSON.stringify({...base,external:{error:String(error)}}))
+            }
+          }
+          NODE
