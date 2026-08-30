@@ -34,6 +34,13 @@ function externalFullJd(){
   return `<html><body><section class="full-detail-description full-detail"><div><h2>Job description</h2><p>${body}</p></div></section></body></html>`
 }
 
+function oraclePayload(){
+  const body='<p>'+ 'Lead enterprise project delivery across scope, risks, dependencies and senior stakeholders. '.repeat(12)+'</p>'
+  return JSON.stringify({items:[{
+    Id:'8022',Title:'Senior Project Manager',LegalEmployer:'Acme A/S',PrimaryLocation:'Kongens Lyngby',PrimaryLocationCountry:'DK',WorkplaceType:'Hybrid',ExternalPostedStartDate:'2026-08-30T08:00:00+00:00',ExternalDescriptionStr:body,
+  }]})
+}
+
 test('uses exact-phrase Jobindex RSS query and rejects obviously unrelated RSS titles before detail fetch',async()=>{
   const seen=[]
   const fetcher=async url=>{
@@ -109,6 +116,39 @@ test('fetches external employer page when current Jobindex detail only has a tea
   assert.ok(seen.includes('https://acme.example/jobs/42'))
 })
 
+test('uses Oracle CandidateExperience API when the public application page is only a shell',async()=>{
+  const seen=[]
+  const oracleUrl='https://tenant.fa.em2.oraclecloud.com/hcmUI/CandidateExperience/da/sites/CX_1/job/8022'
+  const fetcher=async (url,options)=>{
+    seen.push(String(url))
+    if(String(url).includes('jobsoegning.rss')) return response(rss([{id:'h8022',title:'Senior Project Manager',description:'Technology project role'}]))
+    if(String(url).includes('/vis-job/h8022')) return response(currentJobindexDetail({id:'h8022',title:'Senior Project Manager',company:'Acme A/S',location:'Kongens Lyngby',external:oracleUrl}))
+    if(String(url)===oracleUrl) return response('<html><body><div id="app">Candidate Experience</div></body></html>')
+    if(String(url).includes('/hcmRestApi/resources/latest/recruitingCEJobRequisitionDetails')){
+      assert.equal(options?.headers?.Accept,'application/json')
+      assert.equal(options?.headers?.['Ora-Irc-Language'],'da')
+      return response(oraclePayload())
+    }
+    throw new Error(`unexpected ${url}`)
+  }
+  const result=await searchJobindexSource({
+    unionSearchPlan:{directions:[{role:'Senior Project Manager',tier:'primary',query:'Project Manager'}]},
+    fetcher,
+    maxPages:1,
+  })
+  const apiUrl=seen.find(url=>url.includes('recruitingCEJobRequisitionDetails'))
+  assert.ok(apiUrl)
+  assert.equal(new URL(apiUrl).searchParams.get('finder'),'ById;Id="8022",siteNumber=CX_1')
+  assert.match(result.jobs[0].fullJd,/enterprise project delivery/i)
+  assert.equal(result.jobs[0].sourceRecords[0].limitedData,false)
+  assert.equal(result.stats.externalParseMisses,1)
+  assert.equal(result.stats.oracleDetailRequests,1)
+  assert.equal(result.stats.oracleDetailVerified,1)
+  assert.equal(result.stats.oracleDetailFailures,0)
+  assert.equal(result.stats.externalDetailFailures,0)
+  assert.equal(result.stats.fullJdVerified,1)
+})
+
 test('keeps basic Jobindex vacancy as limited when external full JD cannot be verified',async()=>{
   const fetcher=async url=>{
     if(String(url).includes('jobsoegning.rss')) return response('<a href="/vis-job/h1001">one</a>')
@@ -127,6 +167,8 @@ test('keeps basic Jobindex vacancy as limited when external full JD cannot be ve
   assert.equal(result.jobs[0].fullJd,'')
   assert.equal(result.jobs[0].sourceRecords[0].limitedData,true)
   assert.equal(result.stats.externalDetailRequests,1)
+  assert.equal(result.stats.externalFetchFailures,0)
+  assert.equal(result.stats.externalParseMisses,1)
   assert.equal(result.stats.externalDetailFailures,1)
   assert.equal(result.stats.fullJdVerified,0)
   assert.equal(result.status,'partial')
