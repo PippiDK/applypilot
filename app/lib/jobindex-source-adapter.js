@@ -127,7 +127,7 @@ export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},e
       sourceJobId:candidate.jobId,
       publishedAt:detail.postedDate,
       fullJd:verified?fullJd:'',
-      description:verified?fullJd:(detail.teaser||''),
+      description:verified?fullJd:'',
       foundBy:candidate.foundBy,
       sourceRecords:[{
         source:'jobindex',
