@@ -20,6 +20,21 @@ function detail(id,{title='Senior Project Manager',company='Acme A/S',location='
   })}</script>`
 }
 
+test('uses Jobindex RSS feed for discovery',async()=>{
+  const seen=[]
+  const fetcher=async url=>{
+    seen.push(String(url))
+    if(String(url).includes('/vis-job/h1001')) return response(detail('h1001'))
+    return response('<a href="/vis-job/h1001">one</a>')
+  }
+  await searchJobindexSource({
+    unionSearchPlan:{directions:[{role:'Project Manager',tier:'primary',query:'Project Manager'}]},
+    fetcher,
+    maxPages:1,
+  })
+  assert.match(seen[0],/\/jobsoegning\.rss\?q=Project\+Manager/)
+})
+
 test('paginates Jobindex, accumulates unique ids and preserves discovery direction',async()=>{
   const seen=[]
   const fetcher=async url=>{
