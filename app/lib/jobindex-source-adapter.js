@@ -1,7 +1,8 @@
-import { extractJobindexSearchRecords, extractJobindexDetail, jobindexDetailUrl } from './jobindex-parser.js'
+import { extractJobindexSearchRecords, extractJobindexDetail, extractJobindexExternalDetail, jobindexDetailUrl } from './jobindex-parser.js'
 import { normalizeJob } from './normalized-job.js'
 
 const SEARCH_BASE='https://www.jobindex.dk/jobsoegning.rss'
+const FULL_JD_MIN_LENGTH=500
 
 function directions(plan={}){
   return (Array.isArray(plan?.directions)?plan.directions:[])
@@ -51,6 +52,8 @@ function mergeDirection(list,direction){
   return out
 }
 
+function usableFullJd(value){return String(value??'').trim().length>=FULL_JD_MIN_LENGTH}
+
 export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},exclusionRules=[],filters={},fetcher=globalThis.fetch,maxPages=3}={}){
   const plan=directions(unionSearchPlan)
   if(!plan.length) return {source:'jobindex',status:'failed',jobs:[],stats:null,error:'Search Profile is required for Jobindex discovery.'}
@@ -61,6 +64,9 @@ export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},e
   let searchFailures=0
   let detailRequests=0
   let detailFailures=0
+  let externalDetailRequests=0
+  let externalDetailFailures=0
+  let fullJdVerified=0
 
   for(const direction of plan){
     const seenForDirection=new Set()
@@ -94,19 +100,42 @@ export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},e
     const detailUrl=candidate.detailUrl||jobindexDetailUrl(candidate.jobId)
     const html=await fetchText(fetcher,detailUrl)
     const detail=extractJobindexDetail(html,{jobId:candidate.jobId})
+
+    let fullJd=detail.fullJd||''
+    let externalDetail=null
+    if(!usableFullJd(fullJd)&&detail.applicationUrl){
+      externalDetailRequests++
+      try{
+        const externalHtml=await fetchText(fetcher,detail.applicationUrl)
+        externalDetail=extractJobindexExternalDetail(externalHtml,{url:detail.applicationUrl})
+        if(usableFullJd(externalDetail.fullJd)) fullJd=externalDetail.fullJd
+        else externalDetailFailures++
+      }catch{
+        externalDetailFailures++
+      }
+    }
+
+    const verified=usableFullJd(fullJd)
+    if(verified) fullJdVerified++
     return normalizeJob({
       ...detail,
+      title:detail.title||externalDetail?.title||'',
+      company:detail.company||externalDetail?.company||'',
+      location:detail.location||externalDetail?.location||'',
+      country:detail.country||externalDetail?.country||'',
+      remoteType:detail.remoteType||externalDetail?.remoteType||'',
       sourceJobId:candidate.jobId,
       publishedAt:detail.postedDate,
-      description:detail.fullJd,
+      fullJd:verified?fullJd:'',
+      description:verified?fullJd:(detail.teaser||''),
       foundBy:candidate.foundBy,
       sourceRecords:[{
         source:'jobindex',
         sourceJobId:candidate.jobId,
         detailUrl:detail.detailUrl||detailUrl,
         applicationUrl:detail.applicationUrl||'',
-        fullJd:detail.fullJd||'',
-        limitedData:false,
+        fullJd:verified?fullJd:'',
+        limitedData:!verified,
       }],
     })
   })
@@ -133,13 +162,14 @@ export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},e
     }))
   }
 
-  const inaccessible=searchFailures+detailFailures
-  const status=inaccessible?'partial':'success'
+  const limitedData=jobs.filter(job=>(job.sourceRecords||[]).some(record=>record?.limitedData===true)).length
+  const inaccessible=searchFailures+detailFailures+externalDetailFailures
+  const status=(inaccessible||limitedData)?'partial':'success'
   return {
     source:'jobindex',
     status,
     jobs,
-    stats:{searchRequests,searchFailures,detailRequests,detailFailures,discovered:candidates.length,returned:jobs.length,freshnessDays:Number(freshnessDays)||7},
+    stats:{searchRequests,searchFailures,detailRequests,detailFailures,externalDetailRequests,externalDetailFailures,fullJdVerified,limitedData,discovered:candidates.length,returned:jobs.length,freshnessDays:Number(freshnessDays)||7},
     error:status==='partial'?'Some Jobindex vacancies could not be fully retrieved.':'',
     filters,
     exclusionRules,
