@@ -211,8 +211,8 @@ function locationFromPosting(posting){
 function remoteTypeFromText(value=''){
   const text=decodeHtml(value).toLowerCase()
   if(/\bhybrid\b/.test(text)) return 'hybrid'
-  if(/\b(fully remote|100% remote|remote role|remote position|work remotely|work from home|home-based)\b/.test(text)) return 'remote'
-  if(/\b(on-site|onsite|on site|office-based)\b/.test(text)) return 'onsite'
+  if(text==='remote'||/\b(fully remote|100% remote|remote role|remote position|work remotely|work from home|home-based)\b/.test(text)) return 'remote'
+  if(text==='onsite'||text==='on-site'||text==='on site'||/\b(on-site|onsite|on site|office-based)\b/.test(text)) return 'onsite'
   return ''
 }
 
@@ -222,8 +222,27 @@ function remoteTypeFromPosting(posting,fallbackText=''){
   return remoteTypeFromText(`${decodeHtml(posting?.description)} ${fallbackText}`)
 }
 
+function emplyExternalCandidate(html=''){
+  const value=cleanContentHtml(classBlock(html,'csa_jobadText'))
+  return value.length>=FULL_JD_MIN_LENGTH?value:''
+}
+
+function successFactorsExternalCandidate(html=''){
+  const candidates=[]
+  const re=/<span\b([^>]*)>([\s\S]*?)<\/span>/gi
+  for(const match of String(html??'').matchAll(re)){
+    if(!/\bitemprop=["']description["']/i.test(match[1]||'')) continue
+    const value=cleanContentHtml(match[2])
+    if(value.length>=FULL_JD_MIN_LENGTH) candidates.push(value)
+  }
+  return candidates.reduce((best,value)=>value.length>best.length?value:best,'')
+}
+
 function semanticExternalCandidates(html=''){
   const text=String(html??'')
+  const known=[emplyExternalCandidate(text),successFactorsExternalCandidate(text)].filter(Boolean)
+  if(known.length) return known.reduce((best,value)=>value.length>best.length?value:best,'')
+
   const candidates=[]
   const broad=/<(section|article|main)\b([^>]*)>([\s\S]*?)<\/\1>/gi
   for(const match of text.matchAll(broad)){
@@ -259,6 +278,31 @@ export function extractJobindexExternalDetail(html='',context={}){
     location:locationFromPosting(posting),
     country:countryFromPosting(posting),
     remoteType:remoteTypeFromPosting(posting,fullJd),
+    fullJd:fullJd.length>=FULL_JD_MIN_LENGTH?fullJd:'',
+  }
+}
+
+export function extractOracleCandidateExperienceDetail(payload='',context={}){
+  let root=null
+  try{root=typeof payload==='string'?JSON.parse(payload):payload}catch{}
+  const item=Array.isArray(root?.items)?root.items[0]:root
+  if(!item||typeof item!=='object'){
+    return {url:clean(context?.url),title:'',company:'',location:'',country:'',remoteType:'',postedDate:null,fullJd:''}
+  }
+  const parts=[
+    decodeHtml(item.ExternalDescriptionStr),
+    decodeHtml(item.ExternalResponsibilitiesStr),
+    decodeHtml(item.ExternalQualificationsStr),
+  ].filter(Boolean)
+  const fullJd=[...new Set(parts)].join('\n\n')
+  return {
+    url:clean(context?.url),
+    title:clean(item.Title||item.OtherRequisitionTitle),
+    company:clean(item.LegalEmployer||item.Organization),
+    location:clean(item.PrimaryLocation),
+    country:clean(item.PrimaryLocationCountry),
+    remoteType:remoteTypeFromText(item.WorkplaceType),
+    postedDate:clean(item.ExternalPostedStartDate)||null,
     fullJd:fullJd.length>=FULL_JD_MIN_LENGTH?fullJd:'',
   }
 }
