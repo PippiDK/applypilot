@@ -13,7 +13,9 @@ function attr(tag,name){
 function plain(value=''){
   return decodeEntities(String(value??'').replace(/<!--[\s\S]*?-->/g,' ').replace(/<script\b[\s\S]*?<\/script>/gi,' ').replace(/<style\b[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ')).replace(/\s+/g,' ').trim()
 }
-function normalizedTitle(value=''){return plain(value).toLowerCase()}
+function normalizedTitle(value=''){
+  return plain(value).toLowerCase().replace(/[\u2010-\u2015\u2212]/g,'-')
+}
 function hostname(value=''){
   try{return new URL(String(value??'')).hostname.toLowerCase().replace(/^www\./,'')}catch{return ''}
 }
@@ -140,11 +142,16 @@ export function isDsbCareersUrl(value=''){
 }
 export function dsbAppliedUrlForTitle(html='',title=''){
   const text=String(html??'')
-  const escaped=JSON.stringify(clean(title)).slice(1,-1).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')
-  const marker=new RegExp(`"title"\\s*:\\s*"${escaped}"`,'i').exec(text)
-  if(!marker) return ''
-  const chunk=text.slice(marker.index,marker.index+5000)
-  const match=chunk.match(/"appliedUrl"\s*:\s*"((?:\\.|[^"\\])*)"/i)
+  const titleIndex=text.indexOf(clean(title))
+  if(titleIndex<0) return ''
+  const chunk=text.slice(titleIndex,titleIndex+5000)
+  const appliedIndex=chunk.indexOf('appliedUrl')
+  if(appliedIndex<0) return ''
+  const tail=chunk.slice(appliedIndex)
+  const match=tail.match(/https:\/\/dsb\.jobs\.hr\.cloud\.sap\/job\/[^\s"'<>]+/i)
   if(!match) return ''
-  try{return JSON.parse(`"${match[1]}"`)}catch{return decodeEntities(match[1].replace(/\\u0026/gi,'&').replace(/\\\//g,'/'))}
+  return decodeEntities(match[0]
+    .replace(/\\+u0026/gi,'&')
+    .replace(/\\+\//g,'/')
+    .replace(/\\+$/g,''))
 }
