@@ -9,6 +9,8 @@ import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint
 import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'
 import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'
 import {SEARCH_AREAS,WORK_MODELS,classifySearchArea,classifyWorkModel,filterJobItems,filterIgnoredJobItems} from './lib/job-list-filters.js'
+import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
+import {sourceLabel} from './lib/normalized-job.js'
 import {selectAdaptationCv,selectedAdaptationCv} from './lib/cv-adaptation-selection.js'
 import {buildAdaptationBaseline,baselineKey,baselineMatches} from './lib/cv-adaptation-baseline.js'
 import {requestCvAdaptation} from './lib/cv-adaptation-client.js'
@@ -39,10 +41,12 @@ function roleList(value){return Array.isArray(value)?value.map(item=>String(item
 function legacyRoles(value=''){return String(value??'').split(',').map(item=>item.trim()).filter(Boolean)}
 function combinedRoles(primary=[],adjacent=[]){return [...roleList(primary),...roleList(adjacent)].join(', ')}
 function workModelText(values=[]){return values.map(value=>value==='onsite'?'On-site':value==='hybrid'?'Hybrid':'Remote').join(' · ')}
+function sourceWarning(statuses={}){ const failed=Object.entries(statuses||{}).filter(([,value])=>value?.status==='failed').map(([source])=>source==='linkedin'?'LinkedIn':'Jobindex'); return failed.length?`${failed.join(' · ')} search unavailable`:'' }
 
 export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(7)
   const [jobs,setJobs]=useState([])
+  const [selectedSources,setSelectedSources]=useState(()=>[...DEFAULT_SEARCH_SOURCES])
   const [selectedAreas,setSelectedAreas]=useState(()=>SEARCH_AREAS.map(({id})=>id))
   const [selectedWorkModels,setSelectedWorkModels]=useState(()=>WORK_MODELS.map(({id})=>id))
   const allFiltersSelected=SEARCH_AREAS.every(({id})=>selectedAreas.includes(id))&&WORK_MODELS.every(({id})=>selectedWorkModels.includes(id))
@@ -50,7 +54,7 @@ export default function Home(){
   const [selected,setSelected]=useState(null)
   const [jobStatuses,setJobStatuses]=useState({})
   const [showIgnored,setShowIgnored]=useState(false)
-  const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
+  const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[],sourceStatuses:{}})
   const [shadowState,setShadowState]=useState({status:'idle',error:'',stats:null,coverage:null,comparison:null})
   const [cvData,setCvData]=useState(null)
   const [cvLibrary,setCvLibrary]=useState(()=>createCvLibrary())
@@ -88,6 +92,7 @@ export default function Home(){
       const preferences=normalizeSearchPreferences(savedProfile)
       const hydrated={...resumeToProfile(savedProfile,primaryCv),...preferences,geography:legacyGeographyFromPreferences(preferences.locations,preferences.workModels)}
 
+      setSelectedSources(readSearchSources(localStorage))
       setCvLibrary(library)
       if(readyCvCount(library)>0) localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(library))
       if(primaryCv){
@@ -222,23 +227,31 @@ export default function Home(){
     setSelectedWorkModels(checked?WORK_MODELS.map(({id})=>id):[])
   }
 
+  function toggleSource(source){
+    setSelectedSources(current=>{
+      const next=current.includes(source)?current.filter(value=>value!==source):[...current,source]
+      return writeSearchSources(localStorage,next)
+    })
+  }
+
   async function search(){
   if(!resumeLoaded){
-    setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[]})
+    setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[],sourceStatuses:{}})
     return
   }
-  setJobs([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
+  if(!selectedSources.length){
+    setState({loading:false,error:'Select at least one search source.',coverage:null,stats:null,fetchedAt:null,audit:[],sourceStatuses:{}})
+    return
+  }
+  setJobs([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[],sourceStatuses:{}})
   setShadowState({status:'skipped',error:'',stats:null,coverage:null,comparison:null})
-  const hasProfilePlan=Array.isArray(profile?.unionSearchPlan?.directions)&&profile.unionSearchPlan.directions.length>0
   try{
-    const res=hasProfilePlan
-      ? await fetch('/api/linkedin-profile-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,unionSearchPlan:profile.unionSearchPlan,exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[]})})
-      : await fetch('/api/linkedin-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,cvText:cvData.cvText})})
+    const res=await fetch('/api/multi-source-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,unionSearchPlan:profile.unionSearchPlan,exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[],cvText:cvData.cvText,enabledSources:selectedSources,filters:{areas:selectedAreas,workModels:selectedWorkModels}})})
     const data=await res.json()
-    if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
+    if(!res.ok) throw new Error(data.error||'Search failed')
     setJobs(Array.isArray(data.jobs)?data.jobs:[])
-    setState({loading:false,error:'',coverage:data.coverage||null,stats:data.stats||null,fetchedAt:data.fetchedAt||null,audit:Array.isArray(data.audit)?data.audit:[]})
-  }catch(error){ setState({loading:false,error:error.message||'LinkedIn search failed',coverage:null,stats:null,fetchedAt:null,audit:[]}) }
+    setState({loading:false,error:'',coverage:data.coverage||null,stats:data.stats||null,fetchedAt:data.fetchedAt||null,audit:Array.isArray(data.audit)?data.audit:[],sourceStatuses:data.sourceStatuses||{}})
+  }catch(error){ setState({loading:false,error:error.message||'Search failed',coverage:null,stats:null,fetchedAt:null,audit:[],sourceStatuses:{}}) }
 }
   function startProfile(){
     const base=resumeToProfile(profile,cvData)
@@ -468,11 +481,13 @@ export default function Home(){
     }
   }
 
+  const failedSourceWarning=sourceWarning(state.sourceStatuses)
+
   return <main>
-    <header><div><div className="brand">ApplyPilot</div><div className="tag">Search less. Apply better.</div></div><div className="headerActions"><div className={`sourceBadge profileStatus ${resumeLoaded?'statusReady':'statusEmpty'}`}>{resumeLoaded?'Profile ready':'Profile empty'}</div><div className="sourceBadge">LINKEDIN · PUBLIC</div></div></header>
+    <header><div><div className="brand">ApplyPilot</div><div className="tag">Search less. Apply better.</div></div><div className="headerActions"><div className={`sourceBadge profileStatus ${resumeLoaded?'statusReady':'statusEmpty'}`}>{resumeLoaded?'Profile ready':'Profile empty'}</div><div className="sourceBadge">MULTI-SOURCE SEARCH</div></div></header>
 
     <section className="hero">
-      <div><p className="eyebrow">ONE SOURCE · END-TO-END</p><h1>Find the right roles for your Search Profile in Denmark.</h1><p>Search Profile → LinkedIn discovery → full job description → worthwhile matches only.</p></div>
+      <div><p className="eyebrow">MULTI-SOURCE · END-TO-END</p><h1>Find the right roles for your Search Profile in Denmark.</h1><p>Search Profile → selected sources → full job description → worthwhile matches only.</p></div>
       <div className="metric"><b>{state.loading?'…':jobs.length}</b><span>matches</span></div>
     </section>
 
@@ -480,12 +495,13 @@ export default function Home(){
 
     <section className="controls">
       <div><small>POSTED WITHIN</small><div className="choices">{WINDOWS.map(days=><button key={days} className={freshnessDays===days?'choice selected':'choice'} onClick={()=>setFreshnessDays(days)}>{days} day{days===1?'':'s'}</button>)}</div></div>
-      <button className="primary" onClick={search} disabled={state.loading}>{state.loading?'Reading LinkedIn JDs…':'Search LinkedIn'}</button>
+      <div><small>SEARCH SOURCES</small><div className="choices"><label className="choice"><input type="checkbox" checked={selectedSources.includes('linkedin')} onChange={()=>toggleSource('linkedin')}/>LinkedIn</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobindex')} onChange={()=>toggleSource('jobindex')}/>Jobindex</label></div></div>
+      <button className="primary" onClick={search} disabled={state.loading}>{state.loading?'Searching…':'Search'}</button>
     </section>
 
-    {state.error&&<div className="errorBox"><b>{state.error==='Please Upload Your CV'?'Please Upload Your CV':'LinkedIn search failed'}</b>{state.error!=='Please Upload Your CV'&&<span>{state.error}</span>}</div>}
-    {state.stats&&<div className="searchMeta"><span><b>{state.stats.discovered}</b> jobs discovered</span><span><b>{state.stats.fullJdVerified}</b> full JDs read</span><span><b>{state.stats.evaluated}</b> worthwhile after evaluation</span><span>Coverage: <b>{state.coverage?.status}</b></span></div>}
-    {state.coverage?.detail&&<div className="warningBox">Partial source access: {state.coverage.detail}</div>}
+    {state.error&&<div className="errorBox"><b>{state.error==='Please Upload Your CV'?'Please Upload Your CV':'Search failed'}</b>{state.error!=='Please Upload Your CV'&&<span>{state.error}</span>}</div>}
+    {state.stats&&<div className="searchMeta"><span><b>{state.stats.acquired??0}</b> jobs discovered</span><span><b>{state.stats.returned??jobs.length}</b> worthwhile after evaluation</span></div>}
+    {failedSourceWarning&&<div className="warningBox">{failedSourceWarning}</div>}
 
     <section className="grid">
       <div className="list">
@@ -499,32 +515,32 @@ export default function Home(){
             <label className={filterStyles.option}><input type="checkbox" checked={showIgnored} onChange={event=>setShowIgnored(event.target.checked)}/><span>Show ignored</span><b></b></label>
           </div>
         </details>}
-        {!state.loading&&!state.error&&!state.stats&&<div className="empty">Run the LinkedIn search. No other source is used in this milestone.</div>}
-        {state.loading&&<div className="empty">Searching LinkedIn public pages and reading full job descriptions…</div>}
+        {!state.loading&&!state.error&&!state.stats&&<div className="empty">Run search to find matching vacancies from the selected sources.</div>}
+        {state.loading&&<div className="empty">Searching selected sources and reading full job descriptions…</div>}
         {!state.loading&&state.stats&&jobs.length===0&&<div className="empty">NO STRONG NEW MATCHES FOUND.</div>}
         {!state.loading&&state.stats&&jobs.length>0&&visibleJobs.length===0&&<div className="empty">NO MATCHES IN SELECTED FILTERS.</div>}
-        {visibleJobs.map(item=>{const {job,evaluation}=item; const score=Math.round(evaluation.score*10); const manualStatus=jobStatuses[job.sourceJobId]||''; return <div className="jobWrap" key={job.sourceJobId}>
+        {visibleJobs.map(item=>{const {job,evaluation}=item; const score=evaluation?Math.round(evaluation.score*10):null; const manualStatus=jobStatuses[job.sourceJobId]||''; return <div className="jobWrap" key={job.jobId||job.sourceJobId}>
           <button onClick={()=>setSelected(item)} className={'job '+(active?.job.sourceJobId===job.sourceJobId?'active':'')}>
-            <span className="score">{fitLabel(score)}</span>
-            <span><b>{job.title}</b><small>{job.company} · {job.location}</small><small className="sourceLine">LinkedIn · {dateText(job.publishedAt)}</small></span>
+            <span className="score">{score==null?'N/A':fitLabel(score)}</span>
+            <span><b>{job.title||'Vacancy details unavailable'}</b><small>{job.company||'Company unavailable'} · {job.location||'Location unavailable'}</small><small className="sourceLine">{sourceLabel(job)||'Source unavailable'} · {dateText(job.publishedAt)}</small></span>
             <span>→</span>
           </button>
-          <select aria-label={`Status for ${job.title}`} className={`jobStatusSelect status-${manualStatus||'none'}`} value={manualStatus} onChange={event=>changeJobStatus(job.sourceJobId,event.target.value)}>
+          <select aria-label={`Status for ${job.title||'vacancy'}`} className={`jobStatusSelect status-${manualStatus||'none'}`} value={manualStatus} onChange={event=>changeJobStatus(job.sourceJobId,event.target.value)}>
             {JOB_STATUS_OPTIONS.map(option=><option key={option.value||'none'} value={option.value}>{option.label}</option>)}
           </select>
         </div>})}
       </div>
 
       <div className="panel">
-        {active?(()=>{const {job}=active; const expertise=expertiseState.jobKey===jobKey?expertiseState.analysis:null; return <>
-          <div className="panelTop expertiseHeader"><div><h2>{job.title}</h2><p>{job.company} · {job.location}</p><small className="sourceLine">Source: LinkedIn · {dateText(job.publishedAt)}</small></div></div>
+        {active?(()=>{const {job}=active; const expertise=expertiseState.jobKey===jobKey?expertiseState.analysis:null; const vacancyUrl=job.originalUrl||job.detailUrl||job.applicationUrl; return <>
+          <div className="panelTop expertiseHeader"><div><h2>{job.title||'Vacancy details unavailable'}</h2><p>{job.company||'Company unavailable'} · {job.location||'Location unavailable'}</p><small className="sourceLine">Source: {sourceLabel(job)||'Unavailable'} · {dateText(job.publishedAt)}</small></div></div>
 
           <div className="conditionGrid">
             <div className="conditionCard"><small>Area</small><b>{conditionScore(jobConditions?.area.score)}</b><span>{jobConditions?.area.value||'Not stated'}</span></div>
             <div className="conditionCard"><small>Salary</small><b>{conditionScore(jobConditions?.salary.score)}</b><span>{jobConditions?.salary.value||'Not stated'}</span></div>
             <div className="conditionCard"><small>Employment type</small><b>{conditionScore(jobConditions?.employmentType.score)}</b><span>{jobConditions?.employmentType.value||'Not stated'}</span></div>
             <div className="conditionCard"><small>Work model</small><b>{conditionScore(jobConditions?.workModel.score)}</b><span>{jobConditions?.workModel.value||'Not stated'}</span></div>
-            <a className="secondary openLink" style={{gridColumn:'1 / -1',justifySelf:'start'}} href={job.originalUrl} target="_blank" rel="noreferrer">Open LinkedIn vacancy</a>
+            {vacancyUrl&&<a className="secondary openLink" style={{gridColumn:'1 / -1',justifySelf:'start'}} href={vacancyUrl} target="_blank" rel="noreferrer">Open vacancy</a>}
           </div>
 
           <BestCvPanel
@@ -558,9 +574,8 @@ export default function Home(){
             </>}
           </div>
 
-
           <div className="section"><h3>Application pack</h3><div className="docs"><div>{pack.cvReady?'✓':'○'} Tailored CV <span className={pack.cvReady?'ready':'pending'}>{pack.tailoredCvLabel}</span></div><div>○ Cover letter <span className="pending">{pack.coverLetterLabel}</span></div></div></div>
-        </>})():<div className="emptyPanel"><h2>No selected vacancy</h2><p>{state.loading?'Searching LinkedIn public pages…':'Run the LinkedIn search to see matching vacancies.'}</p></div>}
+        </>})():<div className="emptyPanel"><h2>No selected vacancy</h2><p>{state.loading?'Searching selected sources…':'Run search to see matching vacancies.'}</p></div>}
       </div>
     </section>
 
@@ -570,7 +585,7 @@ export default function Home(){
       <ShadowSearchAudit shadowState={shadowState}/>
     </section>}
 
-    <footer>Milestone: LinkedIn public search only · no CVR · no Jobnet · no additional sources</footer>
+    <footer>Milestone: selectable LinkedIn + Jobindex discovery · shared evaluation</footer>
 
     {profileOpen&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget&&!profileSaveState.loading)closeProfile()}}><div className="modal profileModal">
       <div className="modalHead"><div><p className="eyebrow">BUILD YOUR SEARCH AGENT</p><h2>Search profile</h2></div><button className="close" onClick={closeProfile} disabled={profileSaveState.loading}>×</button></div>
@@ -578,7 +593,7 @@ export default function Home(){
       {profileStep===1&&<CvLibraryStep library={cvLibrary} loadingSlot={cvState.loadingSlot} error={cvState.error} primarySkills={draft.skills} onUpload={parseCv} onRemove={removeCv}/>} 
       {profileStep===2&&<SearchProfileRolesStep primaryRoles={draftPrimaryRoles} adjacentRoles={draftAdjacentRoles} status={profileRoleState.status} error={profileRoleState.error} source={profileRoleState.source} totalCount={profileRoleState.totalCount||cvReadyCount} analysedCount={profileRoleState.analysedCount} failedCvs={profileRoleState.failedCvs} onPrimaryChange={roles=>updateDraftRoles('primaryRoles',roles)} onAdjacentChange={roles=>updateDraftRoles('adjacentRoles',roles)} onRetry={()=>buildProfileRoles({forceCvIds:(profileRoleState.failedCvs||[]).map(cv=>cv.cvId)})}/>} 
       {profileStep===3&&<div className="wizard"><h3>What should ApplyPilot exclude?</h3><p>Optional. Write any hard no-go roles, industries, languages or working conditions. ApplyPilot interprets this text only when you save the profile.</p><textarea value={draft.exclusions} onChange={event=>setDraft(current=>({...current,exclusions:event.target.value}))} rows="6"/></div>}
-      {profileStep===4&&<div className="wizard review"><h3>Confirm your search profile</h3><p>This saves your Search Profile and activates profile-driven LinkedIn discovery for future searches.</p><div className="reviewRow"><span>Primary Search CV</span><b>{resumeLoaded?cvData.fileName:cvData?.fileName?'Re-upload required':'Not uploaded yet'}</b></div><div className="reviewRow"><span>CV preparation</span><b>{resumeLoaded?'Ready — complete Source CV prepared':'CV not ready'}</b></div><div className="reviewRow"><span>Role profiles</span><b>{cvReadyCount?`${analysedRoleProfileCount}/${cvReadyCount} CVs analysed`:'Not generated'}</b></div><div className="reviewRow"><span>Target roles</span><b>{draft.roles||'Not set'}</b></div><div className="reviewRow"><span>Where</span><b>{draftLocations.length?draftLocations.join(' · '):'Not set'}</b></div><div className="reviewRow"><span>Work model</span><b>{draftWorkModels.length?workModelText(draftWorkModels):'Not set'}</b></div><div className="reviewRow"><span>Exclude</span><b>{draft.exclusions||'None'}</b></div><SearchPlanPreview plan={draftUnionSearchPlan}/>{profileSaveState.error&&<div className="errorBox"><b>Search Profile save failed</b><span>{profileSaveState.error}</span></div>}<div className="truth"><b>Truth rule</b><span>ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.</span></div></div>}
+      {profileStep===4&&<div className="wizard review"><h3>Confirm your search profile</h3><p>This saves your Search Profile and activates profile-driven discovery for future searches.</p><div className="reviewRow"><span>Primary Search CV</span><b>{resumeLoaded?cvData.fileName:cvData?.fileName?'Re-upload required':'Not uploaded yet'}</b></div><div className="reviewRow"><span>CV preparation</span><b>{resumeLoaded?'Ready — complete Source CV prepared':'CV not ready'}</b></div><div className="reviewRow"><span>Role profiles</span><b>{cvReadyCount?`${analysedRoleProfileCount}/${cvReadyCount} CVs analysed`:'Not generated'}</b></div><div className="reviewRow"><span>Target roles</span><b>{draft.roles||'Not set'}</b></div><div className="reviewRow"><span>Where</span><b>{draftLocations.length?draftLocations.join(' · '):'Not set'}</b></div><div className="reviewRow"><span>Work model</span><b>{draftWorkModels.length?workModelText(draftWorkModels):'Not set'}</b></div><div className="reviewRow"><span>Exclude</span><b>{draft.exclusions||'None'}</b></div><SearchPlanPreview plan={draftUnionSearchPlan}/>{profileSaveState.error&&<div className="errorBox"><b>Search Profile save failed</b><span>{profileSaveState.error}</span></div>}<div className="truth"><b>Truth rule</b><span>ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.</span></div></div>}
       <div className="modalActions"><button className="secondary" disabled={profileSaveState.loading} onClick={()=>profileStep===1?closeProfile():setProfileStep(step=>step-1)}>{profileStep===1?'Cancel':'Back'}</button>{profileStep<4?<button className="primary" disabled={(profileStep===1&&(Boolean(cvState.loadingSlot)||cvReadyCount===0))||(profileStep===2&&profileRoleState.status==='loading')} onClick={nextProfileStep}>Continue</button>:<button className="primary" disabled={profileSaveState.loading} onClick={saveProfile}>{profileSaveState.loading?'Saving profile…':'Save profile'}</button>}</div>
     </div></div>}
 
