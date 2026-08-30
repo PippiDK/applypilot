@@ -17,27 +17,48 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Inspect external JD structure
+      - name: Exercise real Jobindex-only flow
         shell: bash
         run: |
           node --input-type=module <<'NODE'
-          const external='https://stillinger.smartrekruttering.dk/job-detail/112'
-          const response=await fetch(external,{redirect:'follow'})
-          const html=await response.text()
-          const markers=['Stillingsbeskrivelse','Short Description','Ansøgning','Education + Experience']
-          const snippets={}
-          for(const marker of markers){
-            const pos=html.toLowerCase().indexOf(marker.toLowerCase())
-            if(pos>=0) snippets[marker]=html.slice(Math.max(0,pos-2500),pos+9000)
+          import {runMultiSourceSearch} from './app/lib/search-source-orchestrator.js'
+          import {searchJobindexSource} from './app/lib/jobindex-source-adapter.js'
+
+          const input={
+            freshnessDays:14,
+            unionSearchPlan:{
+              version:'live-smoke',
+              directions:[{key:'project-manager',role:'Project Manager',query:'Project Manager',tier:'primary',origin:'manual',cvSlots:[1]}],
+            },
+            exclusionRules:[],
+            enabledSources:['jobindex'],
+            filters:{},
           }
-          const candidateBlocks=[]
-          for(const match of html.matchAll(/<(section|article|main|div)\b([^>]*)>([\s\S]*?)<\/\1>/gi)){
-            const attrs=match[2]||''
-            const body=match[3]||''
-            if(!/Stillingsbeskrivelse/i.test(body)) continue
-            candidateBlocks.push({tag:match[1],attrs,rawLength:body.length,text:body.replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/gi,' ').replace(/&amp;/gi,'&').replace(/\s+/g,' ').trim().slice(0,12000)})
-            if(candidateBlocks.length>=12) break
-          }
-          console.log(JSON.stringify({status:response.status,length:html.length,snippets,candidateBlocks},null,2))
-          if(!response.ok) throw new Error(`Employer detail HTTP ${response.status}`)
+          const result=await runMultiSourceSearch(input,{
+            jobindex:sourceInput=>searchJobindexSource({...sourceInput,maxPages:1}),
+          })
+          const stats=result.stats?.sources?.jobindex||{}
+          const sourceNames=Object.keys(result.sourceStatuses||{})
+          const verified=result.jobs.filter(item=>item?.job?.fullJd&&item?.limitedData!==true)
+          const limited=result.jobs.filter(item=>item?.limitedData===true)
+
+          console.log(JSON.stringify({
+            sourceStatus:result.sourceStatuses?.jobindex,
+            sourceNames,
+            acquired:result.stats?.acquired,
+            deduped:result.stats?.deduped,
+            returned:result.stats?.returned,
+            jobindexStats:stats,
+            evaluatedVerified:verified.length,
+            retainedLimited:limited.length,
+            sampleVerified:verified.slice(0,3).map(({job,evaluation})=>({title:job.title,company:job.company,location:job.location,publishedAt:job.publishedAt,fullJdLength:job.fullJd.length,score:evaluation?.score,detailUrl:job.detailUrl,applicationUrl:job.applicationUrl})),
+            sampleLimited:limited.slice(0,3).map(({job})=>({title:job.title,company:job.company,location:job.location,detailUrl:job.detailUrl})),
+          },null,2))
+
+          if(result.allFailed||result.sourceStatuses?.jobindex?.status==='failed') throw new Error('Live Jobindex-only flow failed')
+          if(sourceNames.length!==1||sourceNames[0]!=='jobindex') throw new Error('Jobindex-only selection invoked another source')
+          if(!(Number(stats.discovered)>0)) throw new Error('Live Jobindex discovery returned no vacancies')
+          if(!(Number(stats.detailRequests)>0)) throw new Error('Live Jobindex detail fetch did not run')
+          if(!(Number(result.stats?.acquired)>0)) throw new Error('Live Jobindex produced no normalized vacancies')
+          if(!(Number(stats.fullJdVerified)>0)) throw new Error('Live Jobindex verified no full job descriptions')
           NODE
