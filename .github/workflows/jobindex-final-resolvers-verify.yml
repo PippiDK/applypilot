@@ -1,0 +1,19 @@
+name: Jobindex final resolver verification
+
+on:
+  push:
+    branches:
+      - feature/jobindex-multisource-search
+
+jobs:
+  final-resolvers:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run final resolver regressions
+        run: node --test app/lib/jobindex-final-resolvers.test.mjs
