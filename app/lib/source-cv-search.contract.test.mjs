@@ -11,18 +11,19 @@ test('search engine has no hard-coded candidate CV fallback', () => {
   assert.doesNotMatch(engine, /resume\s*=\s*MASTER_/)
 })
 
-test('LinkedIn API requires cvText and passes it into search evaluation', () => {
+test('preserved LinkedIn legacy API still requires cvText and passes it into search evaluation', () => {
   assert.match(route, /body\?\.cvText/)
   assert.match(route, /Please Upload Your CV/)
   assert.match(route, /searchLinkedIn\(\{freshnessDays,resume:cvText,fetcher\}\)/)
 })
 
-test('Search LinkedIn is blocked in the browser when Source CV is not ready', () => {
+test('Search is blocked in the browser when Source CV is not ready', () => {
   assert.match(page, /if\(!resumeLoaded\)/)
   assert.match(page, /Please Upload Your CV/)
   assert.match(page, /return/)
 })
 
-test('browser sends the active uploaded Source CV text to LinkedIn evaluation', () => {
-  assert.match(page, /JSON\.stringify\(\{freshnessDays,cvText:cvData\.cvText\}\)/)
+test('browser sends the active uploaded Source CV text to the multi-source endpoint', () => {
+  assert.match(page, /\/api\/multi-source-search/)
+  assert.match(page, /cvText:cvData\.cvText/)
 })
