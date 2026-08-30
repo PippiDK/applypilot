@@ -1,0 +1,41 @@
+import { normalizeJob } from './normalized-job.js'
+
+function hasProfilePlan(plan){return Array.isArray(plan?.directions)&&plan.directions.length>0}
+function linkedinRecord(job={}){
+  return {
+    source:'linkedin',
+    sourceJobId:String(job.sourceJobId??''),
+    detailUrl:String(job.detailUrl||job.url||''),
+    applicationUrl:String(job.applicationUrl||''),
+    fullJd:String(job.fullJd||job.description||''),
+  }
+}
+function normalizeLinkedInJobs(jobs=[]){
+  return (Array.isArray(jobs)?jobs:[]).map(job=>normalizeJob({...job,sourceRecords:[...(Array.isArray(job.sourceRecords)?job.sourceRecords:[]),linkedinRecord(job)]}))
+}
+
+export async function searchLinkedInSource({freshnessDays=7,unionSearchPlan,exclusionRules=[],cvText='',dependencies={}}={}){
+  try{
+    const fetcher=dependencies.createLinkedInStableFetcher?.()
+    let result
+    if(hasProfilePlan(unionSearchPlan)){
+      if(typeof dependencies.buildDiscoverySearchPlan!=='function'||typeof dependencies.searchLinkedInProfile!=='function') throw new Error('LinkedIn profile dependencies unavailable')
+      const discoverySearchPlan=await dependencies.buildDiscoverySearchPlan({unionSearchPlan})
+      result=await dependencies.searchLinkedInProfile({freshnessDays,unionSearchPlan:discoverySearchPlan,exclusionRules,fetcher})
+    }else{
+      if(typeof dependencies.searchLinkedInStable!=='function') throw new Error('LinkedIn legacy search dependency unavailable')
+      result=await dependencies.searchLinkedInStable({freshnessDays,resume:String(cvText??''),fetcher})
+    }
+    return {
+      source:'linkedin',
+      status:result?.status==='partial'?'partial':'success',
+      jobs:normalizeLinkedInJobs(result?.jobs),
+      coverage:result?.coverage??null,
+      stats:result?.stats??null,
+      audit:Array.isArray(result?.audit)?result.audit:[],
+      error:'',
+    }
+  }catch(error){
+    return {source:'linkedin',status:'failed',jobs:[],coverage:null,stats:null,audit:[],error:String(error?.message||'LinkedIn search failed')}
+  }
+}
