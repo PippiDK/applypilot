@@ -117,10 +117,36 @@ export function jobindexDetailUrl(jobId){
   return /^h\d+$/i.test(id)?`${BASE}/vis-job/${id}`:''
 }
 
+function xmlField(item,tag){
+  return String(item??'').match(new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`,'i'))?.[1]||''
+}
+function stripCdata(value){return String(value??'').replace(/^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/i,'$1')}
+function xmlText(value){return decodeHtml(decodeEntities(stripCdata(value)))}
+function jobIdFrom(value){return String(value??'').match(/(?:https?:\/\/(?:www\.)?jobindex\.dk)?\/vis-job\/(h\d+)/i)?.[1]||''}
+
 export function extractJobindexSearchRecords(html=''){
   const text=String(html??'')
   const ids=[]
   const seen=new Set()
+  const items=[...text.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].map(match=>match[1])
+
+  if(items.length){
+    for(const item of items){
+      const link=clean(decodeEntities(stripCdata(xmlField(item,'link'))))
+      const guid=clean(decodeEntities(stripCdata(xmlField(item,'guid'))))
+      const jobId=jobIdFrom(link)||jobIdFrom(guid)||jobIdFrom(item)
+      if(!jobId||seen.has(jobId)) continue
+      seen.add(jobId)
+      ids.push({
+        jobId,
+        detailUrl:jobindexDetailUrl(jobId),
+        title:xmlText(xmlField(item,'title')),
+        rssDescription:xmlText(xmlField(item,'description')),
+      })
+    }
+    return ids
+  }
+
   const re=/(?:https?:\/\/(?:www\.)?jobindex\.dk)?\/vis-job\/(h\d+)/gi
   for(const match of text.matchAll(re)){
     const jobId=match[1]
