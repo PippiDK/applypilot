@@ -148,7 +148,7 @@ export default function HelpPage(){
     <section className={styles.screenshotSection} aria-labelledby="results-example">
       <div className={styles.sectionHead}><p className={styles.eyebrow}>CURRENT MVP</p><h2 id="results-example">Search results and vacancy review</h2><p>The shortlist stays on the left; the selected vacancy, conditions, Expertise Match and CV actions stay on the right.</p></div>
       <figure className={styles.figure}>
-        <img src="/help/applypilot-live-results.avif" alt="ApplyPilot Live matches list and selected vacancy review panel"/>
+        <img src="/help/applypilot-live-results.webp" alt="ApplyPilot Live matches list and selected vacancy review panel"/>
         <figcaption>Example of the current V16 result-review workspace. Additional screenshots can be added to this Help page as the walkthrough evolves.</figcaption>
       </figure>
     </section>
