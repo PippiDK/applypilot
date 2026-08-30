@@ -1,0 +1,60 @@
+name: Jobindex live smoke
+
+on:
+  push:
+    branches:
+      - feature/jobindex-multisource-search
+
+jobs:
+  live-jobindex:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Exercise real Jobindex discovery and detail fetch
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import {runMultiSourceSearch} from './app/lib/search-source-orchestrator.js'
+          import {searchJobindexSource} from './app/lib/jobindex-source-adapter.js'
+          import {SEARCH_AREAS,WORK_MODELS} from './app/lib/job-list-filters.js'
+
+          const unionSearchPlan={
+            version:'live-smoke',
+            directions:[{key:'project-manager',role:'Project Manager',query:'Project Manager',tier:'primary',origin:'manual',cvSlots:[1]}],
+          }
+          const input={
+            freshnessDays:14,
+            unionSearchPlan,
+            exclusionRules:[],
+            enabledSources:['jobindex'],
+            filters:{areas:SEARCH_AREAS.map(item=>item.id),workModels:WORK_MODELS.map(item=>item.id)},
+          }
+          const result=await runMultiSourceSearch(input,{
+            jobindex:sourceInput=>searchJobindexSource({...sourceInput,maxPages:1}),
+          })
+          const stats=result.stats?.sources?.jobindex||{}
+          const summary={
+            status:result.sourceStatuses?.jobindex?.status,
+            discovered:stats.discovered,
+            detailRequests:stats.detailRequests,
+            detailFailures:stats.detailFailures,
+            acquired:result.stats?.acquired,
+            filtered:result.stats?.filtered,
+            returned:result.stats?.returned,
+            sample:result.jobs.slice(0,3).map(({job})=>({title:job.title,company:job.company,location:job.location,workModel:job.remoteType,publishedAt:job.publishedAt,detailUrl:job.detailUrl})),
+          }
+          console.log(JSON.stringify(summary,null,2))
+
+          if(result.allFailed||result.sourceStatuses?.jobindex?.status==='failed') throw new Error('Live Jobindex source failed')
+          if(Object.keys(result.sourceStatuses||{}).some(source=>source!=='jobindex')) throw new Error('Jobindex-only selection invoked another source')
+          if(!(Number(stats.discovered)>0)) throw new Error('Live Jobindex discovery returned no candidates')
+          if(!(Number(stats.detailRequests)>0)) throw new Error('Live Jobindex detail fetch did not run')
+          if(!(Number(result.stats?.acquired)>0)) throw new Error('Live Jobindex source produced no normalized jobs')
+          NODE
