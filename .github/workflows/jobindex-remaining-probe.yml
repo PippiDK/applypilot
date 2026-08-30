@@ -9,39 +9,61 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Use Node 22
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify canonical full-JD pages
+      - name: Trace DSV and DSB resolvers
         shell: bash
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs'
-          const targets={
-            deif:'https://www.jobindex.dk/jobannonce/h1693319/project-manager-for-development-projects',
-            steel:'https://www.jobindex.dk/jobannonce/h1690926/technical-project-manager-bliv-en-del-af-et-staerkt-og-udviklende-team',
-            dsv:'https://www.jobindex.dk/jobannonce/h1692169/senior-project-manager-join-our-group-property-transaction-team',
-            dsb:'https://www.jobindex.dk/jobannonce/h1690238/it-service-delivery-manager-med-ansvar-for-leverandoerstyring-og-stabile-it-services',
+          import {
+            DSB_CURRENT_JOBS_URL,
+            dsbAppliedUrlForTitle,
+            dsvSearchUrl,
+            exactTitleJobHref,
+          } from './app/lib/jobindex-retrieval-fallbacks.js'
+          import {extractJobindexExternalDetail} from './app/lib/jobindex-parser.js'
+
+          const report={dsv:{},dsb:{}}
+          const dsvTitle='Senior Project Manager – join our Group Property Transaction team'
+          const dsvUrl=dsvSearchUrl(dsvTitle)
+          const dsvResponse=await fetch(dsvUrl)
+          const dsvHtml=await dsvResponse.text()
+          const dsvAnchors=[...dsvHtml.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)]
+            .map(m=>({href:m[1],label:String(m[2]||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()}))
+            .filter(a=>/Senior Project Manager/i.test(a.label))
+          const dsvDirect=exactTitleJobHref(dsvHtml,dsvTitle,'https://jobs.dsv.com/')
+          report.dsv={searchUrl:dsvUrl,status:dsvResponse.status,matchingAnchors:dsvAnchors,resolvedUrl:dsvDirect}
+          if(dsvDirect){
+            const directResponse=await fetch(dsvDirect)
+            const directHtml=await directResponse.text()
+            const parsed=extractJobindexExternalDetail(directHtml,{url:directResponse.url||dsvDirect})
+            report.dsv.direct={status:directResponse.status,finalUrl:directResponse.url,fullJdLength:String(parsed.fullJd||'').length}
           }
-          const report={}
-          for(const [name,url] of Object.entries(targets)){
-            const r=await fetch(url,{redirect:'follow'})
-            const text=await r.text()
-            fs.writeFileSync(`${name}.html`,text)
-            const body=text.match(/<section\b[^>]*class=["'][^"']*jobtext-jobad__body[^"']*["'][^>]*>([\s\S]*?)<\/section>/i)?.[1]||''
-            const plain=body.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()
-            report[name]={status:r.status,finalUrl:r.url,length:text.length,hasBody:!!body,bodyLength:plain.length,title:(text.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1]||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()}
+
+          const dsbTitle='IT Service Delivery Manager med ansvar for leverandørstyring og stabile IT-services'
+          const dsbResponse=await fetch(DSB_CURRENT_JOBS_URL)
+          const dsbHtml=await dsbResponse.text()
+          const titleIndex=dsbHtml.indexOf(dsbTitle)
+          const dsbDirect=dsbAppliedUrlForTitle(dsbHtml,dsbTitle)
+          report.dsb={status:dsbResponse.status,titleIndex,resolvedUrl:dsbDirect,snippet:titleIndex>=0?dsbHtml.slice(Math.max(0,titleIndex-400),titleIndex+1800):''}
+          if(dsbDirect){
+            const directResponse=await fetch(dsbDirect)
+            const directHtml=await directResponse.text()
+            const parsed=extractJobindexExternalDetail(directHtml,{url:directResponse.url||dsbDirect})
+            report.dsb.direct={status:directResponse.status,finalUrl:directResponse.url,fullJdLength:String(parsed.fullJd||'').length}
           }
-          fs.writeFileSync('canonical-report.json',JSON.stringify(report,null,2))
+
+          fs.writeFileSync('resolver-report.json',JSON.stringify(report,null,2))
           console.log(JSON.stringify(report,null,2))
-          for(const [name,item] of Object.entries(report)) if(!(item.status===200&&item.hasBody&&item.bodyLength>500)) throw new Error(`${name} canonical JD missing`)
           NODE
-      - name: Upload probe
+      - name: Upload resolver report
         uses: actions/upload-artifact@v4
         with:
-          name: jobindex-canonical-probe
-          path: |
-            canonical-report.json
-            *.html
+          name: jobindex-resolver-probe
+          path: resolver-report.json
           retention-days: 1
