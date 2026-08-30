@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: '22'
       - name: Run targeted Jobindex tests
-        run: node --test app/lib/jobindex-parser.test.mjs app/lib/jobindex-application-url.test.mjs app/lib/jobindex-common-ats.test.mjs app/lib/jobindex-retrieval-fallbacks.test.mjs app/lib/jobindex-source-adapter.test.mjs app/lib/search-source-orchestrator.test.mjs
+        run: node --test app/lib/jobindex-parser.test.mjs app/lib/jobindex-application-url.test.mjs app/lib/jobindex-common-ats.test.mjs app/lib/jobindex-retrieval-fallbacks.test.mjs app/lib/jobindex-final-resolvers.test.mjs app/lib/jobindex-source-adapter.test.mjs app/lib/search-source-orchestrator.test.mjs
 
   live-smoke:
     runs-on: ubuntu-latest
@@ -53,9 +53,8 @@ jobs:
           fs.writeFileSync('jobindex-live-smoke.json',JSON.stringify(report,null,2))
           console.log(JSON.stringify(report,null,2))
 
-          if(!(Number(source.stats?.discovered)>0)) throw new Error('No Jobindex candidates survived discovery relevance')
-          if(!(Number(source.stats?.detailRequests)>0)) throw new Error('No Jobindex detail requests executed')
-          if(!(Number(source.stats?.fullJdVerified)>0)) throw new Error('No Jobindex full JDs verified')
+          if(Number(source.stats?.fullJdVerified)!==Number(source.stats?.discovered)) throw new Error(`Full JD coverage incomplete: ${source.stats?.fullJdVerified}/${source.stats?.discovered}`)
+          if(Number(source.stats?.limitedData)!==0) throw new Error(`Limited-data vacancies remain: ${source.stats?.limitedData}`)
           if(result.jobs.some(item=>item.limitedData||!item.evaluation)) throw new Error('Unverified vacancy leaked into live matches')
           NODE
       - name: Upload live smoke report
@@ -65,7 +64,7 @@ jobs:
           path: jobindex-live-smoke.json
           retention-days: 1
 
-  coverage-probe:
+  production-build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -74,55 +73,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Probe current employer pages and ATS contracts
-        shell: bash
-        run: |
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs'
-          import {extractJobindexExternalDetail,extractOracleCandidateExperienceDetail} from './app/lib/jobindex-parser.js'
-
-          const targets={
-            pharm:'https://pharmacosmos.com/career/job-openings/project-manager-for-strategic-projects-maternity-cover',
-            viking:'https://www.viking-life.com/careers/vacancies/?hr=show-job/40110&linkref=3919&locale=da_DK',
-            weibel:'https://candidate.hr-manager.net/ApplicationInit.aspx?cid=1716&ProjectId=144227&DepartmentId=18956&MediaId=4618',
-            ellab:'https://candidate.hr-manager.net/ApplicationInit.aspx?cid=2275&ProjectId=144042&DepartmentId=19002&MediaId=4616',
-            hron:'https://copenhagengroup.hr-on.com/show-job/343576?linkref=724540&locale=en_US',
-            visue:'https://lindberghr.dk/stillinger/?hr=show-job%2F349477%26locale%3Dda_DK',
-            dsb:'https://www.dsb.dk/om-dsb/karriere-i-dsb/',
-            emply:'https://dao.career.emply.com/da/ad/carrier-for-night-distribution-at-dao/ihba5r',
-            successfactors:'https://job.wfs.aero/job/Trafik-Agent/1708-en_US/',
-          }
-          const report={targets:{}}
-          for(const [name,url] of Object.entries(targets)){
-            try{
-              const response=await fetch(url)
-              const html=await response.text()
-              fs.writeFileSync(`${name}.html`,html)
-              const parsed=extractJobindexExternalDetail(html,{url:response.url||url})
-              report.targets[name]={status:response.status,finalUrl:response.url,length:html.length,fullJdLength:String(parsed.fullJd||'').length,title:parsed.title,hasJsonLdJobPosting:/["']JobPosting["']/i.test(html),hasItempropDescription:/itemprop=["']description["']/i.test(html),hasEmplyText:/csa_jobadText/i.test(html)}
-            }catch(error){report.targets[name]={error:String(error)}}
-          }
-
-          const oracleUrl=new URL('https://efzu.fa.em2.oraclecloud.com/hcmRestApi/resources/latest/recruitingCEJobRequisitionDetails')
-          oracleUrl.searchParams.set('expand','all')
-          oracleUrl.searchParams.set('onlyData','true')
-          oracleUrl.searchParams.set('finder','ById;Id="8022",siteNumber=CX_1')
-          const oracleResponse=await fetch(oracleUrl,{headers:{Accept:'application/json','Ora-Irc-Language':'da'}})
-          const oraclePayload=await oracleResponse.text()
-          const oracleParsed=extractOracleCandidateExperienceDetail(oraclePayload,{url:'https://efzu.fa.em2.oraclecloud.com/hcmUI/CandidateExperience/da/sites/CX_1/job/8022'})
-          report.oracle={status:oracleResponse.status,length:oraclePayload.length,fullJdLength:String(oracleParsed.fullJd||'').length,title:oracleParsed.title}
-
-          fs.writeFileSync('coverage-report.json',JSON.stringify(report,null,2))
-          console.log(JSON.stringify(report,null,2))
-          if(!(Number(report.targets.emply?.fullJdLength)>500)) throw new Error('Live Emply parser contract failed')
-          if(!(Number(report.targets.successfactors?.fullJdLength)>500)) throw new Error('Live SuccessFactors parser contract failed')
-          if(!(Number(report.oracle?.fullJdLength)>500)) throw new Error('Live Oracle parser contract failed')
-          NODE
-      - name: Upload coverage probe
-        uses: actions/upload-artifact@v4
-        with:
-          name: jobindex-coverage-probe
-          path: |
-            coverage-report.json
-            *.html
-          retention-days: 1
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build
+        run: npm run build
