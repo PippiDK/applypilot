@@ -1,4 +1,20 @@
 import { extractJobindexSearchRecords, extractJobindexDetail, extractJobindexExternalDetail, extractOracleCandidateExperienceDetail, jobindexDetailUrl } from './jobindex-parser.js'
+import {
+  DSB_CURRENT_JOBS_URL,
+  dsbAppliedUrlForTitle,
+  dsvSearchUrl,
+  embeddedHrOnDescriptor,
+  exactTitleJobHref,
+  hrManagerAdvertisementUrl,
+  hrOnCompanyIdFromScript,
+  hrOnFrameUrl,
+  hrOnRootFromScript,
+  isDsbCareersUrl,
+  isDsvCareersUrl,
+  jobindexApplyTrackerUrl,
+  jobindexCanonicalFullJd,
+  jobindexCanonicalFullJdUrl,
+} from './jobindex-retrieval-fallbacks.js'
 import { normalizeJob } from './normalized-job.js'
 
 const SEARCH_BASE='https://www.jobindex.dk/jobsoegning.rss'
@@ -46,12 +62,13 @@ function discoveryTitleRelevant(record,direction){
   return approved.some(token=>candidate.some(candidateToken=>tokenEquivalent(token,candidateToken)))
 }
 
-async function fetchText(fetcher,url,options){
+async function fetchPage(fetcher,url,options){
   const response=await fetcher(url,options)
-  if(typeof response==='string') return response
+  if(typeof response==='string') return {text:response,url:String(url)}
   if(!response?.ok) throw new Error(`Jobindex HTTP ${response?.status||'error'}`)
-  return response.text()
+  return {text:await response.text(),url:String(response.url||url)}
 }
+async function fetchText(fetcher,url,options){return (await fetchPage(fetcher,url,options)).text}
 
 async function mapLimit(items,limit,fn){
   const results=new Array(items.length)
@@ -149,36 +166,104 @@ export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},e
     const detailUrl=candidate.detailUrl||jobindexDetailUrl(candidate.jobId)
     const html=await fetchText(fetcher,detailUrl)
     const detail=extractJobindexDetail(html,{jobId:candidate.jobId})
+    const applicationUrl=detail.applicationUrl||jobindexApplyTrackerUrl(html)
 
     let fullJd=detail.fullJd||''
     let externalDetail=null
-    if(!usableFullJd(fullJd)&&detail.applicationUrl){
+    const adoptDetail=parsed=>{
+      if(!usableFullJd(parsed?.fullJd)) return false
+      fullJd=parsed.fullJd
+      externalDetail=parsed
+      return true
+    }
+
+    if(!usableFullJd(fullJd)){
+      const canonicalUrl=jobindexCanonicalFullJdUrl(html)
+      if(canonicalUrl&&canonicalUrl!==detailUrl){
+        try{
+          const canonicalPage=await fetchPage(fetcher,canonicalUrl)
+          const canonicalJd=jobindexCanonicalFullJd(canonicalPage.text)
+          if(usableFullJd(canonicalJd)) fullJd=canonicalJd
+        }catch{}
+      }
+    }
+
+    let externalPage=null
+    if(!usableFullJd(fullJd)&&applicationUrl){
       externalDetailRequests++
       try{
-        const externalHtml=await fetchText(fetcher,detail.applicationUrl)
-        externalDetail=extractJobindexExternalDetail(externalHtml,{url:detail.applicationUrl})
-        if(usableFullJd(externalDetail.fullJd)) fullJd=externalDetail.fullJd
-        else externalParseMisses++
+        externalPage=await fetchPage(fetcher,applicationUrl)
+        const parsed=extractJobindexExternalDetail(externalPage.text,{url:externalPage.url})
+        if(!adoptDetail(parsed)) externalParseMisses++
       }catch{
         externalFetchFailures++
       }
 
+      if(!usableFullJd(fullJd)&&externalPage){
+        const advertisementUrl=hrManagerAdvertisementUrl(externalPage.url)
+        if(advertisementUrl){
+          try{
+            const advertisementPage=await fetchPage(fetcher,advertisementUrl)
+            adoptDetail(extractJobindexExternalDetail(advertisementPage.text,{url:advertisementPage.url}))
+          }catch{externalFetchFailures++}
+        }
+      }
+
+      if(!usableFullJd(fullJd)&&externalPage){
+        const embedded=embeddedHrOnDescriptor(applicationUrl,externalPage.text)
+        if(embedded){
+          try{
+            const [hrScript,customerScript]=await Promise.all([
+              fetchText(fetcher,embedded.hrScriptUrl),
+              fetchText(fetcher,embedded.customerScriptUrl),
+            ])
+            const frameUrl=hrOnFrameUrl({
+              root:hrOnRootFromScript(hrScript),
+              companyId:hrOnCompanyIdFromScript(customerScript),
+              jobId:embedded.jobId,
+              locale:embedded.locale,
+            })
+            if(frameUrl){
+              const framePage=await fetchPage(fetcher,frameUrl)
+              adoptDetail(extractJobindexExternalDetail(framePage.text,{url:framePage.url}))
+            }
+          }catch{externalFetchFailures++}
+        }
+      }
+
+      if(!usableFullJd(fullJd)&&isDsvCareersUrl(applicationUrl)){
+        try{
+          const searchPage=await fetchPage(fetcher,dsvSearchUrl(detail.title||candidate.title))
+          const directUrl=exactTitleJobHref(searchPage.text,detail.title||candidate.title,'https://jobs.dsv.com/')
+          if(directUrl){
+            const directPage=await fetchPage(fetcher,directUrl)
+            adoptDetail(extractJobindexExternalDetail(directPage.text,{url:directPage.url}))
+          }
+        }catch{externalFetchFailures++}
+      }
+
+      if(!usableFullJd(fullJd)&&isDsbCareersUrl(applicationUrl)){
+        try{
+          const listingPage=await fetchPage(fetcher,DSB_CURRENT_JOBS_URL)
+          const directUrl=dsbAppliedUrlForTitle(listingPage.text,detail.title||candidate.title)
+          if(directUrl){
+            const directPage=await fetchPage(fetcher,directUrl)
+            adoptDetail(extractJobindexExternalDetail(directPage.text,{url:directPage.url}))
+          }
+        }catch{externalFetchFailures++}
+      }
+
       if(!usableFullJd(fullJd)){
-        const oracleRequest=oracleCandidateExperienceRequest(detail.applicationUrl)
+        const oracleRequest=oracleCandidateExperienceRequest(applicationUrl)
         if(oracleRequest){
           oracleDetailRequests++
           try{
             const oraclePayload=await fetchText(fetcher,oracleRequest.url,{
               headers:{Accept:'application/json','Ora-Irc-Language':oracleRequest.language},
             })
-            const oracleDetail=extractOracleCandidateExperienceDetail(oraclePayload,{url:detail.applicationUrl})
-            if(usableFullJd(oracleDetail.fullJd)){
-              fullJd=oracleDetail.fullJd
-              externalDetail=oracleDetail
-              oracleDetailVerified++
-            }else{
-              oracleDetailFailures++
-            }
+            const oracleDetail=extractOracleCandidateExperienceDetail(oraclePayload,{url:applicationUrl})
+            if(adoptDetail(oracleDetail)) oracleDetailVerified++
+            else oracleDetailFailures++
           }catch{
             oracleDetailFailures++
           }
@@ -193,6 +278,7 @@ export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},e
     const postedDate=detail.postedDate||externalDetail?.postedDate||null
     return normalizeJob({
       ...detail,
+      applicationUrl,
       title:detail.title||externalDetail?.title||candidate.title||'',
       company:detail.company||externalDetail?.company||'',
       location:detail.location||externalDetail?.location||'',
@@ -208,7 +294,7 @@ export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},e
         source:'jobindex',
         sourceJobId:candidate.jobId,
         detailUrl:detail.detailUrl||detailUrl,
-        applicationUrl:detail.applicationUrl||'',
+        applicationUrl,
         fullJd:verified?fullJd:'',
         limitedData:!verified,
       }],
