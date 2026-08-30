@@ -22,24 +22,39 @@ jobs:
           import fs from 'node:fs'
           import { extractJobindexDetail, extractJobindexExternalDetail } from './app/lib/jobindex-parser.js'
 
-          const decode=s=>String(s||'').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,'$1').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()
+          const decode=s=>String(s||'').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,'$1').replace(/&#x([0-9a-f]+);/gi,(_,h)=>String.fromCodePoint(parseInt(h,16))).replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()
           const field=(item,tag)=>decode(item.match(new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`,'i'))?.[1]||'')
           const host=u=>{try{return new URL(u).hostname}catch{return ''}}
           const idFrom=s=>String(s||'').match(/\/vis-job\/(h\d+)/i)?.[1]||''
-          const query='Project Manager'
-          const rssUrl=`https://www.jobindex.dk/jobsoegning.rss?q=${encodeURIComponent(query)}`
-          const rss=await fetch(rssUrl)
-          const rssText=await rss.text()
-          const rssMeta={status:rss.status,url:rss.url,contentType:rss.headers.get('content-type'),length:rssText.length}
 
-          const items=[...rssText.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].map(m=>m[1])
-          const rows=items.slice(0,20).map((item,index)=>{
-            const title=field(item,'title')
-            const link=field(item,'link')||field(item,'guid')
-            const description=field(item,'description')
-            return {index:index+1,id:idFrom(link)||idFrom(item),title,link,description:description.slice(0,300),titleHasProject:/\bproject\b/i.test(title),titleHasManager:/\bmanager\b/i.test(title)}
-          })
-          const titleCounts={items:items.length,projectTitle:rows.filter(x=>x.titleHasProject).length,managerTitle:rows.filter(x=>x.titleHasManager).length,neither:rows.filter(x=>!x.titleHasProject&&!x.titleHasManager).length}
+          async function readRss(query){
+            const url=new URL('https://www.jobindex.dk/jobsoegning.rss')
+            if(query!==null) url.searchParams.set('q',query)
+            const response=await fetch(url)
+            const text=await response.text()
+            const items=[...text.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].map(m=>m[1])
+            const rows=items.slice(0,20).map((item,index)=>{
+              const title=field(item,'title')
+              const link=field(item,'link')||field(item,'guid')
+              const description=field(item,'description')
+              return {index:index+1,id:idFrom(link)||idFrom(item),title,link,description:description.slice(0,500)}
+            })
+            return {query,status:response.status,url:response.url,contentType:response.headers.get('content-type'),length:text.length,itemCount:items.length,rows}
+          }
+
+          const feeds=[]
+          for(const query of ['Project Manager','Delivery Manager','zzzznotrealzzzz',null]) feeds.push(await readRss(query))
+          const ids=feed=>new Set(feed.rows.map(r=>r.id).filter(Boolean))
+          const overlap=(a,b)=>[...ids(a)].filter(id=>ids(b).has(id)).length
+          const rssComparisons={
+            feeds:feeds.map(feed=>({query:feed.query,status:feed.status,url:feed.url,itemCount:feed.itemCount,firstIds:feed.rows.slice(0,10).map(r=>r.id),firstTitles:feed.rows.slice(0,10).map(r=>r.title)})),
+            overlaps:{projectVsDelivery:overlap(feeds[0],feeds[1]),projectVsNonsense:overlap(feeds[0],feeds[2]),projectVsNoQuery:overlap(feeds[0],feeds[3]),deliveryVsNoQuery:overlap(feeds[1],feeds[3]),nonsenseVsNoQuery:overlap(feeds[2],feeds[3])},
+          }
+
+          const primary=feeds[0]
+          const rows=primary.rows
+          const titleCounts={items:primary.itemCount,projectTitle:rows.filter(x=>/\bproject\b/i.test(x.title)).length,managerTitle:rows.filter(x=>/\bmanager\b/i.test(x.title)).length,neither:rows.filter(x=>!/\bproject\b/i.test(x.title)&&!/\bmanager\b/i.test(x.title)).length}
+          const queryMentions=rows.map(row=>({id:row.id,title:row.title,descriptionHasProject:/\bproject\b/i.test(row.description),descriptionHasManager:/\bmanager\b/i.test(row.description)}))
           const details=[]
 
           for(const row of rows.slice(0,12)){
@@ -49,28 +64,20 @@ jobs:
             try{
               detailResponse=await fetch(detailUrl)
               detailHtml=await detailResponse.text()
-            }catch(error){
-              details.push({id:row.id,rssTitle:row.title,detailError:String(error)})
-              continue
-            }
+            }catch(error){details.push({id:row.id,rssTitle:row.title,detailError:String(error)});continue}
             const detail=extractJobindexDetail(detailHtml,{jobId:row.id})
             const externalAnchors=[...detailHtml.matchAll(/<a\b[^>]*href=["'](https?:\/\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)].slice(0,12).map(m=>({href:m[1],label:decode(m[2]).slice(0,120),host:host(m[1])}))
             const base={id:row.id,rssTitle:row.title,status:detailResponse.status,length:detailHtml.length,title:detail.title,company:detail.company,location:detail.location,applicationUrl:detail.applicationUrl,applicationHost:host(detail.applicationUrl),jobindexFullJdLength:String(detail.fullJd||'').length,teaserLength:String(detail.teaser||'').length,externalAnchors}
-            if(!detail.applicationUrl||String(detail.fullJd||'').length>=500){
-              details.push({...base,external:null})
-              continue
-            }
+            if(!detail.applicationUrl||String(detail.fullJd||'').length>=500){details.push({...base,external:null});continue}
             try{
               const ext=await fetch(detail.applicationUrl)
               const extHtml=await ext.text()
               const parsed=extractJobindexExternalDetail(extHtml,{url:detail.applicationUrl})
-              details.push({...base,external:{status:ext.status,finalUrl:ext.url,finalHost:host(ext.url),contentType:ext.headers.get('content-type'),length:extHtml.length,fullJdLength:String(parsed.fullJd||'').length,title:parsed.title,company:parsed.company,hasJobPosting:/["']JobPosting["']/i.test(extHtml),looksBlocked:/access denied|forbidden|captcha|cloudflare|bot detection|request blocked/i.test(extHtml.slice(0,12000)),htmlSignals:{workday:/workday/i.test(extHtml.slice(0,50000)),successFactors:/successfactors/i.test(extHtml.slice(0,50000)),teamtailor:/teamtailor/i.test(extHtml.slice(0,50000)),smartRecruiters:/smartrecruiters/i.test(extHtml.slice(0,50000)),recruitee:/recruitee/i.test(extHtml.slice(0,50000))}}})
-            }catch(error){
-              details.push({...base,external:{error:String(error)}})
-            }
+              details.push({...base,external:{status:ext.status,finalUrl:ext.url,finalHost:host(ext.url),contentType:ext.headers.get('content-type'),length:extHtml.length,fullJdLength:String(parsed.fullJd||'').length,title:parsed.title,company:parsed.company,hasJobPosting:/["']JobPosting["']/i.test(extHtml),looksBlocked:/access denied|forbidden|captcha|cloudflare|bot detection|request blocked/i.test(extHtml.slice(0,12000)),htmlSignals:{oracle:/oraclecloud|candidateexperience/i.test(extHtml.slice(0,50000)),emply:/emply/i.test(extHtml.slice(0,50000)),successFactors:/successfactors|jobs2web/i.test(extHtml.slice(0,50000)),teamtailor:/teamtailor/i.test(extHtml.slice(0,50000))}}})
+            }catch(error){details.push({...base,external:{error:String(error)}})}
           }
 
-          const diagnostic={query,rssMeta,titleCounts,rows,details}
+          const diagnostic={rssComparisons,titleCounts,queryMentions,rows,details}
           fs.writeFileSync('jobindex-diagnostic.json',JSON.stringify(diagnostic,null,2))
           console.log(JSON.stringify(diagnostic,null,2))
           NODE
