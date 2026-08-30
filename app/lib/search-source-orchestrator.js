@@ -42,6 +42,12 @@ export async function runMultiSourceSearch(input={},dependencies={}){
       continue
     }
 
+    if((!Array.isArray(job.foundBy)||job.foundBy.length===0)&&job.legacyEvaluation){
+      jobs.push({job,evaluation:job.legacyEvaluation,limitedData:false})
+      evaluationAudit.push({jobId:job.jobId||job.sourceJobId,stage:'LEGACY_EVALUATED',decision:'KEEP',reason:'Preserved existing LinkedIn legacy evaluation',score:job.legacyEvaluation?.score??0})
+      continue
+    }
+
     const result=evaluateProfileJob({
       job,
       foundBy:Array.isArray(job.foundBy)?job.foundBy:[],
