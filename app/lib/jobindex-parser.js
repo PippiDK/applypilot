@@ -55,15 +55,41 @@ function parseJsonLd(html){
   return null
 }
 
+function addressCountryValue(value){
+  if(typeof value==='string') return clean(value)
+  if(value&&typeof value==='object') return clean(value.name||value.addressCountry||value['@id'])
+  return ''
+}
+
+function countryFromPosting(posting){
+  const locations=Array.isArray(posting?.jobLocation)?posting.jobLocation:[posting?.jobLocation]
+  for(const entry of locations){
+    const address=entry?.address||entry
+    const country=addressCountryValue(address?.addressCountry)
+    if(country) return country
+  }
+  return ''
+}
+
 function locationFromPosting(posting){
   const locations=Array.isArray(posting?.jobLocation)?posting.jobLocation:[posting?.jobLocation]
   for(const entry of locations){
     const address=entry?.address||entry
     if(!address) continue
-    const parts=[address.addressLocality,address.addressRegion,address.addressCountry].map(clean).filter(Boolean)
+    const parts=[address.addressLocality,address.addressRegion,addressCountryValue(address.addressCountry)].map(clean).filter(Boolean)
     if(parts.length) return parts.join(', ')
   }
   return clean(posting?.jobLocationType)
+}
+
+function remoteTypeFromPosting(posting){
+  const locationType=clean(posting?.jobLocationType).toLowerCase()
+  const description=decodeHtml(posting?.description).toLowerCase()
+  if(locationType.includes('telecommute')) return 'remote'
+  if(/\bhybrid\b/.test(description)) return 'hybrid'
+  if(/\b(remote|work from home|home-based)\b/.test(description)) return 'remote'
+  if(/\b(on-site|onsite|on site)\b/.test(description)) return 'onsite'
+  return ''
 }
 
 function applicationUrlFromHtml(html){
@@ -84,6 +110,8 @@ export function extractJobindexDetail(html='',context={}){
   const title=clean(posting?.title)
   const company=clean(posting?.hiringOrganization?.name)
   const location=locationFromPosting(posting)
+  const country=countryFromPosting(posting)
+  const remoteType=remoteTypeFromPosting(posting)
   const postedDate=clean(posting?.datePosted)||null
   const fullJd=decodeHtml(posting?.description)
   const applicationUrl=applicationUrlFromHtml(html)
@@ -92,6 +120,8 @@ export function extractJobindexDetail(html='',context={}){
     title,
     company,
     location,
+    country,
+    remoteType,
     postedDate,
     detailUrl,
     applicationUrl,
