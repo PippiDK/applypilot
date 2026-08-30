@@ -5,6 +5,10 @@ on:
     branches:
       - feature/jobindex-multisource-search
 
+permissions:
+  contents: read
+  statuses: write
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -19,27 +23,33 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: Diagnose test files
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set +e
           failures=0
-          echo '## Failing test files' >> "$GITHUB_STEP_SUMMARY"
           while IFS= read -r file; do
             output="$(mktemp)"
             node --test "$file" >"$output" 2>&1
             status=$?
             if [ "$status" -ne 0 ]; then
               failures=1
-              echo "### $file" >> "$GITHUB_STEP_SUMMARY"
-              echo '```text' >> "$GITHUB_STEP_SUMMARY"
-              sed -n '1,120p' "$output" >> "$GITHUB_STEP_SUMMARY"
-              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              context="diagnostic/$(basename "$file")"
+              description="$(grep -m1 '^not ok' "$output" | sed -E 's/^not ok [0-9]+ - //' | cut -c1-130)"
+              if [ -z "$description" ]; then
+                description="Test file failed when run independently"
+              fi
+              payload="$(jq -nc --arg state failure --arg context "$context" --arg description "$description" '{state:$state,context:$context,description:$description}')"
+              curl -fsSL -X POST \
+                -H "Authorization: Bearer $GH_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+                -d "$payload" >/dev/null
             fi
             rm -f "$output"
           done < <(find app/lib app/api -type f -name '*.test.mjs' | sort)
-          if [ "$failures" -eq 0 ]; then
-            echo 'No test file fails when run independently.' >> "$GITHUB_STEP_SUMMARY"
-          fi
           exit "$failures"
 
       - name: Run full test suite
