@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { runMultiSourceSearch } from './search-source-orchestrator.js'
 
 const direction={role:'Senior Project Manager',tier:'primary',query:'Project Manager'}
-const input={freshnessDays:7,unionSearchPlan:{directions:[direction]},exclusionRules:[],enabledSources:['linkedin','jobindex'],filters:{areas:[],workModels:[]}}
+const input={freshnessDays:7,unionSearchPlan:{directions:[direction]},exclusionRules:[],enabledSources:['linkedin','jobindex'],filters:{}}
 
 function job(source,id,overrides={}){
   return {
