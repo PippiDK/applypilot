@@ -42,11 +42,12 @@ export async function runMultiSourceSearch(input={},dependencies={}){
   const filtered=applyCommonFilters(merged,input)
   const jobs=[]
   const evaluationAudit=[]
+  let unverified=0
   const now=dependencies?.now instanceof Date?dependencies.now:new Date()
 
   for(const job of filtered){
     if(isLimited(job)){
-      jobs.push({job,evaluation:null,limitedData:true})
+      unverified++
       evaluationAudit.push({jobId:job.jobId||job.sourceJobId,stage:'LIMITED_DATA',decision:'UNVERIFIED',reason:'Full Job Description could not be retrieved'})
       continue
     }
@@ -74,7 +75,7 @@ export async function runMultiSourceSearch(input={},dependencies={}){
   return {
     jobs,
     sourceStatuses,
-    stats:{sources:Object.fromEntries(settled.map(result=>[result.source,result.stats])),acquired:acquired.length,deduped:merged.length,filtered:filtered.length,returned:jobs.length},
+    stats:{sources:Object.fromEntries(settled.map(result=>[result.source,result.stats])),acquired:acquired.length,deduped:merged.length,filtered:filtered.length,returned:jobs.length,unverified},
     coverage:settled.map(result=>result.coverage).filter(Boolean),
     audit:[...sourceAudit,...evaluationAudit],
     allFailed,
