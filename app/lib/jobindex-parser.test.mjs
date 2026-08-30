@@ -9,6 +9,21 @@ test('extracts stable Jobindex ids once and ignores unrelated hrefs', () => {
   assert.equal(records[0].detailUrl,'https://www.jobindex.dk/vis-job/h1693319')
 })
 
+test('RSS parser preserves title and teaser for discovery relevance checks', () => {
+  const rss=`<?xml version="1.0"?><rss><channel><item>
+    <title>Technical Project Manager, Acme A&amp;S</title>
+    <link>https://www.jobindex.dk/vis-job/h1693319</link>
+    <description><![CDATA[<div><p>Lead complex technology projects across teams.</p></div>]]></description>
+  </item></channel></rss>`
+  const records=extractJobindexSearchRecords(rss)
+  assert.deepEqual(records,[{
+    jobId:'h1693319',
+    detailUrl:'https://www.jobindex.dk/vis-job/h1693319',
+    title:'Technical Project Manager, Acme A&S',
+    rssDescription:'Lead complex technology projects across teams.',
+  }])
+})
+
 test('builds canonical detail URL', () => {
   assert.equal(jobindexDetailUrl('h1693319'),'https://www.jobindex.dk/vis-job/h1693319')
 })
