@@ -57,6 +57,12 @@ function classBlock(html,classNeedle){
   return match?.[2]||''
 }
 
+function idBlock(html,idNeedle){
+  const escaped=String(idNeedle).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')
+  const match=String(html??'').match(new RegExp(`<([a-z0-9]+)\\b[^>]*id=["']${escaped}["'][^>]*>([\\s\\S]*?)<\\/\\1>`,'i'))
+  return match?.[2]||''
+}
+
 function companyFromHtml(html){
   const text=decodeHtml(classBlock(html,'jix-toolbar-top__company'))
   if(!text) return ''
@@ -246,8 +252,10 @@ function hostMatches(host,domain){return host===domain||host.endsWith(`.${domain
 function hostSpecificExternalCandidate(html='',context={}){
   const host=hostname(context?.url)
   let value=''
-  if(hostMatches(host,'hr-manager.net')) value=cleanContentHtml(classBlock(html,'AdContentContainer'))
-  else if(hostMatches(host,'hr-on.com')) value=cleanContentHtml(classBlock(html,'description'))
+  if(hostMatches(host,'hr-manager.net')){
+    value=cleanContentHtml(classBlock(html,'AdContentContainer'))
+    if(value.length<FULL_JD_MIN_LENGTH) value=cleanContentHtml(idBlock(html,'AdvertisementInnerContent'))
+  }else if(hostMatches(host,'hr-on.com')) value=cleanContentHtml(classBlock(html,'description'))
   else if(hostMatches(host,'pharmacosmos.com')) value=cleanContentHtml(classBlock(html,'structured-text'))
   return value.length>=FULL_JD_MIN_LENGTH?value:''
 }
