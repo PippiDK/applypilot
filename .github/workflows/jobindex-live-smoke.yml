@@ -17,44 +17,41 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Inspect stable Jobindex detail fields
+      - name: Inspect external full JD source
         shell: bash
         run: |
           node --input-type=module <<'NODE'
-          import {extractJobindexSearchRecords} from './app/lib/jobindex-parser.js'
+          const jobindexUrl='https://www.jobindex.dk/vis-job/h1692863'
+          const jobindexResponse=await fetch(jobindexUrl,{redirect:'follow'})
+          const jobindexHtml=await jobindexResponse.text()
+          const paid=(jobindexHtml.match(/<div class=["']PaidJob-inner["'][^>]*>([\s\S]*?)<\/div>\s*<div class=["']jix_toolbar/i)||[])[1]||''
+          const external=(paid.match(/<a\b[^>]*href=["'](https?:\/\/[^"']+)["'][^>]*>/i)||[])[1]||''
+          if(!external) throw new Error('No employer URL found on Jobindex detail page')
 
-          const rss=await (await fetch('https://www.jobindex.dk/jobsoegning.rss?q=Project%20Manager')).text()
-          const [record]=extractJobindexSearchRecords(rss)
-          if(!record) throw new Error('No Jobindex RSS record found')
-          const response=await fetch(record.detailUrl,{redirect:'follow'})
+          const response=await fetch(external,{redirect:'follow'})
           const html=await response.text()
-
-          const meta=[...html.matchAll(/<meta\b([^>]+)>/gi)].map(match=>match[1]).map(attrs=>{
-            const name=(attrs.match(/\b(?:name|property)=["']([^"']+)["']/i)||[])[1]||''
-            const content=(attrs.match(/\bcontent=["']([^"']*)["']/i)||[])[1]||''
-            return {name,content}
-          }).filter(item=>/title|description|company|location|date|published|job|employment/i.test(item.name)).slice(0,80)
-
-          const classNames=[...html.matchAll(/class=["']([^"']+)["']/gi)].flatMap(match=>match[1].split(/\s+/)).filter(value=>/job|ad|company|location|area|description|content|date/i.test(value))
-          const uniqueClasses=[...new Set(classNames)].slice(0,120)
-          const markers=['jobad','jobtext','job-description','jobdescription','companytext','firstdate','geoarea','jobad-element-area','jobad-content','PaidJob-inner','og:description','application_url','apply']
-          const snippets={}
-          for(const marker of markers){
-            const pos=html.toLowerCase().indexOf(marker.toLowerCase())
-            if(pos>=0) snippets[marker]=html.slice(Math.max(0,pos-900),pos+3500)
+          const jsonLd=[]
+          for(const match of html.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)){
+            let parsed=null
+            try{parsed=JSON.parse(match[1].trim())}catch{}
+            if(parsed) jsonLd.push(parsed)
           }
+          function findJobPosting(value){
+            if(!value||typeof value!=='object') return null
+            if(Array.isArray(value)){for(const item of value){const found=findJobPosting(item);if(found)return found};return null}
+            const type=value['@type']
+            if(type==='JobPosting'||(Array.isArray(type)&&type.includes('JobPosting'))) return value
+            if(value['@graph']) return findJobPosting(value['@graph'])
+            for(const child of Object.values(value)){const found=findJobPosting(child);if(found)return found}
+            return null
+          }
+          const posting=jsonLd.map(findJobPosting).find(Boolean)||null
+          const meta=[...html.matchAll(/<meta\b([^>]+)>/gi)].map(match=>match[1]).map(attrs=>({
+            name:(attrs.match(/\b(?:name|property)=["']([^"']+)["']/i)||[])[1]||'',
+            content:(attrs.match(/\bcontent=["']([^"']*)["']/i)||[])[1]||'',
+          })).filter(item=>/title|description|company|location|date|published|job/i.test(item.name)).slice(0,80)
+          const visible=html.replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/gi,' ').replace(/&amp;/gi,'&').replace(/\s+/g,' ').trim()
 
-          const stripped=html
-            .replace(/<script[\s\S]*?<\/script>/gi,' ')
-            .replace(/<style[\s\S]*?<\/style>/gi,' ')
-            .replace(/<[^>]+>/g,' ')
-            .replace(/&nbsp;/gi,' ')
-            .replace(/&amp;/gi,'&')
-            .replace(/&#x([0-9a-f]+);/gi,(_,hex)=>String.fromCodePoint(parseInt(hex,16)))
-            .replace(/&#(\d+);/g,(_,num)=>String.fromCodePoint(Number(num)))
-            .replace(/\s+/g,' ')
-            .trim()
-
-          console.log(JSON.stringify({record,response:{status:response.status,length:html.length},meta,uniqueClasses,snippets,visibleText:stripped.slice(0,14000)},null,2))
-          if(!response.ok) throw new Error(`Jobindex detail HTTP ${response.status}`)
+          console.log(JSON.stringify({jobindexUrl,external,response:{status:response.status,finalUrl:response.url,contentType:response.headers.get('content-type'),length:html.length},posting,meta,visibleText:visible.slice(0,12000)},null,2))
+          if(!response.ok) throw new Error(`Employer detail HTTP ${response.status}`)
           NODE
