@@ -1,10 +1,10 @@
-import { bestFullJd, normalizeJob } from './normalized-job.js'
+import { bestFullJd, normalizeFoundBy, normalizeJob } from './normalized-job.js'
 
 function text(value){return String(value??'').trim().toLowerCase().replace(/\s+/g,' ')}
 function companyKey(value){return text(value).replace(/\b(a\/s|as)\b/g,'as').replace(/[.,]/g,'').trim()}
 function urlKey(value){return String(value??'').trim().toLowerCase().replace(/\/+$/,'')}
 function sources(job){return new Set((job?.sourceRecords||[]).map(record=>String(record?.source||'').toLowerCase()).filter(Boolean))}
-function crossSource(a,b){const left=sources(a),right=sources(b);return [...left].some(source=>![...right].includes(source))||[...right].some(source=>![...left].includes(source))}
+function crossSource(a,b){const left=sources(a),right=sources(b);return [...left].some(source=>!right.has(source))||[...right].some(source=>!left.has(source))}
 
 function datesCompatible(a,b){
   if(!a||!b) return true
@@ -21,7 +21,7 @@ export function isHighConfidenceDuplicate(a,b){
     companyKey(a?.company)&&companyKey(a?.company)===companyKey(b?.company)&&
     text(a?.title)&&text(a?.title)===text(b?.title)&&
     text(a?.location)&&text(a?.location)===text(b?.location)&&
-    datesCompatible(a?.postedDate,b?.postedDate)
+    datesCompatible(a?.postedDate||a?.publishedAt,b?.postedDate||b?.publishedAt)
   )
 }
 
@@ -38,10 +38,13 @@ function mergeJobs(a,b){
   for(const record of [...(a?.sourceRecords||[]),...(b?.sourceRecords||[])]){
     const id=sourceIdentity(record)
     if(seen.has(id)) continue
-    seen.add(id);records.push(record)
+    seen.add(id)
+    records.push(record)
   }
   merged.sourceRecords=records
   merged.fullJd=bestFullJd(records,merged.fullJd)
+  merged.description=merged.description||merged.fullJd
+  merged.foundBy=normalizeFoundBy([...(a?.foundBy||[]),...(b?.foundBy||[])])
   merged.jobId=a?.jobId||b?.jobId||''
   merged.sourceJobId=a?.sourceJobId||b?.sourceJobId||''
   return normalizeJob(merged)
