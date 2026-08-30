@@ -18,51 +18,49 @@ jobs:
       - name: Run targeted Jobindex tests
         run: node --test app/lib/jobindex-parser.test.mjs app/lib/jobindex-source-adapter.test.mjs app/lib/search-source-orchestrator.test.mjs
 
-  ats-probe:
+  live-smoke:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Use Node 22
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Capture public ATS responses
+      - name: Exercise real Jobindex relevance and full-JD flow
         shell: bash
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs'
-          const targets={
-            emply:'https://dao.career.emply.com/da/ad/carrier-for-night-distribution-at-dao/ihba5r',
-            successfactors:'https://job.wfs.aero/job/Trafik-Agent/1708-en_US/',
+          import {runMultiSourceSearch} from './app/lib/search-source-orchestrator.js'
+          import {searchJobindexSource} from './app/lib/jobindex-source-adapter.js'
+
+          const directions=[
+            {key:'project-manager',role:'Senior Project Manager',query:'Project Manager',tier:'primary',origin:'manual',cvSlots:[1]},
+            {key:'delivery-manager',role:'IT Delivery Manager',query:'Delivery Manager',tier:'primary',origin:'manual',cvSlots:[1]},
+          ]
+          const input={freshnessDays:14,unionSearchPlan:{version:'jobindex-fix-smoke',directions},exclusionRules:[],enabledSources:['jobindex'],filters:{}}
+          const source=await searchJobindexSource({...input,maxPages:1})
+          const result=await runMultiSourceSearch(input,{jobindex:async()=>source})
+          const report={
+            sourceStatus:source.status,
+            sourceStats:source.stats,
+            adapterJobs:source.jobs.map(job=>({title:job.title,company:job.company,location:job.location,publishedAt:job.publishedAt,fullJdLength:String(job.fullJd||'').length,limitedData:(job.sourceRecords||[]).some(record=>record?.limitedData===true),applicationUrl:job.applicationUrl})),
+            returned:result.jobs.map(item=>({title:item.job.title,company:item.job.company,location:item.job.location,score:item.evaluation?.score,fullJdLength:String(item.job.fullJd||'').length,limitedData:item.limitedData})),
+            audit:result.audit,
+            resultStats:result.stats,
           }
-          const meta={}
-          for(const [name,url] of Object.entries(targets)){
-            const r=await fetch(url)
-            const text=await r.text()
-            fs.writeFileSync(`${name}.html`,text)
-            meta[name]={status:r.status,finalUrl:r.url,contentType:r.headers.get('content-type'),length:text.length}
-          }
-          const oracle=[]
-          for(const siteNumber of ['CX_1','CX_2001']){
-            const u=new URL('https://efzu.fa.em2.oraclecloud.com/hcmRestApi/resources/latest/recruitingCEJobRequisitionDetails')
-            u.searchParams.set('expand','all')
-            u.searchParams.set('onlyData','true')
-            u.searchParams.set('finder',`ById;Id="8022",siteNumber=${siteNumber}`)
-            const r=await fetch(u,{headers:{Accept:'application/json','Ora-Irc-Language':'da'}})
-            const text=await r.text()
-            fs.writeFileSync(`oracle-${siteNumber}.txt`,text)
-            oracle.push({siteNumber,status:r.status,finalUrl:r.url,contentType:r.headers.get('content-type'),length:text.length,preview:text.slice(0,500)})
-          }
-          fs.writeFileSync('meta.json',JSON.stringify({...meta,oracle},null,2))
-          console.log(JSON.stringify({...meta,oracle},null,2))
+          fs.writeFileSync('jobindex-live-smoke.json',JSON.stringify(report,null,2))
+          console.log(JSON.stringify(report,null,2))
+
+          if(!(Number(source.stats?.discovered)>0)) throw new Error('No Jobindex candidates survived discovery relevance')
+          if(!(Number(source.stats?.detailRequests)>0)) throw new Error('No Jobindex detail requests executed')
+          if(!(Number(source.stats?.fullJdVerified)>0)) throw new Error('No Jobindex full JDs verified')
+          if(result.jobs.some(item=>item.limitedData||!item.evaluation)) throw new Error('Unverified vacancy leaked into live matches')
           NODE
-      - name: Upload ATS fixtures
+      - name: Upload live smoke report
         uses: actions/upload-artifact@v4
         with:
-          name: jobindex-ats-probe
-          path: |
-            meta.json
-            emply.html
-            successfactors.html
-            oracle-CX_1.txt
-            oracle-CX_2001.txt
+          name: jobindex-live-smoke
+          path: jobindex-live-smoke.json
           retention-days: 1
