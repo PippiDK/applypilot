@@ -239,9 +239,22 @@ function successFactorsExternalCandidate(html=''){
   return candidates.reduce((best,value)=>value.length>best.length?value:best,'')
 }
 
-function semanticExternalCandidates(html=''){
+function hostname(value=''){
+  try{return new URL(String(value??'')).hostname.toLowerCase().replace(/^www\./,'')}catch{return ''}
+}
+function hostMatches(host,domain){return host===domain||host.endsWith(`.${domain}`)}
+function hostSpecificExternalCandidate(html='',context={}){
+  const host=hostname(context?.url)
+  let value=''
+  if(hostMatches(host,'hr-manager.net')) value=cleanContentHtml(classBlock(html,'AdContentContainer'))
+  else if(hostMatches(host,'hr-on.com')) value=cleanContentHtml(classBlock(html,'description'))
+  else if(hostMatches(host,'pharmacosmos.com')) value=cleanContentHtml(classBlock(html,'structured-text'))
+  return value.length>=FULL_JD_MIN_LENGTH?value:''
+}
+
+function semanticExternalCandidates(html='',context={}){
   const text=String(html??'')
-  const known=[emplyExternalCandidate(text),successFactorsExternalCandidate(text)].filter(Boolean)
+  const known=[hostSpecificExternalCandidate(text,context),emplyExternalCandidate(text),successFactorsExternalCandidate(text)].filter(Boolean)
   if(known.length) return known.reduce((best,value)=>value.length>best.length?value:best,'')
 
   const candidates=[]
@@ -270,7 +283,7 @@ function semanticExternalCandidates(html=''){
 export function extractJobindexExternalDetail(html='',context={}){
   const posting=parseJsonLd(html)
   const structured=decodeHtml(posting?.description)
-  const fallback=structured.length>=FULL_JD_MIN_LENGTH?'':semanticExternalCandidates(html)
+  const fallback=structured.length>=FULL_JD_MIN_LENGTH?'':semanticExternalCandidates(html,context)
   const fullJd=structured.length>=FULL_JD_MIN_LENGTH?structured:fallback
   return {
     url:clean(context?.url),
