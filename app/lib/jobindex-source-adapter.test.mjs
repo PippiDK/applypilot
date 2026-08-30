@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { searchJobindexSource } from './jobindex-source-adapter.js'
 
 function response(body,status=200){return {ok:status>=200&&status<300,status,text:async()=>body}}
+function rss(items=[]){return `<?xml version="1.0"?><rss><channel>${items.map(({id,title,description=''})=>`<item><title>${title}</title><link>https://www.jobindex.dk/vis-job/${id}</link><description><![CDATA[<p>${description}</p>]]></description></item>`).join('')}</channel></rss>`}
 
 const SEARCH_PAGE_1='<a href="/vis-job/h1001">one</a><a href="/vis-job/h1002">two</a>'
 const SEARCH_PAGE_2='<a href="/vis-job/h1002">two</a><a href="/vis-job/h1003">three</a>'
@@ -33,19 +34,28 @@ function externalFullJd(){
   return `<html><body><section class="full-detail-description full-detail"><div><h2>Job description</h2><p>${body}</p></div></section></body></html>`
 }
 
-test('uses Jobindex RSS feed for discovery',async()=>{
+test('uses exact-phrase Jobindex RSS query and rejects obviously unrelated RSS titles before detail fetch',async()=>{
   const seen=[]
   const fetcher=async url=>{
     seen.push(String(url))
-    if(String(url).includes('/vis-job/h1001')) return response(detail('h1001'))
-    return response('<a href="/vis-job/h1001">one</a>')
+    if(String(url).includes('jobsoegning.rss')) return response(rss([
+      {id:'h1001',title:'R&amp;D Chef - BRIGHT',description:'Research role'},
+      {id:'h1002',title:'Technical Project Manager, Acme A/S',description:'Technology delivery role'},
+    ]))
+    if(String(url).includes('/vis-job/h1002')) return response(detail('h1002',{title:'Technical Project Manager'}))
+    throw new Error(`unexpected detail fetch ${url}`)
   }
-  await searchJobindexSource({
-    unionSearchPlan:{directions:[{role:'Project Manager',tier:'primary',query:'Project Manager'}]},
+  const result=await searchJobindexSource({
+    unionSearchPlan:{directions:[{role:'Senior Project Manager',tier:'primary',query:'Project Manager'}]},
     fetcher,
     maxPages:1,
   })
-  assert.match(seen[0],/\/jobsoegning\.rss\?q=Project\+Manager/)
+  assert.match(seen[0],/\/jobsoegning\.rss\?q=%22Project\+Manager%22/)
+  assert.equal(result.jobs.length,1)
+  assert.equal(result.jobs[0].sourceJobId,'h1002')
+  assert.equal(result.stats.detailRequests,1)
+  assert.equal(result.stats.discoveryTitleRejected,1)
+  assert.ok(!seen.some(url=>url.includes('/vis-job/h1001')))
 })
 
 test('paginates Jobindex, accumulates unique ids and preserves discovery direction',async()=>{
