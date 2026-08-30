@@ -6,16 +6,24 @@ export const maxDuration=60
 
 const SEARCH_URL='https://www.jobindex.dk/jobsoegning?q=project%20manager'
 
+function uniq(values=[]){return [...new Set(values.filter(Boolean))]}
+
 function summarize(html=''){
   const text=String(html)
-  const jobLinks=[...text.matchAll(/href=["']([^"']*jobannonce[^"']*|[^"']*job[^"']*)["']/gi)].map(match=>match[1])
-  const pagination=[...text.matchAll(/href=["']([^"']*(?:page|side|start|offset)=[^"']*)["']/gi)].map(match=>match[1])
+  const hrefs=uniq([...text.matchAll(/href=["']([^"']+)["']/gi)].map(match=>match[1].replaceAll('&amp;','&')))
+  const usefulHrefs=hrefs.filter(href=>!/^javascript:/i.test(href)&&!/(\.css|\.js|\.png|\.svg|\.ico|\.woff2?)(\?|$)/i.test(href))
+  const likelyJobLinks=usefulHrefs.filter(href=>/\b(h\d{5,}|jobid|job-id|jobannonce|vis-job|job\/|stilling|ledige-job)\b/i.test(href))
+  const pagination=usefulHrefs.filter(href=>/[?&](?:page|side|start|offset|p)=\d+/i.test(href))
+  const jobIds=uniq([...text.matchAll(/\bh\d{5,}\b/gi)].map(match=>match[0]))
   return {
     bytes:Buffer.byteLength(text),
     hasHtml:/<html/i.test(text),
     hasJobindex:/jobindex/i.test(text),
-    jobLinkSamples:[...new Set(jobLinks)].slice(0,5),
-    paginationSamples:[...new Set(pagination)].slice(0,5)
+    hrefCount:hrefs.length,
+    jobIds:jobIds.slice(0,10),
+    likelyJobLinks:likelyJobLinks.slice(0,10),
+    paginationSamples:pagination.slice(0,10),
+    usefulHrefSamples:usefulHrefs.slice(0,25)
   }
 }
 
@@ -34,7 +42,7 @@ export async function GET(){
     const searchSummary=summarize(searchHtml)
 
     let detail=null
-    const firstRelative=searchSummary.jobLinkSamples[0]
+    const firstRelative=searchSummary.likelyJobLinks[0]
     if(firstRelative){
       const detailUrl=new URL(firstRelative,searchResponse.url||SEARCH_URL).toString()
       const detailResponse=await fetch(detailUrl,{
@@ -57,7 +65,7 @@ export async function GET(){
     }
 
     return NextResponse.json({
-      probe:'jobindex-vercel-readonly-v1',
+      probe:'jobindex-vercel-readonly-v2',
       elapsedMs:Date.now()-started,
       search:{
         requestedUrl:SEARCH_URL,
@@ -71,7 +79,7 @@ export async function GET(){
     })
   }catch(error){
     return NextResponse.json({
-      probe:'jobindex-vercel-readonly-v1',
+      probe:'jobindex-vercel-readonly-v2',
       elapsedMs:Date.now()-started,
       error:String(error?.message||error)
     },{status:502})
