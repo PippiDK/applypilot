@@ -17,34 +17,31 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Inspect real Jobindex search response
+      - name: Inspect Jobindex HTML and RSS discovery
         shell: bash
         run: |
           node --input-type=module <<'NODE'
-          import {extractJobindexSearchRecords} from './app/lib/jobindex-parser.js'
-
-          const url='https://www.jobindex.dk/jobsoegning?q=Project%20Manager'
-          const response=await fetch(url,{headers:{
+          const headers={
             'user-agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/151 Safari/537.36',
-            'accept':'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'accept-language':'da-DK,da;q=0.9,en;q=0.8',
-          },redirect:'follow'})
-          const html=await response.text()
-          const hrefs=[...html.matchAll(/href=["']([^"']+)["']/gi)].map(match=>match[1])
-          const jobLike=hrefs.filter(href=>/job|stilling|vis-/i.test(href)).slice(0,60)
-          const ids=[...html.matchAll(/\bh\d{5,}\b/gi)].map(match=>match[0]).slice(0,30)
-          const records=extractJobindexSearchRecords(html)
+          }
+          const searchUrl='https://www.jobindex.dk/jobsoegning?q=Project%20Manager'
+          const htmlResponse=await fetch(searchUrl,{headers,redirect:'follow'})
+          const html=await htmlResponse.text()
+          const idMatch=html.match(/\bh\d{5,}\b/i)
+          const id=idMatch?.[0]||''
+          const pos=id?html.indexOf(id):-1
+
+          const rssUrl='https://www.jobindex.dk/jobsoegning.rss?q=Project%20Manager'
+          const rssResponse=await fetch(rssUrl,{headers:{...headers,accept:'application/rss+xml,application/xml,text/xml,*/*'},redirect:'follow'})
+          const rss=await rssResponse.text()
+          const itemLinks=[...rss.matchAll(/<item>[\s\S]*?<link>([\s\S]*?)<\/link>[\s\S]*?<\/item>/gi)].map(match=>match[1].trim()).slice(0,20)
+          const guidValues=[...rss.matchAll(/<guid[^>]*>([\s\S]*?)<\/guid>/gi)].map(match=>match[1].trim()).slice(0,20)
+          const rssIds=[...rss.matchAll(/\bh\d{5,}\b/gi)].map(match=>match[0]).slice(0,30)
+
           console.log(JSON.stringify({
-            status:response.status,
-            finalUrl:response.url,
-            contentType:response.headers.get('content-type'),
-            length:html.length,
-            visJobOccurrences:(html.match(/\/vis-job\//gi)||[]).length,
-            parserRecords:records.length,
-            hIds:[...new Set(ids)],
-            jobLikeHrefs:[...new Set(jobLike)],
-            title:(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)||[])[1]||'',
-            firstText:html.slice(0,1200),
+            html:{status:htmlResponse.status,length:html.length,id,context:pos>=0?html.slice(Math.max(0,pos-700),pos+1200):''},
+            rss:{status:rssResponse.status,finalUrl:rssResponse.url,contentType:rssResponse.headers.get('content-type'),length:rss.length,itemLinks,guidValues,rssIds:[...new Set(rssIds)],firstText:rss.slice(0,1800)},
           },null,2))
-          if(!response.ok) throw new Error(`Jobindex search HTTP ${response.status}`)
+          if(!htmlResponse.ok||!rssResponse.ok) throw new Error(`Jobindex fetch failed: HTML ${htmlResponse.status}, RSS ${rssResponse.status}`)
           NODE
