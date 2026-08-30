@@ -17,6 +17,8 @@ test('page builds Search Profile roles from ready CV library entries',()=>{
   assert.match(page,/cvRoleProfiles/)
 })
 
-test('LinkedIn Search request remains CV1 payload during Step 1',()=>{
-  assert.match(page,/JSON\.stringify\(\{freshnessDays,cvText:cvData\.cvText\}\)/)
+test('multi-source Search request keeps active Source CV text',()=>{
+  assert.match(page,/\/api\/multi-source-search/)
+  assert.match(page,/cvText:cvData\.cvText/)
+  assert.match(page,/enabledSources:selectedSources/)
 })
