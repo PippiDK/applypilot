@@ -11,7 +11,7 @@ function attr(tag,name){
   return match?decodeEntities(match[1]).trim():''
 }
 function plain(value=''){
-  return decodeEntities(String(value??'').replace(/<[^>]+>/g,' ')).replace(/\s+/g,' ').trim()
+  return decodeEntities(String(value??'').replace(/<!--[\s\S]*?-->/g,' ').replace(/<script\b[\s\S]*?<\/script>/gi,' ').replace(/<style\b[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ')).replace(/\s+/g,' ').trim()
 }
 function normalizedTitle(value=''){return plain(value).toLowerCase()}
 function hostname(value=''){
@@ -31,6 +31,12 @@ export function jobindexCanonicalFullJdUrl(html=''){
     }catch{}
   }
   return ''
+}
+
+export function jobindexCanonicalFullJd(html=''){
+  const match=String(html??'').match(/<section\b[^>]*class=["'][^"']*\bjobtext-jobad__body\b[^"']*["'][^>]*>([\s\S]*?)<\/section>/i)
+  const value=plain(match?.[1]||'')
+  return value.length>=500?value:''
 }
 
 export function jobindexApplyTrackerUrl(html=''){
