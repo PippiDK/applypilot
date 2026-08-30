@@ -4,9 +4,9 @@ import { extractJobindexExternalDetail } from './jobindex-parser.js'
 
 const body='Lead complex enterprise project delivery across scope, risks, dependencies, vendors and senior stakeholders. '.repeat(12)
 
-test('extracts HR-manager Advertisement content without surrounding form noise',()=>{
+test('extracts HR-manager AdvertisementInnerContent without surrounding form noise',()=>{
   const html=`<html><body>
-    <div id="AdvertisementContent"><div id="AdvertisementInnerContent"><div class="AdContentContainer"><p>${body}</p></div></div></div>
+    <div id="AdvertisementContent"><div id="AdvertisementInnerContent"><p>${body}</p></div></div>
     <div id="ApplicationForm">Application form noise that must not be part of the job description.</div>
   </body></html>`
   const detail=extractJobindexExternalDetail(html,{url:'https://candidate.hr-manager.net/ApplicationInit.aspx?cid=1716&ProjectId=144227'})
