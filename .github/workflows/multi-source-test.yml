@@ -17,7 +17,46 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Test
+
+      - name: Test search sources
+        continue-on-error: true
+        run: node --test app/lib/search-sources.test.mjs
+      - name: Test normalized job
+        continue-on-error: true
+        run: node --test app/lib/normalized-job.test.mjs
+      - name: Test cross-source dedupe
+        continue-on-error: true
+        run: node --test app/lib/cross-source-dedupe.test.mjs
+      - name: Test LinkedIn source adapter
+        continue-on-error: true
+        run: node --test app/lib/linkedin-source-adapter.test.mjs
+      - name: Test Jobindex parser
+        continue-on-error: true
+        run: node --test app/lib/jobindex-parser.test.mjs
+      - name: Test Jobindex source adapter
+        continue-on-error: true
+        run: node --test app/lib/jobindex-source-adapter.test.mjs
+      - name: Test source orchestrator
+        continue-on-error: true
+        run: node --test app/lib/search-source-orchestrator.test.mjs
+      - name: Test shared evaluator
+        continue-on-error: true
+        run: node --test app/lib/job-profile-evaluator.test.mjs app/lib/shared-evaluator-integration.test.mjs
+      - name: Test acquisition extraction
+        continue-on-error: true
+        run: node --test app/lib/linkedin-profile-acquisition.test.mjs
+      - name: Test multi-source API contract
+        continue-on-error: true
+        run: node --test app/lib/multi-source-api.contract.test.mjs
+      - name: Test multi-source UI contract
+        continue-on-error: true
+        run: node --test app/lib/multi-source-ui.contract.test.mjs
+      - name: Test modified legacy contracts
+        continue-on-error: true
+        run: node --test app/lib/profile-driven-live.contract.test.mjs app/lib/profile-shadow-wiring.test.mjs app/lib/source-cv-search.contract.test.mjs app/lib/union-search-plan-wiring.test.mjs
+
+      - name: Run full test suite
         run: npm test
-      - name: Build
+      - name: Production build
+        if: always()
         run: npm run build
