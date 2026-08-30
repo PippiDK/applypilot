@@ -235,11 +235,22 @@ function emplyExternalCandidate(html=''){
 }
 
 function successFactorsExternalCandidate(html=''){
+  const text=String(html??'')
   const candidates=[]
   const re=/<span\b([^>]*)>([\s\S]*?)<\/span>/gi
-  for(const match of String(html??'').matchAll(re)){
+  for(const match of text.matchAll(re)){
     if(!/\bitemprop=["']description["']/i.test(match[1]||'')) continue
     const value=cleanContentHtml(match[2])
+    if(value.length>=FULL_JD_MIN_LENGTH) candidates.push(value)
+  }
+  if(candidates.length) return candidates.reduce((best,value)=>value.length>best.length?value:best,'')
+
+  if(!/itemtype=["']https?:\/\/schema\.org\/JobPosting["']/i.test(text)) return ''
+  const starts=[...text.matchAll(/<div\b[^>]*class=["'][^"']*\bjoblayouttoken\b[^"']*["'][^>]*>/gi)].map(match=>match.index)
+  for(let index=0;index<starts.length;index++){
+    const start=starts[index]
+    const end=index+1<starts.length?starts[index+1]:Math.min(text.length,start+60000)
+    const value=cleanContentHtml(text.slice(start,end))
     if(value.length>=FULL_JD_MIN_LENGTH) candidates.push(value)
   }
   return candidates.reduce((best,value)=>value.length>best.length?value:best,'')
