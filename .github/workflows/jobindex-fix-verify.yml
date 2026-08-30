@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: '22'
       - name: Run targeted Jobindex tests
-        run: node --test app/lib/jobindex-parser.test.mjs app/lib/jobindex-application-url.test.mjs app/lib/jobindex-common-ats.test.mjs app/lib/jobindex-source-adapter.test.mjs app/lib/search-source-orchestrator.test.mjs
+        run: node --test app/lib/jobindex-parser.test.mjs app/lib/jobindex-application-url.test.mjs app/lib/jobindex-common-ats.test.mjs app/lib/jobindex-retrieval-fallbacks.test.mjs app/lib/jobindex-source-adapter.test.mjs app/lib/search-source-orchestrator.test.mjs
 
   live-smoke:
     runs-on: ubuntu-latest
