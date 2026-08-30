@@ -5,48 +5,91 @@ on:
     branches:
       - feature/jobindex-multisource-search
 
-permissions:
-  contents: read
-  statuses: write
-
 jobs:
-  baseline-main:
+  verify:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout feature
+        uses: actions/checkout@v4
+        with:
+          path: feature
+
       - name: Checkout main baseline
         uses: actions/checkout@v4
         with:
           ref: main
+          path: baseline
+
       - name: Use Node 22
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install dependencies
+
+      - name: Install feature dependencies
+        working-directory: feature
         run: npm install --no-audit --no-fund
-      - name: Diagnose main baseline test files
-        env:
-          GH_TOKEN: ${{ github.token }}
+
+      - name: Install baseline dependencies
+        working-directory: baseline
+        run: npm install --no-audit --no-fund
+
+      - name: Test multi-source feature contracts
+        working-directory: feature
+        run: >-
+          node --test
+          app/lib/search-sources.test.mjs
+          app/lib/normalized-job.test.mjs
+          app/lib/cross-source-dedupe.test.mjs
+          app/lib/linkedin-source-adapter.test.mjs
+          app/lib/linkedin-profile-acquisition.test.mjs
+          app/lib/jobindex-parser.test.mjs
+          app/lib/jobindex-source-adapter.test.mjs
+          app/lib/search-source-orchestrator.test.mjs
+          app/lib/job-profile-evaluator.test.mjs
+          app/lib/shared-evaluator-integration.test.mjs
+          app/lib/multi-source-api.contract.test.mjs
+          app/lib/multi-source-ui.contract.test.mjs
+          app/lib/profile-driven-live.contract.test.mjs
+          app/lib/profile-shadow-wiring.test.mjs
+          app/lib/source-cv-search.contract.test.mjs
+          app/lib/union-search-plan-wiring.test.mjs
+          app/lib/multi-cv-search-profile-contract.test.mjs
+          app/lib/right-panel-expertise-ui.contract.test.mjs
+          app/lib/search-profile-exclusions-save-ui.test.mjs
+
+      - name: Reject regressions beyond main baseline
         shell: bash
         run: |
-          set +e
-          while IFS= read -r file; do
-            output="$(mktemp)"
-            node --test "$file" >"$output" 2>&1
-            status=$?
-            if [ "$status" -ne 0 ]; then
-              context="baseline/$(basename "$file")"
-              description="$(grep -m1 '^not ok' "$output" | sed -E 's/^not ok [0-9]+ - //' | cut -c1-130)"
-              if [ -z "$description" ]; then
-                description="Test file fails on main baseline"
+          set -euo pipefail
+          collect_failures() {
+            root="$1"
+            out="$2"
+            : > "$out"
+            while IFS= read -r file; do
+              if ! (cd "$root" && node --test "$file" >/dev/null 2>&1); then
+                basename "$file" >> "$out"
               fi
-              payload="$(jq -nc --arg state failure --arg context "$context" --arg description "$description" '{state:$state,context:$context,description:$description}')"
-              curl -fsSL -X POST \
-                -H "Authorization: Bearer $GH_TOKEN" \
-                -H "Accept: application/vnd.github+json" \
-                -H "X-GitHub-Api-Version: 2022-11-28" \
-                "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-                -d "$payload" >/dev/null
-            fi
-            rm -f "$output"
-          done < <(find app/lib app/api -type f -name '*.test.mjs' | sort)
-          exit 0
+            done < <(cd "$root" && find app/lib app/api -type f -name '*.test.mjs' | sort)
+            sort -u "$out" -o "$out"
+          }
+
+          collect_failures feature "$RUNNER_TEMP/feature-failures.txt"
+          collect_failures baseline "$RUNNER_TEMP/baseline-failures.txt"
+          comm -23 "$RUNNER_TEMP/feature-failures.txt" "$RUNNER_TEMP/baseline-failures.txt" > "$RUNNER_TEMP/new-failures.txt"
+
+          echo 'Feature failures:'
+          cat "$RUNNER_TEMP/feature-failures.txt" || true
+          echo 'Main baseline failures:'
+          cat "$RUNNER_TEMP/baseline-failures.txt" || true
+
+          if [ -s "$RUNNER_TEMP/new-failures.txt" ]; then
+            echo 'New failures introduced by multi-source feature:'
+            cat "$RUNNER_TEMP/new-failures.txt"
+            exit 1
+          fi
+
+          echo 'No test-file regressions beyond current main baseline.'
+
+      - name: Production build
+        working-directory: feature
+        run: npm run build
