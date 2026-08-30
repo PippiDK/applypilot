@@ -1,6 +1,7 @@
 import { dedupeJobs } from './cross-source-dedupe.js'
 import { normalizeJob } from './normalized-job.js'
 import { evaluateProfileJob } from './job-profile-evaluator.js'
+import { filterJobItems } from './job-list-filters.js'
 
 function selected(value=[]){return [...new Set((Array.isArray(value)?value:[]).map(item=>String(item||'').toLowerCase()).filter(item=>item==='linkedin'||item==='jobindex'))]}
 function failedStatus(source,error){return {source,status:'failed',jobs:[],stats:null,audit:[],error:String(error?.message||error||`${source} search failed`)} }
@@ -23,6 +24,13 @@ async function runSource(source,input,dependencies){
   }catch(error){return failedStatus(source,error)}
 }
 
+function applyCommonFilters(jobs,input={}){
+  const areas=input?.filters?.areas
+  const workModels=input?.filters?.workModels
+  if(!Array.isArray(areas)||!Array.isArray(workModels)) return jobs
+  return filterJobItems(jobs.map(job=>({job})),areas,workModels).map(item=>item.job)
+}
+
 export async function runMultiSourceSearch(input={},dependencies={}){
   const enabled=selected(input?.enabledSources)
   if(!enabled.length) throw new Error('Select at least one search source.')
@@ -31,11 +39,12 @@ export async function runMultiSourceSearch(input={},dependencies={}){
   const sourceStatuses=Object.fromEntries(settled.map(result=>[result.source,{status:result.status,error:result.error,stats:result.stats,coverage:result.coverage??null}]))
   const acquired=settled.filter(result=>result.status!=='failed').flatMap(result=>result.jobs).map(normalizeJob)
   const merged=dedupeJobs(acquired)
+  const filtered=applyCommonFilters(merged,input)
   const jobs=[]
   const evaluationAudit=[]
   const now=dependencies?.now instanceof Date?dependencies.now:new Date()
 
-  for(const job of merged){
+  for(const job of filtered){
     if(isLimited(job)){
       jobs.push({job,evaluation:null,limitedData:true})
       evaluationAudit.push({jobId:job.jobId||job.sourceJobId,stage:'LIMITED_DATA',decision:'UNVERIFIED',reason:'Full Job Description could not be retrieved'})
@@ -65,7 +74,7 @@ export async function runMultiSourceSearch(input={},dependencies={}){
   return {
     jobs,
     sourceStatuses,
-    stats:{sources:Object.fromEntries(settled.map(result=>[result.source,result.stats])),acquired:acquired.length,deduped:merged.length,returned:jobs.length},
+    stats:{sources:Object.fromEntries(settled.map(result=>[result.source,result.stats])),acquired:acquired.length,deduped:merged.length,filtered:filtered.length,returned:jobs.length},
     coverage:settled.map(result=>result.coverage).filter(Boolean),
     audit:[...sourceAudit,...evaluationAudit],
     allFailed,
