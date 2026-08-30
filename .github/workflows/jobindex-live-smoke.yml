@@ -17,31 +17,42 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Inspect Jobindex HTML and RSS discovery
+      - name: Exercise real Jobindex adapter
         shell: bash
         run: |
           node --input-type=module <<'NODE'
-          const headers={
-            'user-agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/151 Safari/537.36',
-            'accept-language':'da-DK,da;q=0.9,en;q=0.8',
-          }
-          const searchUrl='https://www.jobindex.dk/jobsoegning?q=Project%20Manager'
-          const htmlResponse=await fetch(searchUrl,{headers,redirect:'follow'})
-          const html=await htmlResponse.text()
-          const idMatch=html.match(/\bh\d{5,}\b/i)
-          const id=idMatch?.[0]||''
-          const pos=id?html.indexOf(id):-1
+          import {searchJobindexSource} from './app/lib/jobindex-source-adapter.js'
 
-          const rssUrl='https://www.jobindex.dk/jobsoegning.rss?q=Project%20Manager'
-          const rssResponse=await fetch(rssUrl,{headers:{...headers,accept:'application/rss+xml,application/xml,text/xml,*/*'},redirect:'follow'})
-          const rss=await rssResponse.text()
-          const itemLinks=[...rss.matchAll(/<item>[\s\S]*?<link>([\s\S]*?)<\/link>[\s\S]*?<\/item>/gi)].map(match=>match[1].trim()).slice(0,20)
-          const guidValues=[...rss.matchAll(/<guid[^>]*>([\s\S]*?)<\/guid>/gi)].map(match=>match[1].trim()).slice(0,20)
-          const rssIds=[...rss.matchAll(/\bh\d{5,}\b/gi)].map(match=>match[0]).slice(0,30)
+          const result=await searchJobindexSource({
+            freshnessDays:14,
+            unionSearchPlan:{
+              version:'live-smoke',
+              directions:[{key:'project-manager',role:'Project Manager',query:'Project Manager',tier:'primary',origin:'manual',cvSlots:[1]}],
+            },
+            exclusionRules:[],
+            filters:{},
+            maxPages:1,
+          })
 
+          const complete=result.jobs.filter(job=>job.title&&job.company&&job.fullJd)
           console.log(JSON.stringify({
-            html:{status:htmlResponse.status,length:html.length,id,context:pos>=0?html.slice(Math.max(0,pos-700),pos+1200):''},
-            rss:{status:rssResponse.status,finalUrl:rssResponse.url,contentType:rssResponse.headers.get('content-type'),length:rss.length,itemLinks,guidValues,rssIds:[...new Set(rssIds)],firstText:rss.slice(0,1800)},
+            status:result.status,
+            stats:result.stats,
+            completeJobs:complete.length,
+            sample:complete.slice(0,3).map(job=>({
+              sourceJobId:job.sourceJobId,
+              title:job.title,
+              company:job.company,
+              location:job.location,
+              remoteType:job.remoteType,
+              publishedAt:job.publishedAt,
+              detailUrl:job.detailUrl,
+            })),
           },null,2))
-          if(!htmlResponse.ok||!rssResponse.ok) throw new Error(`Jobindex fetch failed: HTML ${htmlResponse.status}, RSS ${rssResponse.status}`)
+
+          if(result.status==='failed') throw new Error(`Jobindex adapter failed: ${result.error}`)
+          if(!(Number(result.stats?.discovered)>0)) throw new Error('Jobindex adapter discovered no live vacancies')
+          if(!(Number(result.stats?.detailRequests)>0)) throw new Error('Jobindex adapter did not fetch live detail pages')
+          if(!(result.jobs.length>0)) throw new Error('Jobindex adapter produced no normalized jobs')
+          if(!(complete.length>0)) throw new Error('Jobindex adapter produced no complete normalized vacancy')
           NODE
