@@ -89,8 +89,9 @@ function safeExternalHref(value){
   if(!/^https?:\/\//i.test(href)) return ''
   try{
     const url=new URL(href)
-    if(url.hostname==='jobindex.dk'||url.hostname.endsWith('.jobindex.dk')) return ''
-    if(/(?:facebook|linkedin|twitter|instagram)\.com$/i.test(url.hostname)||/(?:^|\.)google\.com$/i.test(url.hostname)) return ''
+    const host=url.hostname.toLowerCase().replace(/^www\./,'')
+    if(host==='jobindex.dk'||host.endsWith('.jobindex.dk')) return ''
+    if(/^(?:facebook|linkedin|twitter|instagram|youtube|youtu\.be|vimeo)\.com$/i.test(host)||/(?:^|\.)google\.com$/i.test(host)||host==='youtu.be') return ''
     return href
   }catch{return ''}
 }
