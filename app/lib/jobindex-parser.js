@@ -1,16 +1,116 @@
 const BASE='https://www.jobindex.dk'
+const FULL_JD_MIN_LENGTH=500
 
 function clean(value){return String(value??'').trim()}
-function decodeHtml(value){return clean(value)
+
+function decodeEntities(value=''){
+  const named={
+    nbsp:' ',amp:'&',quot:'"',apos:"'",lt:'<',gt:'>',
+    aelig:'æ',AElig:'Æ',oslash:'ø',Oslash:'Ø',aring:'å',Aring:'Å',
+    eacute:'é',Eacute:'É',ndash:'–',mdash:'—',ldquo:'“',rdquo:'”',lsquo:'‘',rsquo:'’',bull:'•',hellip:'…',
+  }
+  return String(value??'')
+    .replace(/&#x([0-9a-f]+);/gi,(_,hex)=>String.fromCodePoint(parseInt(hex,16)))
+    .replace(/&#(\d+);/g,(_,num)=>String.fromCodePoint(Number(num)))
+    .replace(/&([A-Za-z]+);/g,(match,name)=>Object.prototype.hasOwnProperty.call(named,name)?named[name]:match)
+}
+
+function decodeHtml(value){return clean(decodeEntities(String(value??'')
+  .replace(/<!--[\s\S]*?-->/g,' ')
   .replace(/<br\s*\/?\s*>/gi,'\n')
-  .replace(/<\/p\s*>/gi,'\n')
-  .replace(/<[^>]+>/g,' ')
-  .replace(/&nbsp;/gi,' ')
-  .replace(/&amp;/gi,'&')
-  .replace(/&quot;/gi,'"')
-  .replace(/&#39;|&apos;/gi,"'")
+  .replace(/<\/p\s*>|<\/li\s*>|<\/h[1-6]\s*>/gi,'\n')
+  .replace(/<[^>]+>/g,' ')))
   .replace(/\s+/g,' ')
   .trim()}
+
+function cleanContentHtml(value=''){
+  return decodeHtml(String(value??'')
+    .replace(/<!--[\s\S]*?-->/g,' ')
+    .replace(/<script\b[\s\S]*?<\/script>/gi,' ')
+    .replace(/<style\b[\s\S]*?<\/style>/gi,' ')
+    .replace(/<noscript\b[\s\S]*?<\/noscript>/gi,' ')
+    .replace(/<svg\b[\s\S]*?<\/svg>/gi,' ')
+    .replace(/<nav\b[\s\S]*?<\/nav>/gi,' ')
+    .replace(/<footer\b[\s\S]*?<\/footer>/gi,' ')
+    .replace(/<aside\b[\s\S]*?<\/aside>/gi,' ')
+    .replace(/<form\b[\s\S]*?<\/form>/gi,' '))
+}
+
+function attr(tag,name){
+  const match=String(tag??'').match(new RegExp(`\\b${name}=["']([^"']*)["']`,'i'))
+  return match?decodeEntities(match[1]).trim():''
+}
+
+function metaContent(html,name){
+  const wanted=String(name??'').toLowerCase()
+  for(const match of String(html??'').matchAll(/<meta\b[^>]*>/gi)){
+    const tag=match[0]
+    const key=(attr(tag,'property')||attr(tag,'name')).toLowerCase()
+    if(key===wanted) return attr(tag,'content')
+  }
+  return ''
+}
+
+function classBlock(html,classNeedle){
+  const escaped=String(classNeedle).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')
+  const match=String(html??'').match(new RegExp(`<([a-z0-9]+)\\b[^>]*class=["'][^"']*${escaped}[^"']*["'][^>]*>([\\s\\S]*?)<\\/\\1>`,'i'))
+  return match?.[2]||''
+}
+
+function companyFromHtml(html){
+  const text=decodeHtml(classBlock(html,'jix-toolbar-top__company'))
+  if(!text) return ''
+  const represented=text.match(/\b(?:søger|rekrutterer)\s+for\s+(.+)$/i)
+  return clean(represented?.[1]||text)
+}
+
+function locationFromHtml(html){
+  return decodeHtml(classBlock(html,'jix_robotjob--area'))
+}
+
+function postedDateFromHtml(html){
+  const block=classBlock(html,'jix-toolbar__pubdate')
+  const timeTag=String(block||html).match(/<time\b[^>]*>/i)?.[0]||''
+  return clean(attr(timeTag,'datetime'))||null
+}
+
+function paidJobSegment(html){
+  const text=String(html??'')
+  const open=text.search(/<div\b[^>]*class=["'][^"']*PaidJob-inner[^"']*["'][^>]*>/i)
+  if(open<0) return ''
+  const start=text.indexOf('>',open)+1
+  const tail=text.slice(start)
+  const marker=tail.search(/<div\b[^>]*class=["'][^"']*jix_toolbar\b/i)
+  return marker>=0?tail.slice(0,marker):tail.slice(0,12000)
+}
+
+function safeExternalHref(value){
+  const href=clean(decodeEntities(value))
+  if(!/^https?:\/\//i.test(href)) return ''
+  try{
+    const url=new URL(href)
+    if(url.hostname==='jobindex.dk'||url.hostname.endsWith('.jobindex.dk')) return ''
+    if(/(?:facebook|linkedin|twitter|instagram)\.com$/i.test(url.hostname)||/(?:^|\.)google\.com$/i.test(url.hostname)) return ''
+    return href
+  }catch{return ''}
+}
+
+function applicationUrlFromHtml(html){
+  const paid=paidJobSegment(html)
+  for(const match of paid.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>/gi)){
+    const href=safeExternalHref(match[1])
+    if(href) return href
+  }
+
+  const re=/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
+  for(const match of String(html??'').matchAll(re)){
+    const href=safeExternalHref(match[1])
+    if(!href) continue
+    const label=decodeHtml(match[2]).toLowerCase()
+    if(/søg|apply|ansøg|send ansøgning|gå til job|se jobbet|view job/i.test(label)) return href
+  }
+  return ''
+}
 
 export function jobindexDetailUrl(jobId){
   const id=clean(jobId)
@@ -82,37 +182,71 @@ function locationFromPosting(posting){
   return clean(posting?.jobLocationType)
 }
 
-function remoteTypeFromPosting(posting){
-  const locationType=clean(posting?.jobLocationType).toLowerCase()
-  const description=decodeHtml(posting?.description).toLowerCase()
-  if(locationType.includes('telecommute')) return 'remote'
-  if(/\bhybrid\b/.test(description)) return 'hybrid'
-  if(/\b(remote|work from home|home-based)\b/.test(description)) return 'remote'
-  if(/\b(on-site|onsite|on site)\b/.test(description)) return 'onsite'
+function remoteTypeFromText(value=''){
+  const text=decodeHtml(value).toLowerCase()
+  if(/\bhybrid\b/.test(text)) return 'hybrid'
+  if(/\b(fully remote|100% remote|remote role|remote position|work remotely|work from home|home-based)\b/.test(text)) return 'remote'
+  if(/\b(on-site|onsite|on site|office-based)\b/.test(text)) return 'onsite'
   return ''
 }
 
-function applicationUrlFromHtml(html){
-  const re=/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
-  for(const match of String(html??'').matchAll(re)){
-    const href=clean(match[1])
-    const label=decodeHtml(match[2]).toLowerCase()
-    if(!/^https?:\/\//i.test(href)) continue
-    if(href.toLowerCase().startsWith(BASE)) continue
-    if(/søg|apply|ansøg|send ansøgning|gå til job/i.test(label)) return href
+function remoteTypeFromPosting(posting,fallbackText=''){
+  const locationType=clean(posting?.jobLocationType).toLowerCase()
+  if(locationType.includes('telecommute')) return 'remote'
+  return remoteTypeFromText(`${decodeHtml(posting?.description)} ${fallbackText}`)
+}
+
+function semanticExternalCandidates(html=''){
+  const text=String(html??'')
+  const candidates=[]
+  const broad=/<(section|article|main)\b([^>]*)>([\s\S]*?)<\/\1>/gi
+  for(const match of text.matchAll(broad)){
+    const attrs=match[2]||''
+    if(!/(job|vacan|position|career|role|detail|description|posting)/i.test(attrs)) continue
+    const value=cleanContentHtml(match[3])
+    if(value.length>=FULL_JD_MIN_LENGTH) candidates.push(value)
   }
-  return ''
+
+  const strong=/<div\b([^>]*)>([\s\S]*?)<\/div>/gi
+  for(const match of text.matchAll(strong)){
+    const attrs=match[1]||''
+    if(!/(full[-_ ]?detail[-_ ]?description|job[-_ ]?(description|details?|content|posting)|vacanc(y|ies)[-_ ]?(description|details?|content)|position[-_ ]?(description|details?|content)|role[-_ ]?(description|details?|content))/i.test(attrs)) continue
+    const value=cleanContentHtml(match[2])
+    if(value.length>=FULL_JD_MIN_LENGTH) candidates.push(value)
+  }
+
+  if(!candidates.length) return ''
+  const withHeading=candidates.filter(value=>/(stillingsbeskrivelse|job description|about the job|about this role|role description|position description|om stillingen|om jobbet)/i.test(value))
+  const pool=withHeading.length?withHeading:candidates
+  return pool.reduce((best,value)=>value.length>best.length?value:best,'')
+}
+
+export function extractJobindexExternalDetail(html='',context={}){
+  const posting=parseJsonLd(html)
+  const structured=decodeHtml(posting?.description)
+  const fallback=structured.length>=FULL_JD_MIN_LENGTH?'':semanticExternalCandidates(html)
+  const fullJd=structured.length>=FULL_JD_MIN_LENGTH?structured:fallback
+  return {
+    url:clean(context?.url),
+    title:clean(posting?.title),
+    company:clean(posting?.hiringOrganization?.name),
+    location:locationFromPosting(posting),
+    country:countryFromPosting(posting),
+    remoteType:remoteTypeFromPosting(posting,fullJd),
+    fullJd:fullJd.length>=FULL_JD_MIN_LENGTH?fullJd:'',
+  }
 }
 
 export function extractJobindexDetail(html='',context={}){
   const posting=parseJsonLd(html)
   const detailUrl=clean(posting?.url)||jobindexDetailUrl(context?.jobId)
-  const title=clean(posting?.title)
-  const company=clean(posting?.hiringOrganization?.name)
-  const location=locationFromPosting(posting)
+  const title=clean(posting?.title)||clean(metaContent(html,'og:title'))
+  const company=clean(posting?.hiringOrganization?.name)||companyFromHtml(html)
+  const location=locationFromPosting(posting)||locationFromHtml(html)
   const country=countryFromPosting(posting)
-  const remoteType=remoteTypeFromPosting(posting)
-  const postedDate=clean(posting?.datePosted)||null
+  const teaser=decodeHtml(paidJobSegment(html))||clean(metaContent(html,'og:description'))
+  const remoteType=remoteTypeFromPosting(posting,`${location} ${teaser}`)
+  const postedDate=clean(posting?.datePosted)||postedDateFromHtml(html)
   const fullJd=decodeHtml(posting?.description)
   const applicationUrl=applicationUrlFromHtml(html)
   return {
@@ -125,6 +259,7 @@ export function extractJobindexDetail(html='',context={}){
     postedDate,
     detailUrl,
     applicationUrl,
+    teaser,
     fullJd,
   }
 }
