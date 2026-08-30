@@ -24,9 +24,21 @@ test('detail parser reads JobPosting JSON-LD', () => {
   assert.equal(detail.title,'Senior Project Manager')
   assert.equal(detail.company,'Acme A/S')
   assert.match(detail.location,/Copenhagen/)
+  assert.equal(detail.country,'DK')
   assert.equal(detail.postedDate,'2026-08-30')
   assert.match(detail.fullJd,/Lead complex delivery/)
   assert.equal(detail.applicationUrl,'https://acme.example/jobs/42')
+})
+
+test('detail parser captures explicit remote and hybrid work-model signals', () => {
+  const remoteHtml=`<script type="application/ld+json">${JSON.stringify({
+    '@type':'JobPosting',title:'Delivery Manager',jobLocationType:'TELECOMMUTE',description:'Remote role available from Denmark.'
+  })}</script>`
+  const hybridHtml=`<script type="application/ld+json">${JSON.stringify({
+    '@type':'JobPosting',title:'Delivery Manager',description:'We use a hybrid working model with office days in Copenhagen.'
+  })}</script>`
+  assert.equal(extractJobindexDetail(remoteHtml,{jobId:'h2'}).remoteType,'remote')
+  assert.equal(extractJobindexDetail(hybridHtml,{jobId:'h3'}).remoteType,'hybrid')
 })
 
 test('missing optional fields do not throw', () => {
