@@ -3,6 +3,7 @@ import { normalizeJob } from './normalized-job.js'
 
 const SEARCH_BASE='https://www.jobindex.dk/jobsoegning.rss'
 const FULL_JD_MIN_LENGTH=500
+const GENERIC_ROLE_TOKENS=new Set(['senior','sr','junior','jr','principal','global','regional','international','experienced','manager','lead','specialist','consultant','coordinator','director','head','officer','owner'])
 
 function directions(plan={}){
   return (Array.isArray(plan?.directions)?plan.directions:[])
@@ -15,11 +16,34 @@ function directions(plan={}){
     .filter(direction=>direction.role&&direction.query)
 }
 
+function exactJobindexQuery(value){
+  const query=String(value??'').trim().replace(/\s+/g,' ')
+  if(!query) return ''
+  if(/^"[^"]+"$/.test(query)||/[+]/.test(query)||/\b(?:AND|OR|NOT)\b/i.test(query)) return query
+  return `"${query.replace(/"/g,' ').replace(/\s+/g,' ').trim()}"`
+}
+
 function searchUrl(query,page=1){
   const url=new URL(SEARCH_BASE)
-  url.searchParams.set('q',query)
+  url.searchParams.set('q',exactJobindexQuery(query))
   if(page>1) url.searchParams.set('page',String(page))
   return url.toString()
+}
+
+function roleTokens(value=''){
+  return String(value??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/ø/g,'o').replace(/æ/g,'ae').replace(/å/g,'a')
+    .replace(/\bprogramme\b/g,'program').replace(/\bprogrammes\b/g,'programs')
+    .replace(/[^a-z0-9+#.]+/g,' ').trim().split(/\s+/).filter(Boolean)
+}
+function tokenEquivalent(a,b){return a===b||`${a}s`===b||`${b}s`===a}
+function discoveryTitleRelevant(record,direction){
+  const title=String(record?.title??'').trim()
+  if(!title) return true
+  const approved=roleTokens(direction?.role||direction?.query).filter(token=>!GENERIC_ROLE_TOKENS.has(token))
+  if(!approved.length) return true
+  const candidate=roleTokens(title)
+  return approved.some(token=>candidate.some(candidateToken=>tokenEquivalent(token,candidateToken)))
 }
 
 async function fetchText(fetcher,url){
@@ -62,6 +86,7 @@ export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},e
   const byId=new Map()
   let searchRequests=0
   let searchFailures=0
+  let discoveryTitleRejected=0
   let detailRequests=0
   let detailFailures=0
   let externalDetailRequests=0
@@ -85,6 +110,10 @@ export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},e
       for(const record of records){
         if(seenForDirection.has(record.jobId)) continue
         seenForDirection.add(record.jobId)
+        if(!discoveryTitleRelevant(record,direction)){
+          discoveryTitleRejected++
+          continue
+        }
         newIds++
         const current=byId.get(record.jobId)||{...record,foundBy:[]}
         current.foundBy=mergeDirection(current.foundBy,direction)
@@ -119,7 +148,7 @@ export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},e
     if(verified) fullJdVerified++
     return normalizeJob({
       ...detail,
-      title:detail.title||externalDetail?.title||'',
+      title:detail.title||externalDetail?.title||candidate.title||'',
       company:detail.company||externalDetail?.company||'',
       location:detail.location||externalDetail?.location||'',
       country:detail.country||externalDetail?.country||'',
@@ -151,7 +180,7 @@ export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},e
     jobs.push(normalizeJob({
       sourceJobId:candidate.jobId,
       jobId:`jobindex:${candidate.jobId}`,
-      title:'',company:'',location:'',postedDate:null,publishedAt:null,fullJd:'',description:'',
+      title:candidate.title||'',company:'',location:'',postedDate:null,publishedAt:null,fullJd:'',description:'',
       detailUrl:candidate.detailUrl||jobindexDetailUrl(candidate.jobId),
       foundBy:candidate.foundBy||[],
       sourceRecords:[{
@@ -169,7 +198,7 @@ export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},e
     source:'jobindex',
     status,
     jobs,
-    stats:{searchRequests,searchFailures,detailRequests,detailFailures,externalDetailRequests,externalDetailFailures,fullJdVerified,limitedData,discovered:candidates.length,returned:jobs.length,freshnessDays:Number(freshnessDays)||7},
+    stats:{searchRequests,searchFailures,discoveryTitleRejected,detailRequests,detailFailures,externalDetailRequests,externalDetailFailures,fullJdVerified,limitedData,discovered:candidates.length,returned:jobs.length,freshnessDays:Number(freshnessDays)||7},
     error:status==='partial'?'Some Jobindex vacancies could not be fully retrieved.':'',
     filters,
     exclusionRules,
