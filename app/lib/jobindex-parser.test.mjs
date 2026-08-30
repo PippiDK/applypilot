@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { extractJobindexSearchRecords, extractJobindexDetail, extractJobindexExternalDetail, jobindexDetailUrl } from './jobindex-parser.js'
+import { extractJobindexSearchRecords, extractJobindexDetail, extractJobindexExternalDetail, extractOracleCandidateExperienceDetail, jobindexDetailUrl } from './jobindex-parser.js'
 
 test('extracts stable Jobindex ids once and ignores unrelated hrefs', () => {
   const html=`<a href="/vis-job/h1693319">Role</a><a href="/company/acme">Acme</a><a href="https://www.jobindex.dk/vis-job/h1693319">Role duplicate</a><a href="/vis-job/not-a-job">No</a>`
@@ -83,6 +83,56 @@ test('external employer parser extracts only a substantive job-description conta
   assert.ok(detail.fullJd.length>700)
   assert.match(detail.fullJd,/end-to-end delivery/i)
   assert.doesNotMatch(detail.fullJd,/Privacy consent text/i)
+})
+
+test('external employer parser extracts Emply csa_jobadText', () => {
+  const body='Lead complex project delivery, scope, risks, dependencies and senior stakeholders. '.repeat(12)
+  const html=`<html><body>
+    <div class="csa_jobadLeft">
+      <h1 class="css_headline">Senior Project Manager</h1>
+      <div class="csa_jobadText"><p>${body}</p></div>
+    </div>
+    <div class="content">Unrelated account content</div>
+  </body></html>`
+  const detail=extractJobindexExternalDetail(html,{url:'https://acme.career.emply.com/en/ad/pm/id'})
+  assert.ok(detail.fullJd.length>700)
+  assert.match(detail.fullJd,/complex project delivery/i)
+  assert.doesNotMatch(detail.fullJd,/Unrelated account content/i)
+})
+
+test('external employer parser extracts substantive SuccessFactors itemprop description', () => {
+  const body='Own end-to-end IT delivery, service stability, vendors, risks and senior stakeholders. '.repeat(12)
+  const html=`<html><body>
+    <span itemprop="description"></span>
+    <span xml:lang="en-US" itemprop="description" class="rtltextaligneligible"><h1>IT Service Delivery Manager</h1><p>${body}</p></span>
+  </body></html>`
+  const detail=extractJobindexExternalDetail(html,{url:'https://jobs.example/job/it-service/1708-en_US/'})
+  assert.ok(detail.fullJd.length>700)
+  assert.match(detail.fullJd,/end-to-end IT delivery/i)
+})
+
+test('Oracle CandidateExperience parser reads external requisition description', () => {
+  const body='<p>'+ 'Lead enterprise project delivery across scope, risks, dependencies and stakeholders. '.repeat(12)+'</p>'
+  const payload=JSON.stringify({items:[{
+    Id:'8022',
+    Title:'Senior Project Manager',
+    ExternalPostedStartDate:'2026-08-28T09:33:19+00:00',
+    ExternalDescriptionStr:body,
+    ExternalResponsibilitiesStr:'',
+    ExternalQualificationsStr:'',
+    PrimaryLocation:'Kongens Lyngby',
+    PrimaryLocationCountry:'DK',
+    WorkplaceType:'Hybrid',
+    LegalEmployer:'Acme A/S',
+  }]})
+  const detail=extractOracleCandidateExperienceDetail(payload,{url:'https://tenant.oraclecloud.com/hcmUI/CandidateExperience/da/sites/CX_1/job/8022'})
+  assert.equal(detail.title,'Senior Project Manager')
+  assert.equal(detail.company,'Acme A/S')
+  assert.equal(detail.location,'Kongens Lyngby')
+  assert.equal(detail.country,'DK')
+  assert.equal(detail.remoteType,'hybrid')
+  assert.equal(detail.postedDate,'2026-08-28T09:33:19+00:00')
+  assert.ok(detail.fullJd.length>700)
 })
 
 test('external employer parser refuses generic page text when no reliable JD container exists', () => {
