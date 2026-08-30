@@ -2,6 +2,8 @@ import {parseSearchHtml} from './linkedin-search.js'
 
 const LINKEDIN_SEARCH='https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search'
 const WINDOWS=new Set([1,3,7,14])
+const SEARCH_PAGE_SIZE=25
+const MAX_SEARCH_PAGES=4
 const text=value=>String(value??'').replace(/\s+/g,' ').trim()
 
 function cleanSlots(values=[]){
@@ -19,13 +21,17 @@ function cleanSlots(values=[]){
 function normalizeDirection(raw={}){
   const role=text(raw?.role)
   if(!role) return null
-  return {
+  const direction={
     key:text(raw?.key)||role.toLowerCase(),
     role,
     tier:raw?.tier==='primary'?'primary':'adjacent',
     origin:raw?.origin==='cv'?'cv':'manual',
     cvSlots:cleanSlots(raw?.cvSlots)
   }
+  const query=text(raw?.query)
+  if(query) direction.query=query
+  if(raw?.discoveryMode) direction.discoveryMode=raw.discoveryMode==='expanded'?'expanded':'exact'
+  return direction
 }
 
 async function mapLimit(items,limit,fn){
@@ -44,7 +50,18 @@ async function mapLimit(items,limit,fn){
 }
 
 function foundByKey(direction){
-  return `${direction.key}|${direction.tier}|${direction.origin}|${direction.cvSlots.join(',')}`
+  return `${direction.key}|${text(direction.query)||direction.role}|${direction.discoveryMode||'exact'}|${direction.tier}|${direction.origin}|${direction.cvSlots.join(',')}`
+}
+
+function groupDirections(directions){
+  const byQuery=new Map()
+  for(const direction of directions){
+    const query=text(direction.query)||direction.role
+    const key=query.toLowerCase()
+    if(!byQuery.has(key)) byQuery.set(key,{query,directions:[]})
+    byQuery.get(key).directions.push(direction)
+  }
+  return [...byQuery.values()]
 }
 
 export async function searchLinkedInShadow({freshnessDays=7,unionSearchPlan={},fetcher}={}){
@@ -62,60 +79,39 @@ export async function searchLinkedInShadow({freshnessDays=7,unionSearchPlan={},f
   let searchRows=0
   const errors=[]
 
-  const settled=await mapLimit(directions,4,async direction=>{
-    searchRequests++
-    const qs=new URLSearchParams({
-      keywords:direction.role,
-      location:'Denmark',
-      f_TPR:`r${days*86400}`,
-      sortBy:'DD',
-      start:'0'
-    })
-    const html=await fetcher(`${LINKEDIN_SEARCH}?${qs}`)
-    const rows=parseSearchHtml(html)
-    return {direction,rows}
+  const searchGroups=groupDirections(directions)
+  const settled=await mapLimit(searchGroups,4,async group=>{
+    const rows=[]
+    const seenIds=new Set()
+    for(let page=0;page<MAX_SEARCH_PAGES;page++){
+      searchRequests++
+      const qs=new URLSearchParams({keywords:group.query,location:'Denmark',f_TPR:`r${days*86400}`,sortBy:'DD',start:String(page*SEARCH_PAGE_SIZE)})
+      const html=await fetcher(`${LINKEDIN_SEARCH}?${qs}`)
+      const pageRows=parseSearchHtml(html)
+      let newRows=0
+      for(const row of pageRows){const jobId=text(row?.jobId);if(!jobId||seenIds.has(jobId)) continue;seenIds.add(jobId);rows.push(row);newRows++}
+      if(pageRows.length<SEARCH_PAGE_SIZE||newRows===0) break
+    }
+    return {group,rows}
   })
 
   const byId=new Map()
   for(const item of settled){
-    if(item.status==='rejected'){
-      searchFailures++
-      errors.push(String(item.reason?.message||item.reason))
-      continue
-    }
-
-    const {direction,rows}=item.value
+    if(item.status==='rejected'){searchFailures++;errors.push(String(item.reason?.message||item.reason));continue}
+    const {group,rows}=item.value
     searchRows+=rows.length
     for(const row of rows){
-      const jobId=text(row?.jobId)
-      if(!jobId) continue
+      const jobId=text(row?.jobId);if(!jobId) continue
       if(!byId.has(jobId)) byId.set(jobId,{...row,jobId,foundBy:[],__foundByKeys:new Set()})
       const candidate=byId.get(jobId)
-      const key=foundByKey(direction)
-      if(candidate.__foundByKeys.has(key)) continue
-      candidate.__foundByKeys.add(key)
-      candidate.foundBy.push(direction)
+      for(const direction of group.directions){
+        const key=foundByKey(direction);if(candidate.__foundByKeys.has(key)) continue
+        candidate.__foundByKeys.add(key);candidate.foundBy.push(direction)
+      }
     }
   }
-
-  if(searchRequests>0&&searchFailures===searchRequests){
-    throw new Error(`LinkedIn shadow search unavailable: ${errors[0]||'all search requests failed'}`)
-  }
-
+  if(searchRequests>0&&searchFailures===searchRequests) throw new Error(`LinkedIn shadow search unavailable: ${errors[0]||'all search requests failed'}`)
   const candidates=[...byId.values()].map(({__foundByKeys,...candidate})=>candidate)
   const coverage=searchFailures?'ACCESS LIMITED':candidates.length?'SEARCHED':'NO RELEVANT RESULTS'
-
-  return {
-    candidates,
-    stats:{
-      directions:directions.length,
-      primaryDirections:directions.filter(direction=>direction.tier==='primary').length,
-      adjacentDirections:directions.filter(direction=>direction.tier==='adjacent').length,
-      searchRequests,
-      searchFailures,
-      searchRows,
-      discovered:candidates.length
-    },
-    coverage:{status:coverage,detail:errors[0]||null}
-  }
+  return {candidates,stats:{directions:directions.length,primaryDirections:directions.filter(d=>d.tier==='primary').length,adjacentDirections:directions.filter(d=>d.tier==='adjacent').length,searchRequests,searchFailures,searchRows,discovered:candidates.length},coverage:{status:coverage,detail:errors[0]||null}}
 }

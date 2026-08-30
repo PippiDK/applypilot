@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireUser } from '../../lib/auth/require-user.js'
 import { createLinkedInStableFetcher } from '../../lib/linkedin-stable-fetcher.js'
 import { searchLinkedInProfile } from '../../lib/linkedin-profile-search.js'
+import { buildDiscoverySearchPlan } from '../../lib/search-query-expansion-ai.js'
 
 export const runtime='nodejs'
 export const dynamic='force-dynamic'
@@ -19,7 +20,8 @@ export async function POST(request){
     if(!Array.isArray(unionSearchPlan?.directions)||unionSearchPlan.directions.length===0){
       return NextResponse.json({error:'Search Profile is not configured.'},{status:400})
     }
-    const result=await searchLinkedInProfile({freshnessDays,unionSearchPlan,exclusionRules,fetcher:createLinkedInStableFetcher()})
+    const discoverySearchPlan=await buildDiscoverySearchPlan({unionSearchPlan})
+    const result=await searchLinkedInProfile({freshnessDays,unionSearchPlan:discoverySearchPlan,exclusionRules,fetcher:createLinkedInStableFetcher()})
     return NextResponse.json({...result,fetchedAt:new Date().toISOString()})
   }catch(error){
     console.error('linkedin-profile-search error',error)
