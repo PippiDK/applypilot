@@ -8,7 +8,7 @@ import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfile
 import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'
 import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'
 import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'
-import {SEARCH_AREAS,WORK_MODELS,classifySearchArea,classifyWorkModel,filterJobItems} from './lib/job-list-filters.js'
+import {SEARCH_AREAS,WORK_MODELS,classifySearchArea,classifyWorkModel,filterJobItems,filterIgnoredJobItems} from './lib/job-list-filters.js'
 import {selectAdaptationCv,selectedAdaptationCv} from './lib/cv-adaptation-selection.js'
 import {buildAdaptationBaseline,baselineKey,baselineMatches} from './lib/cv-adaptation-baseline.js'
 import {requestCvAdaptation} from './lib/cv-adaptation-client.js'
@@ -49,6 +49,7 @@ export default function Home(){
   const someFiltersSelected=selectedAreas.length>0||selectedWorkModels.length>0
   const [selected,setSelected]=useState(null)
   const [jobStatuses,setJobStatuses]=useState({})
+  const [showIgnored,setShowIgnored]=useState(false)
   const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
   const [shadowState,setShadowState]=useState({status:'idle',error:'',stats:null,coverage:null,comparison:null})
   const [cvData,setCvData]=useState(null)
@@ -70,7 +71,7 @@ export default function Home(){
   const [editedUpdates,setEditedUpdates]=useState({})
   const [sourceDocxFiles,setSourceDocxFiles]=useState({})
   const [exportState,setExportState]=useState({loading:false,error:'',baselineKey:''})
-  const visibleJobs=useMemo(()=>filterJobItems(jobs,selectedAreas,selectedWorkModels),[jobs,selectedAreas,selectedWorkModels])
+  const visibleJobs=useMemo(()=>filterIgnoredJobItems(filterJobItems(jobs,selectedAreas,selectedWorkModels),jobStatuses,showIgnored),[jobs,selectedAreas,selectedWorkModels,jobStatuses,showIgnored])
   const active=visibleJobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||visibleJobs[0]||null
 
   useEffect(()=>{
@@ -495,6 +496,7 @@ export default function Home(){
             <label className={filterStyles.option}><input type="checkbox" checked={allFiltersSelected} ref={node=>{if(node)node.indeterminate=someFiltersSelected&&!allFiltersSelected}} onChange={toggleAllJobFilters}/><span>All filters</span><b></b></label>
             <div className={filterStyles.group}><small className={filterStyles.groupTitle}>SEARCH AREAS</small>{SEARCH_AREAS.map(area=><label className={filterStyles.option} key={area.id}><input type="checkbox" checked={selectedAreas.includes(area.id)} onChange={()=>toggleJobFilter(setSelectedAreas,area.id)}/><span>{area.label}</span><b>{areaCounts[area.id]||0}</b></label>)}</div>
             <div className={filterStyles.group}><small className={filterStyles.groupTitle}>WORK MODEL</small>{WORK_MODELS.map(model=><label className={filterStyles.option} key={model.id}><input type="checkbox" checked={selectedWorkModels.includes(model.id)} onChange={()=>toggleJobFilter(setSelectedWorkModels,model.id)}/><span>{model.label}</span><b>{workModelCounts[model.id]||0}</b></label>)}</div>
+            <label className={filterStyles.option}><input type="checkbox" checked={showIgnored} onChange={event=>setShowIgnored(event.target.checked)}/><span>Show ignored</span><b></b></label>
           </div>
         </details>}
         {!state.loading&&!state.error&&!state.stats&&<div className="empty">Run the LinkedIn search. No other source is used in this milestone.</div>}

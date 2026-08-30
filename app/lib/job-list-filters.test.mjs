@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {SEARCH_AREAS,WORK_MODELS,classifySearchArea,classifyWorkModel,filterJobItems} from './job-list-filters.js'
+import {SEARCH_AREAS,WORK_MODELS,classifySearchArea,classifyWorkModel,filterJobItems,filterIgnoredJobItems} from './job-list-filters.js'
 
 test('maps representative Danish locations into agreed search areas',()=>{
   assert.equal(classifySearchArea({location:'Nærum, Capital Region of Denmark'}),'copenhagen_north')
@@ -56,4 +56,15 @@ test('Remote is a separate work-model switch and remote scope ignores Search Are
 test('all selected is a no-op for the existing pool, including unclassified jobs',()=>{
   const items=[{job:{sourceJobId:'x',location:'Somewhere',remoteType:'unknown'}}]
   assert.equal(filterJobItems(items,SEARCH_AREAS.map(x=>x.id),WORK_MODELS.map(x=>x.id)).length,1)
+})
+
+test('ignored jobs are hidden by default and restored when Show ignored is enabled',()=>{
+  const items=[
+    {job:{sourceJobId:'keep'}},
+    {job:{sourceJobId:'hide'}},
+  ]
+  const statuses={hide:'ignore'}
+
+  assert.deepEqual(filterIgnoredJobItems(items,statuses,false).map(item=>item.job.sourceJobId),['keep'])
+  assert.deepEqual(filterIgnoredJobItems(items,statuses,true).map(item=>item.job.sourceJobId),['keep','hide'])
 })

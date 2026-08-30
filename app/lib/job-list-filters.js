@@ -80,3 +80,8 @@ export function filterJobItems(items=[],selectedAreas=[],selectedWorkModels=[]){
     return Boolean(areaMatch&&workMatch)
   })
 }
+
+export function filterIgnoredJobItems(items=[],statuses={},showIgnored=false){
+  if(showIgnored) return items
+  return items.filter(item=>statuses[item?.job?.sourceJobId]!=='ignore')
+}
