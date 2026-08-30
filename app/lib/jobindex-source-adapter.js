@@ -1,4 +1,4 @@
-import { extractJobindexSearchRecords, extractJobindexDetail, extractJobindexExternalDetail, jobindexDetailUrl } from './jobindex-parser.js'
+import { extractJobindexSearchRecords, extractJobindexDetail, extractJobindexExternalDetail, extractOracleCandidateExperienceDetail, jobindexDetailUrl } from './jobindex-parser.js'
 import { normalizeJob } from './normalized-job.js'
 
 const SEARCH_BASE='https://www.jobindex.dk/jobsoegning.rss'
@@ -46,8 +46,8 @@ function discoveryTitleRelevant(record,direction){
   return approved.some(token=>candidate.some(candidateToken=>tokenEquivalent(token,candidateToken)))
 }
 
-async function fetchText(fetcher,url){
-  const response=await fetcher(url)
+async function fetchText(fetcher,url,options){
+  const response=await fetcher(url,options)
   if(typeof response==='string') return response
   if(!response?.ok) throw new Error(`Jobindex HTTP ${response?.status||'error'}`)
   return response.text()
@@ -78,6 +78,21 @@ function mergeDirection(list,direction){
 
 function usableFullJd(value){return String(value??'').trim().length>=FULL_JD_MIN_LENGTH}
 
+function oracleCandidateExperienceRequest(value){
+  try{
+    const url=new URL(String(value??''))
+    if(!/(?:^|\.)oraclecloud\.com$/i.test(url.hostname)) return null
+    const match=url.pathname.match(/^\/hcmUI\/CandidateExperience\/([^/]+)\/sites\/([^/]+)\/job\/([^/?#]+)/i)
+    if(!match) return null
+    const [,language,siteNumber,requisitionId]=match
+    const api=new URL('/hcmRestApi/resources/latest/recruitingCEJobRequisitionDetails',url.origin)
+    api.searchParams.set('expand','all')
+    api.searchParams.set('onlyData','true')
+    api.searchParams.set('finder',`ById;Id="${requisitionId}",siteNumber=${siteNumber}`)
+    return {url:api.toString(),language,siteNumber,requisitionId}
+  }catch{return null}
+}
+
 export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},exclusionRules=[],filters={},fetcher=globalThis.fetch,maxPages=3}={}){
   const plan=directions(unionSearchPlan)
   if(!plan.length) return {source:'jobindex',status:'failed',jobs:[],stats:null,error:'Search Profile is required for Jobindex discovery.'}
@@ -91,6 +106,11 @@ export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},e
   let detailFailures=0
   let externalDetailRequests=0
   let externalDetailFailures=0
+  let externalFetchFailures=0
+  let externalParseMisses=0
+  let oracleDetailRequests=0
+  let oracleDetailFailures=0
+  let oracleDetailVerified=0
   let fullJdVerified=0
 
   for(const direction of plan){
@@ -138,14 +158,39 @@ export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},e
         const externalHtml=await fetchText(fetcher,detail.applicationUrl)
         externalDetail=extractJobindexExternalDetail(externalHtml,{url:detail.applicationUrl})
         if(usableFullJd(externalDetail.fullJd)) fullJd=externalDetail.fullJd
-        else externalDetailFailures++
+        else externalParseMisses++
       }catch{
-        externalDetailFailures++
+        externalFetchFailures++
       }
+
+      if(!usableFullJd(fullJd)){
+        const oracleRequest=oracleCandidateExperienceRequest(detail.applicationUrl)
+        if(oracleRequest){
+          oracleDetailRequests++
+          try{
+            const oraclePayload=await fetchText(fetcher,oracleRequest.url,{
+              headers:{Accept:'application/json','Ora-Irc-Language':oracleRequest.language},
+            })
+            const oracleDetail=extractOracleCandidateExperienceDetail(oraclePayload,{url:detail.applicationUrl})
+            if(usableFullJd(oracleDetail.fullJd)){
+              fullJd=oracleDetail.fullJd
+              externalDetail=oracleDetail
+              oracleDetailVerified++
+            }else{
+              oracleDetailFailures++
+            }
+          }catch{
+            oracleDetailFailures++
+          }
+        }
+      }
+
+      if(!usableFullJd(fullJd)) externalDetailFailures++
     }
 
     const verified=usableFullJd(fullJd)
     if(verified) fullJdVerified++
+    const postedDate=detail.postedDate||externalDetail?.postedDate||null
     return normalizeJob({
       ...detail,
       title:detail.title||externalDetail?.title||candidate.title||'',
@@ -153,8 +198,9 @@ export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},e
       location:detail.location||externalDetail?.location||'',
       country:detail.country||externalDetail?.country||'',
       remoteType:detail.remoteType||externalDetail?.remoteType||'',
+      postedDate,
       sourceJobId:candidate.jobId,
-      publishedAt:detail.postedDate,
+      publishedAt:postedDate,
       fullJd:verified?fullJd:'',
       description:verified?fullJd:'',
       foundBy:candidate.foundBy,
@@ -192,13 +238,13 @@ export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},e
   }
 
   const limitedData=jobs.filter(job=>(job.sourceRecords||[]).some(record=>record?.limitedData===true)).length
-  const inaccessible=searchFailures+detailFailures+externalDetailFailures
+  const inaccessible=searchFailures+detailFailures+externalDetailFailures+oracleDetailFailures
   const status=(inaccessible||limitedData)?'partial':'success'
   return {
     source:'jobindex',
     status,
     jobs,
-    stats:{searchRequests,searchFailures,discoveryTitleRejected,detailRequests,detailFailures,externalDetailRequests,externalDetailFailures,fullJdVerified,limitedData,discovered:candidates.length,returned:jobs.length,freshnessDays:Number(freshnessDays)||7},
+    stats:{searchRequests,searchFailures,discoveryTitleRejected,detailRequests,detailFailures,externalDetailRequests,externalDetailFailures,externalFetchFailures,externalParseMisses,oracleDetailRequests,oracleDetailFailures,oracleDetailVerified,fullJdVerified,limitedData,discovered:candidates.length,returned:jobs.length,freshnessDays:Number(freshnessDays)||7},
     error:status==='partial'?'Some Jobindex vacancies could not be fully retrieved.':'',
     filters,
     exclusionRules,
