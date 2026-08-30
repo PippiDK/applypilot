@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { runMultiSourceSearch } from './search-source-orchestrator.js'
 
 const direction={role:'Senior Project Manager',tier:'primary',query:'Project Manager'}
-const input={freshnessDays:7,unionSearchPlan:{directions:[direction]},exclusionRules:[],enabledSources:['linkedin','jobindex'],filters:{}}
+const input={freshnessDays:7,unionSearchPlan:{directions:[direction]},exclusionRules:[],enabledSources:['linkedin','jobindex'],filters:{areas:[],workModels:[]}}
 
 function job(source,id,overrides={}){
   return {
@@ -63,4 +63,20 @@ test('limited-data vacancy is retained without pretending it was fully evaluated
   assert.equal(result.jobs.length,1)
   assert.equal(result.jobs[0].evaluation,null)
   assert.equal(result.jobs[0].limitedData,true)
+})
+
+test('common Areas and work-model filters are applied after normalization across all sources',async()=>{
+  const copenhagen=job('linkedin','11',{applicationUrl:'https://acme.example/jobs/11',sourceRecords:[{source:'linkedin',sourceJobId:'11',applicationUrl:'https://acme.example/jobs/11'}]})
+  const aarhus=job('jobindex','h12',{
+    location:'Aarhus, Denmark',country:'Denmark',remoteType:'On-site',
+    applicationUrl:'https://acme.example/jobs/12',
+    sourceRecords:[{source:'jobindex',sourceJobId:'h12',applicationUrl:'https://acme.example/jobs/12'}],
+  })
+  const result=await runMultiSourceSearch({...input,filters:{areas:['copenhagen_north'],workModels:['dk_hybrid']}},{
+    linkedin:async()=>({source:'linkedin',status:'success',jobs:[copenhagen]}),
+    jobindex:async()=>({source:'jobindex',status:'success',jobs:[aarhus]}),
+    now:new Date('2026-08-30T12:00:00Z'),
+  })
+  assert.deepEqual(result.jobs.map(item=>item.job.sourceJobId),['11'])
+  assert.equal(result.stats.filtered,1)
 })
