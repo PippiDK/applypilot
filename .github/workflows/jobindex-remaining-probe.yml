@@ -13,56 +13,42 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Probe remaining limited-data vacancies
+      - name: Verify final retrieval paths
         shell: bash
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs'
-
-          const jobs={
-            deif:'h1693319',viking:'h1685703',steeltank:'h1690926',dsv:'h1692169',visue:'h1693574',dsb:'h1690238',
+          const targets={
+            deifAd:'https://candidate.hr-manager.net/ApplicationInit.aspx?cid=2273&ProjectId=143916&DepartmentId=18963&MediaId=4616',
+            vikingFrame:'https://viking-life.hr-on.com/frame-api/pages/show-job/40110?companyid=192&locale=da_DK',
+            steelCanonical:'https://www.jobindex.dk/jobannonce/h1690926/technical-project-manager-bliv-en-del-af-et-staerkt-og-udviklende-team',
           }
-          const report={jobindex:{},direct:{}}
-          const decode=s=>String(s||'').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/\\u0026/g,'&')
-          for(const [name,id] of Object.entries(jobs)){
-            const url=`https://www.jobindex.dk/vis-job/${id}`
-            const r=await fetch(url)
-            const html=await r.text()
-            fs.writeFileSync(`${name}-jobindex.html`,html)
-            const anchors=[...html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)].map(m=>({href:decode(m[1]),label:String(m[2]||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()})).filter(x=>/^https?:\/\//i.test(x.href))
-            report.jobindex[name]={status:r.status,length:html.length,anchors:anchors.slice(0,100)}
-          }
-
-          const direct={
-            deifTracker:'https://www.jobindex.dk/c?t=e6266804&ctx=w',
-            steeltankTracker:'https://www.jobindex.dk/c?t=e6252971&ctx=w&source=showjob',
-            vikingDirect:'https://viking-life.hr-on.com/show-job/40110?linkref=3919&locale=da_DK',
-            visueDirect1:'https://recruit.hr-on.com/show-job/349477?companyid=291&locale=da_DK',
-            visueDirect2:'https://recruit.hr-on.com/frame-api/pages/show-job/349477?companyid=291&locale=da_DK',
-            visueDirect3:'https://recruit.hr-on.com/frame-api/pages/show-job.php?companyid=291&jobid=349477&locale=da_DK',
-            dsbExact:'https://dsb.jobs.hr.cloud.sap/job/H%C3%B8je-Taastrup-IT-Service-Delivery-Manager-med-ansvar-for-leverand%C3%B8rstyring-og-stabile-IT-services-2630/1426908133/?feedId=453133&utm_source=LILimitedListings',
-            dsvSearch:'https://jobs.dsv.com/search/?q=Senior%20Project%20Manager&locationsearch=Hedehusene',
-            dsvKnown:'https://jobs.dsv.com/job/Hedehusene-Senior-Project-Manager-join-our-Group-Property-Transaction-team-84-2640/1429452533/',
-          }
-          for(const [name,url] of Object.entries(direct)){
+          const report={}
+          for(const [name,url] of Object.entries(targets)){
             try{
               const r=await fetch(url,{redirect:'follow'})
               const text=await r.text()
-              fs.writeFileSync(`${name}.txt`,text)
-              const anchors=[...text.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)].map(m=>({href:decode(m[1]),label:String(m[2]||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()}))
-              report.direct[name]={status:r.status,finalUrl:r.url,length:text.length,contentType:r.headers.get('content-type'),markers:{description:/class=["'][^"']*description/i.test(text),advertisement:/AdvertisementInnerContent|AdContentContainer/i.test(text),itemprop:/itemprop=["']description["']/i.test(text),jobposting:/JobPosting/i.test(text),targetTitle:/Project Manager for development projects|Technical Project Manager|IT Service Delivery Manager|Senior Project Manager - join our Group Property Transaction team|IT Delivery Manager til VISUE|styring og fremdrift af IT-leverancer/i.test(text)},matchingAnchors:anchors.filter(a=>/Project Manager for development projects|Technical Project Manager|IT Service Delivery Manager|Senior Project Manager|VISUE/i.test(a.label)).slice(0,20)}
-            }catch(error){report.direct[name]={error:String(error)}}
+              fs.writeFileSync(`${name}.html`,text)
+              report[name]={
+                status:r.status,finalUrl:r.url,length:text.length,
+                markers:{
+                  description:/class=["'][^"']*description/i.test(text),
+                  advertisement:/AdvertisementInnerContent|AdContentContainer/i.test(text),
+                  target:/Project Manager for development projects|Project Manager for Service Excellence|Technical Project Manager/i.test(text),
+                  jobposting:/JobPosting/i.test(text),
+                  paidjob:/PaidJob-inner/i.test(text)
+                }
+              }
+            }catch(error){report[name]={error:String(error)}}
           }
-
-          fs.writeFileSync('remaining-report.json',JSON.stringify(report,null,2))
+          fs.writeFileSync('final-path-report.json',JSON.stringify(report,null,2))
           console.log(JSON.stringify(report,null,2))
           NODE
-      - name: Upload remaining probe
+      - name: Upload probe
         uses: actions/upload-artifact@v4
         with:
-          name: jobindex-remaining-probe
+          name: jobindex-final-path-probe
           path: |
-            remaining-report.json
+            final-path-report.json
             *.html
-            *.txt
           retention-days: 1
