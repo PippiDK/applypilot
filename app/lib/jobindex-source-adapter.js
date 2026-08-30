@@ -1,7 +1,7 @@
 import { extractJobindexSearchRecords, extractJobindexDetail, jobindexDetailUrl } from './jobindex-parser.js'
 import { normalizeJob } from './normalized-job.js'
 
-const SEARCH_BASE='https://www.jobindex.dk/jobsoegning'
+const SEARCH_BASE='https://www.jobindex.dk/jobsoegning.rss'
 
 function directions(plan={}){
   return (Array.isArray(plan?.directions)?plan.directions:[])
