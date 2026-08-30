@@ -2,6 +2,8 @@ import {parseSearchHtml} from './linkedin-search.js'
 
 const LINKEDIN_SEARCH='https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search'
 const WINDOWS=new Set([1,3,7,14])
+const SEARCH_PAGE_SIZE=25
+const MAX_SEARCH_PAGES=4
 const text=value=>String(value??'').replace(/\s+/g,' ').trim()
 
 function cleanSlots(values=[]){
@@ -63,16 +65,29 @@ export async function searchLinkedInShadow({freshnessDays=7,unionSearchPlan={},f
   const errors=[]
 
   const settled=await mapLimit(directions,4,async direction=>{
-    searchRequests++
-    const qs=new URLSearchParams({
-      keywords:direction.role,
-      location:'Denmark',
-      f_TPR:`r${days*86400}`,
-      sortBy:'DD',
-      start:'0'
-    })
-    const html=await fetcher(`${LINKEDIN_SEARCH}?${qs}`)
-    const rows=parseSearchHtml(html)
+    const rows=[]
+    const seenIds=new Set()
+    for(let page=0;page<MAX_SEARCH_PAGES;page++){
+      searchRequests++
+      const qs=new URLSearchParams({
+        keywords:direction.role,
+        location:'Denmark',
+        f_TPR:`r${days*86400}`,
+        sortBy:'DD',
+        start:String(page*SEARCH_PAGE_SIZE)
+      })
+      const html=await fetcher(`${LINKEDIN_SEARCH}?${qs}`)
+      const pageRows=parseSearchHtml(html)
+      let newRows=0
+      for(const row of pageRows){
+        const jobId=text(row?.jobId)
+        if(!jobId||seenIds.has(jobId)) continue
+        seenIds.add(jobId)
+        rows.push(row)
+        newRows++
+      }
+      if(pageRows.length<SEARCH_PAGE_SIZE||newRows===0) break
+    }
     return {direction,rows}
   })
 

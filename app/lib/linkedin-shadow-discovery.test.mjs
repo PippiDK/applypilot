@@ -71,3 +71,26 @@ test('empty plan returns a valid empty result without network calls',async()=>{
   assert.deepEqual(result.stats,{directions:0,primaryDirections:0,adjacentDirections:0,searchRequests:0,searchFailures:0,searchRows:0,discovered:0})
   assert.deepEqual(result.coverage,{status:'NO DIRECTIONS',detail:null})
 })
+
+test('continues to the next LinkedIn discovery page so wider windows do not lose fresh jobs pushed off page 1',async()=>{
+  const urls=[]
+  const singlePlan={directions:[{key:'project manager',role:'Project Manager',tier:'primary',origin:'cv',cvSlots:[1]}]}
+  const firstPage=Array.from({length:25},(_,index)=>card(String(4454700000+index),`Project Manager ${index}`)).join('')
+  const target=card('4454799999','Fresh Project Manager','Novo Nordisk')
+  const result=await searchLinkedInShadow({
+    freshnessDays:3,
+    unionSearchPlan:singlePlan,
+    fetcher:async url=>{
+      urls.push(url)
+      const start=new URL(url).searchParams.get('start')
+      if(start==='0') return firstPage
+      if(start==='25') return target
+      return ''
+    }
+  })
+
+  assert.deepEqual(urls.map(url=>new URL(url).searchParams.get('start')),['0','25'])
+  assert.equal(result.candidates.some(candidate=>candidate.jobId==='4454799999'),true)
+  assert.equal(result.stats.searchRequests,2)
+  assert.equal(result.stats.discovered,26)
+})
