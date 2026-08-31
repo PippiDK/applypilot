@@ -1,9 +1,5 @@
 'use client'
-
-function scoreText(value){
-  if(value==null||value==='') return '—'
-  return Number.isFinite(Number(value))?`${Number(value)}%`:'—'
-}
+import {formatAuditScore} from '../lib/search-audit-format.js'
 
 export default function SearchAudit({audit=[]}){
   if(!Array.isArray(audit)||audit.length===0) return null
@@ -17,7 +13,7 @@ export default function SearchAudit({audit=[]}){
           <td style={{padding:'7px',minWidth:130}}>{row.company||'—'}</td>
           <td style={{padding:'7px',whiteSpace:'nowrap'}}>{row.stage||'—'}</td>
           <td style={{padding:'7px',whiteSpace:'nowrap'}}>{row.decision||'—'}</td>
-          <td style={{padding:'7px',whiteSpace:'nowrap'}}>{scoreText(row.score)}</td>
+          <td style={{padding:'7px',whiteSpace:'nowrap'}}>{formatAuditScore(row.score)}</td>
           <td style={{padding:'7px',minWidth:260}}>{row.reason||'—'}</td>
         </tr>)}</tbody>
       </table>

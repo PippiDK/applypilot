@@ -6,6 +6,7 @@ import { filterJobItems } from './job-list-filters.js'
 function selected(value=[]){return [...new Set((Array.isArray(value)?value:[]).map(item=>String(item||'').toLowerCase()).filter(item=>item==='linkedin'||item==='jobindex'))]}
 function failedStatus(source,error){return {source,status:'failed',jobs:[],stats:null,audit:[],error:String(error?.message||error||`${source} search failed`)} }
 function isLimited(job){return (job?.sourceRecords||[]).some(record=>record?.limitedData===true)||(!job?.title&&!job?.fullJd&&!job?.description)}
+function auditRow(job,row={}){return {jobId:job.jobId||job.sourceJobId,title:job.title||'',company:job.company||'',...row}}
 
 async function runSource(source,input,dependencies){
   const fn=dependencies?.[source]
@@ -48,13 +49,13 @@ export async function runMultiSourceSearch(input={},dependencies={}){
   for(const job of filtered){
     if(isLimited(job)){
       unverified++
-      evaluationAudit.push({jobId:job.jobId||job.sourceJobId,stage:'LIMITED_DATA',decision:'UNVERIFIED',reason:'Full Job Description could not be retrieved'})
+      evaluationAudit.push(auditRow(job,{stage:'LIMITED_DATA',decision:'UNVERIFIED',reason:'Full Job Description could not be retrieved'}))
       continue
     }
 
     if((!Array.isArray(job.foundBy)||job.foundBy.length===0)&&job.legacyEvaluation){
       jobs.push({job,evaluation:job.legacyEvaluation,limitedData:false})
-      evaluationAudit.push({jobId:job.jobId||job.sourceJobId,stage:'LEGACY_EVALUATED',decision:'KEEP',reason:'Preserved existing LinkedIn legacy evaluation',score:job.legacyEvaluation?.score??0})
+      evaluationAudit.push(auditRow(job,{stage:'LEGACY_EVALUATED',decision:'KEEP',reason:'Preserved existing LinkedIn legacy evaluation',score:job.legacyEvaluation?.score??0}))
       continue
     }
 
@@ -65,7 +66,7 @@ export async function runMultiSourceSearch(input={},dependencies={}){
       freshnessDays:input?.freshnessDays,
       now,
     })
-    evaluationAudit.push({jobId:job.jobId||job.sourceJobId,stage:result.stage,decision:result.decision,reason:result.reason,score:result.evaluation?.score??0})
+    evaluationAudit.push(auditRow(job,{stage:result.stage,decision:result.decision,reason:result.reason,score:result.evaluation?.score??0}))
     if(result.pass) jobs.push({job,evaluation:result.evaluation,limitedData:false})
   }
 

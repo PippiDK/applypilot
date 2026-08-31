@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { runMultiSourceSearch } from './search-source-orchestrator.js'
+import { formatAuditScore } from './search-audit-format.js'
 
 const direction={role:'Senior Project Manager',tier:'primary',query:'Project Manager'}
 const input={freshnessDays:7,unionSearchPlan:{directions:[direction]},exclusionRules:[],enabledSources:['linkedin','jobindex'],filters:{}}
@@ -31,6 +32,9 @@ test('runs both enabled sources, dedupes before one shared evaluation and keeps 
   assert.equal(result.jobs.length,1)
   assert.equal(result.jobs[0].evaluation.score,9.6)
   assert.equal(result.jobs[0].job.sourceRecords.length,2)
+  const kept=result.audit.find(item=>item.stage==='KEPT')
+  assert.equal(kept.title,'Senior Project Manager')
+  assert.equal(kept.company,'Acme A/S')
 })
 
 test('one failed source does not discard successful source results',async()=>{
@@ -64,6 +68,24 @@ test('limited-data vacancy stays auditable but is excluded from worthwhile live 
   assert.equal(result.stats.returned,0)
   assert.equal(result.stats.unverified,1)
   assert.ok(result.audit.some(item=>item.jobId==='jobindex:h3'&&item.stage==='LIMITED_DATA'&&item.decision==='UNVERIFIED'))
+})
+
+test('limited-data audit preserves available vacancy title and company',async()=>{
+  const limited=job('jobindex','h4',{title:'IT Delivery Manager',company:'VISUE',description:'',fullJd:'',sourceRecords:[{source:'jobindex',sourceJobId:'h4',limitedData:true}]})
+  const result=await runMultiSourceSearch({...input,enabledSources:['jobindex']},{
+    jobindex:async()=>({source:'jobindex',status:'partial',jobs:[limited],stats:{returned:1}}),
+  })
+  const audit=result.audit.find(item=>item.jobId==='jobindex:h4')
+  assert.equal(audit.stage,'LIMITED_DATA')
+  assert.equal(audit.title,'IT Delivery Manager')
+  assert.equal(audit.company,'VISUE')
+})
+
+test('formats audit evaluator score on a 10-point scale',()=>{
+  assert.equal(formatAuditScore(9.1),'9.1/10')
+  assert.equal(formatAuditScore(8),'8/10')
+  assert.equal(formatAuditScore(0),'0/10')
+  assert.equal(formatAuditScore(null),'—')
 })
 
 test('common Areas and work-model filters are applied after normalization across all sources',async()=>{
