@@ -46,8 +46,9 @@ function classTokenMatch(tag,classNeedle){
   const classes=attr(tag,'class').split(/\s+/).filter(Boolean)
   return classes.includes(classNeedle)
 }
-function balancedClassBlock(html,classNeedle){
+function balancedClassBlocks(html,classNeedle){
   const text=String(html??'')
+  const blocks=[]
   const opening=/<([a-z0-9]+)\b[^>]*>/gi
   let match
   while((match=opening.exec(text))){
@@ -58,26 +59,27 @@ function balancedClassBlock(html,classNeedle){
     tags.lastIndex=start
     let depth=1
     let token
+    let end=text.length
     while((token=tags.exec(text))){
       if(/^<\//.test(token[0])) depth--
       else if(!/\/>$/.test(token[0])) depth++
-      if(depth===0) return text.slice(start,token.index)
+      if(depth===0){end=token.index;break}
     }
-    return text.slice(start)
+    blocks.push(text.slice(start,end))
   }
-  return ''
+  return blocks
 }
 function usable(value){return clean(value).length>=FULL_JD_MIN_LENGTH}
 function best(...values){
-  return values.map(value=>plain(value)).filter(usable).reduce((longest,value)=>value.length>longest.length?value:longest,'')
+  return values.flat().map(value=>plain(value)).filter(usable).reduce((longest,value)=>value.length>longest.length?value:longest,'')
 }
 
 export function recoverExternalFullJd(html='',url=''){
   const host=hostname(url)
   let value=''
-  if(hostMatches(host,'egecarpets.com')) value=best(balancedClassBlock(html,'job-detail-description'))
-  else if(hostMatches(host,'cruitconsult.dk')) value=best(balancedClassBlock(html,'col1'))
-  else if(hostMatches(host,'avature.net')) value=best(balancedClassBlock(html,'article--details'))
+  if(hostMatches(host,'egecarpets.com')) value=best(balancedClassBlocks(html,'job-detail-description'))
+  else if(hostMatches(host,'cruitconsult.dk')) value=best(balancedClassBlocks(html,'col1'))
+  else if(hostMatches(host,'avature.net')) value=best(balancedClassBlocks(html,'article--details'))
   else if(hostMatches(host,'youngcrm.com')) value=best(metaContent(html,'og:description'),metaContent(html,'description'))
   return usable(value)?value:''
 }
@@ -85,7 +87,7 @@ export function recoverExternalFullJd(html='',url=''){
 export function recoverJobindexCanonicalFullJd(html='',url=''){
   const host=hostname(url)
   if(host&&!JOBINDEX_HOSTS.has(host)) return ''
-  const value=best(balancedClassBlock(html,'jobadd'))
+  const value=best(balancedClassBlocks(html,'jobadd'))
   return usable(value)?value:''
 }
 
