@@ -6,7 +6,7 @@ on:
       - diag/jobindex-limited-data
 
 jobs:
-  regression-and-live:
+  teamtailor-case:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -15,38 +15,55 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run LIMITED_DATA recovery regression
-        run: node --test app/lib/jobindex-live-retrieval.test.mjs app/lib/jobindex-source-adapter.test.mjs
-      - name: Verify real Jobindex full-JD recovery
+      - name: Trace Senior HR Business Partner retrieval
         shell: bash
         run: |
           node --input-type=module <<'NODE'
-          import {searchJobindexSource} from './app/lib/jobindex-source-adapter.js'
+          import {extractJobindexSearchRecords,extractJobindexDetail,extractJobindexExternalDetail} from './app/lib/jobindex-parser.js'
+          import {recoverExternalFullJd} from './app/lib/jobindex-live-retrieval.js'
+          import {jobindexCanonicalFullJdUrl,jobindexApplyTrackerUrl} from './app/lib/jobindex-retrieval-fallbacks.js'
 
-          const directions=[
-            {key:'senior-it-delivery-manager',role:'Senior IT Delivery Manager',query:'Senior IT Delivery Manager',tier:'primary'},
-            {key:'senior-it-project-manager',role:'Senior IT Project Manager',query:'Senior IT Project Manager',tier:'primary'},
-            {key:'technical-program-manager',role:'Technical Program Manager',query:'Technical Program Manager',tier:'primary'},
-            {key:'digital-transformation-manager',role:'Digital Transformation Manager',query:'Digital Transformation Manager',tier:'primary'},
-            {key:'it-delivery-manager',role:'IT Delivery Manager',query:'IT Delivery Manager',tier:'primary'},
-            {key:'it-programme-manager',role:'IT Programme Manager',query:'IT Programme Manager',tier:'primary'},
-            {key:'technology-program-manager',role:'Technology Program Manager',query:'Technology Program Manager',tier:'primary'},
-            {key:'enterprise-implementation-manager',role:'Enterprise Implementation Manager',query:'Enterprise Implementation Manager',tier:'primary'},
-            {key:'agile-delivery-manager',role:'Agile Delivery Manager',query:'Agile Delivery Manager',tier:'adjacent'},
-            {key:'pmo-manager',role:'PMO Manager',query:'PMO Manager',tier:'adjacent'},
-            {key:'regulatory-change-project-manager',role:'Regulatory Change Project Manager',query:'Regulatory Change Project Manager',tier:'adjacent'},
-            {key:'client-delivery-manager',role:'Client Delivery Manager',query:'Client Delivery Manager',tier:'adjacent'},
-            {key:'it-governance-manager',role:'IT Governance Manager',query:'IT Governance Manager',tier:'adjacent'},
-          ]
+          const clean=s=>String(s||'').replace(/\s+/g,' ').trim()
+          const rssUrl=new URL('https://www.jobindex.dk/jobsoegning.rss')
+          rssUrl.searchParams.set('q','Senior HR Business Partner')
+          const rssResponse=await fetch(rssUrl,{redirect:'follow'})
+          const rss=await rssResponse.text()
+          const records=extractJobindexSearchRecords(rss)
+          const record=records.find(row=>/Senior HR Business Partner/i.test(row.title||''))
+          if(!record) throw new Error('Target Jobindex record not found')
 
-          const source=await searchJobindexSource({freshnessDays:1,unionSearchPlan:{version:'limited-data-live-final',directions},exclusionRules:[],filters:{},maxPages:3})
-          const rows=source.jobs.map(job=>({
-            jobId:job.sourceJobId,title:job.title,company:job.company,location:job.location,
-            fullJdLength:String(job.fullJd||'').length,
-            limitedData:(job.sourceRecords||[]).some(record=>record?.limitedData===true),
-            applicationUrl:job.applicationUrl,
-          }))
-          console.log(JSON.stringify({stats:source.stats,rows,limited:rows.filter(row=>row.limitedData)},null,2))
-          if(Number(source.stats?.limitedData)!==0) throw new Error(`LIMITED_DATA remains: ${source.stats?.limitedData}`)
-          if(Number(source.stats?.fullJdVerified)!==Number(source.stats?.discovered)) throw new Error(`Full JD coverage incomplete: ${source.stats?.fullJdVerified}/${source.stats?.discovered}`)
+          const detailResponse=await fetch(record.detailUrl,{redirect:'follow'})
+          const detailHtml=await detailResponse.text()
+          const detail=extractJobindexDetail(detailHtml,{jobId:record.jobId})
+          const applicationUrl=detail.applicationUrl||jobindexApplyTrackerUrl(detailHtml)
+          const canonicalUrl=jobindexCanonicalFullJdUrl(detailHtml)
+
+          const result={record,detail:{title:detail.title,company:detail.company,location:detail.location,postedDate:detail.postedDate,applicationUrl,canonicalUrl,fullJdLength:String(detail.fullJd||'').length}}
+
+          if(canonicalUrl){
+            try{
+              const r=await fetch(canonicalUrl,{redirect:'follow'})
+              const html=await r.text()
+              const parsed=extractJobindexExternalDetail(html,{url:r.url||canonicalUrl})
+              result.canonical={status:r.status,finalUrl:r.url,length:html.length,parsedLength:String(parsed.fullJd||'').length,hasJobPosting:/application\/ld\+json/i.test(html)}
+            }catch(error){result.canonical={error:String(error?.message||error)}}
+          }
+
+          if(applicationUrl){
+            try{
+              const r=await fetch(applicationUrl,{redirect:'follow'})
+              const html=await r.text()
+              const parsed=extractJobindexExternalDetail(html,{url:r.url||applicationUrl})
+              const recovered=recoverExternalFullJd(html,r.url||applicationUrl)
+              const scripts=[...html.matchAll(/<script\b[^>]*src=["']([^"']+)["']/gi)].map(m=>m[1]).slice(0,20)
+              const hrefs=[...html.matchAll(/<a\b[^>]*href=["']([^"']+)["']/gi)].map(m=>m[1]).filter(v=>/job|career|teamtailor|apply/i.test(v)).slice(0,30)
+              const needles=['Senior HR Business Partner','Struers','Teamtailor','job-description','job_description','data-job','application/ld+json','__NEXT_DATA__']
+              const snippets={}
+              const lower=html.toLowerCase()
+              for(const needle of needles){const i=lower.indexOf(needle.toLowerCase());if(i>=0) snippets[needle]=clean(html.slice(Math.max(0,i-1000),i+4500))}
+              result.application={status:r.status,finalUrl:r.url,contentType:r.headers.get('content-type'),length:html.length,parsedLength:String(parsed.fullJd||'').length,recoveredLength:String(recovered||'').length,hasJsonLd:/application\/ld\+json/i.test(html),hasNextData:/__NEXT_DATA__/i.test(html),scripts,hrefs,snippets}
+            }catch(error){result.application={error:String(error?.message||error)}}
+          }
+
+          console.log(JSON.stringify(result,null,2))
           NODE
