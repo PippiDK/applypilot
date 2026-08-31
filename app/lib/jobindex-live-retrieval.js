@@ -5,6 +5,9 @@ function clean(value){return String(value??'').trim()}
 function hostname(value=''){
   try{return new URL(String(value??'')).hostname.toLowerCase().replace(/^www\./,'')}catch{return ''}
 }
+function pathname(value=''){
+  try{return new URL(String(value??'')).pathname.toLowerCase()}catch{return ''}
+}
 function hostMatches(host,domain){return host===domain||host.endsWith(`.${domain}`)}
 function decodeEntities(value=''){
   const named={nbsp:' ',amp:'&',quot:'"',apos:"'",lt:'<',gt:'>',aelig:'æ',AElig:'Æ',oslash:'ø',Oslash:'Ø',aring:'å',Aring:'Å',ndash:'–',mdash:'—',bull:'•'}
@@ -76,11 +79,13 @@ function best(...values){
 
 export function recoverExternalFullJd(html='',url=''){
   const host=hostname(url)
+  const path=pathname(url)
   let value=''
   if(hostMatches(host,'egecarpets.com')) value=best(balancedClassBlocks(html,'job-detail-description'))
   else if(hostMatches(host,'cruitconsult.dk')) value=best(balancedClassBlocks(html,'col1'))
   else if(hostMatches(host,'avature.net')) value=best(balancedClassBlocks(html,'article--details'))
   else if(hostMatches(host,'youngcrm.com')) value=best(metaContent(html,'og:description'),metaContent(html,'description'))
+  else if(hostMatches(host,'brinchpartners.dk')&&/(^|\/)stillinger\/[^/]+\/?$/.test(path)) value=best(balancedClassBlocks(html,'elementor-widget-theme-post-content'))
   return usable(value)?value:''
 }
 
