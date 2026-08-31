@@ -15,6 +15,7 @@ import {
   jobindexCanonicalFullJd,
   jobindexCanonicalFullJdUrl,
 } from './jobindex-retrieval-fallbacks.js'
+import { ennovaMindkeyDetailUrl, recoverExternalFullJd, recoverJobindexCanonicalFullJd } from './jobindex-live-retrieval.js'
 import { normalizeJob } from './normalized-job.js'
 
 const SEARCH_BASE='https://www.jobindex.dk/jobsoegning.rss'
@@ -66,6 +67,11 @@ async function fetchPage(fetcher,url,options){
   const response=await fetcher(url,options)
   if(typeof response==='string') return {text:response,url:String(url)}
   if(!response?.ok) throw new Error(`Jobindex HTTP ${response?.status||'error'}`)
+  const contentType=String(response?.headers?.get?.('content-type')||'')
+  if(/charset\s*=\s*(?:windows-1252|iso-8859-1)/i.test(contentType)&&typeof response?.arrayBuffer==='function'){
+    const bytes=await response.arrayBuffer()
+    return {text:new TextDecoder('windows-1252').decode(bytes),url:String(response.url||url)}
+  }
   return {text:await response.text(),url:String(response.url||url)}
 }
 async function fetchText(fetcher,url,options){return (await fetchPage(fetcher,url,options)).text}
@@ -187,7 +193,8 @@ export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},e
       if(canonicalUrl&&canonicalUrl!==detailUrl){
         try{
           const canonicalPage=await fetchPage(fetcher,canonicalUrl)
-          const canonicalJd=jobindexCanonicalFullJd(canonicalPage.text)
+          let canonicalJd=jobindexCanonicalFullJd(canonicalPage.text)
+          if(!usableFullJd(canonicalJd)) canonicalJd=recoverJobindexCanonicalFullJd(canonicalPage.text,canonicalPage.url)
           if(usableFullJd(canonicalJd)) fullJd=canonicalJd
         }catch{}
       }
@@ -199,9 +206,23 @@ export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},e
       try{
         externalPage=await fetchPage(fetcher,applicationUrl)
         const parsed=extractJobindexExternalDetail(externalPage.text,{url:externalPage.url})
-        if(!adoptDetail(parsed)) externalParseMisses++
+        const recovered=recoverExternalFullJd(externalPage.text,externalPage.url)
+        if(!adoptDetail(parsed)&&!adoptDetail({fullJd:recovered})) externalParseMisses++
       }catch{
         externalFetchFailures++
+      }
+
+      if(!usableFullJd(fullJd)&&externalPage){
+        const mindkeyUrl=ennovaMindkeyDetailUrl(applicationUrl,externalPage.text)
+        if(mindkeyUrl){
+          externalDetailRequests++
+          try{
+            const mindkeyPage=await fetchPage(fetcher,mindkeyUrl)
+            const parsed=extractJobindexExternalDetail(mindkeyPage.text,{url:mindkeyPage.url})
+            const recovered=recoverExternalFullJd(mindkeyPage.text,mindkeyPage.url)
+            adoptDetail(parsed)||adoptDetail({fullJd:recovered})
+          }catch{externalFetchFailures++}
+        }
       }
 
       if(!usableFullJd(fullJd)&&externalPage){
