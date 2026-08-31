@@ -6,7 +6,7 @@ on:
       - diag/jobindex-limited-data
 
 jobs:
-  red:
+  regression-and-live:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -15,5 +15,28 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run Brinch Partners retrieval regression
-        run: node --test app/lib/jobindex-live-retrieval.test.mjs
+      - name: Run Jobindex retrieval regression
+        run: node --test app/lib/jobindex-live-retrieval.test.mjs app/lib/jobindex-source-adapter.test.mjs
+      - name: Verify live Brinch Partners vacancy end to end
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import {searchJobindexSource} from './app/lib/jobindex-source-adapter.js'
+
+          const title='Senior HR Business Partner'
+          const source=await searchJobindexSource({
+            freshnessDays:1,
+            unionSearchPlan:{directions:[{key:'senior-hr-business-partner',role:title,query:title,tier:'primary'}]},
+            exclusionRules:[],
+            filters:{},
+            maxPages:3,
+          })
+          const target=source.jobs.find(job=>job.sourceJobId==='h1680601'||(/Senior HR Business Partner/i.test(job.title||'')&&/Brinch|Struers/i.test(job.company||'')))
+          if(!target) throw new Error('Live Brinch Partners vacancy h1680601 was not retrieved')
+          const limited=(target.sourceRecords||[]).some(record=>record?.limitedData===true)
+          const summary={jobId:target.sourceJobId,title:target.title,company:target.company,applicationUrl:target.applicationUrl,fullJdLength:String(target.fullJd||'').length,limitedData:limited,stats:source.stats}
+          console.log(JSON.stringify(summary,null,2))
+          if(limited) throw new Error('Brinch Partners vacancy is still LIMITED_DATA')
+          if(String(target.fullJd||'').length<500) throw new Error('Brinch Partners full JD is still incomplete')
+          if(!/Your responsibilities/i.test(target.fullJd||'')) throw new Error('Recovered Brinch Partners JD is missing vacancy responsibilities')
+          NODE
