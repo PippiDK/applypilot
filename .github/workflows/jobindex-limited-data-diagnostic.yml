@@ -6,7 +6,7 @@ on:
       - diag/jobindex-limited-data
 
 jobs:
-  locate-teamtailor-case:
+  inspect-brinch-container:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -15,45 +15,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Paginate and trace Senior HR Business Partner retrieval
+      - name: Inspect live Brinch Partners vacancy markup
         shell: bash
         run: |
           node --input-type=module <<'NODE'
-          import {extractJobindexSearchRecords,extractJobindexDetail,extractJobindexExternalDetail} from './app/lib/jobindex-parser.js'
-          import {recoverExternalFullJd} from './app/lib/jobindex-live-retrieval.js'
-          import {jobindexCanonicalFullJdUrl,jobindexApplyTrackerUrl} from './app/lib/jobindex-retrieval-fallbacks.js'
-
-          const queries=['Senior HR Business Partner','HR Business Partner','Business Partner','Transformation Manager','Project Manager','Technical Project Manager','Programme Manager','Implementation Manager','Integration Manager','PMO Manager','Portfolio Manager','Governance Manager']
-          let target=null
-          outer: for(const query of queries){
-            for(let page=1;page<=5;page++){
-              const url=new URL('https://www.jobindex.dk/jobsoegning.rss');url.searchParams.set('q',query);if(page>1)url.searchParams.set('page',String(page))
-              const r=await fetch(url,{redirect:'follow'});const rss=await r.text();const records=extractJobindexSearchRecords(rss)
-              const matches=records.filter(row=>/Senior HR Business Partner/i.test(row.title||''))
-              console.log('QUERY',query,'page',page,'records',records.length,'matches',matches.map(x=>({jobId:x.jobId,title:x.title})))
-              if(matches[0]){target={...matches[0],query,page};break outer}
-              if(!records.length) break
-            }
+          const url='https://brinchpartners.dk/stillinger/12-904/'
+          const r=await fetch(url,{redirect:'follow'});const html=await r.text();const low=html.toLowerCase()
+          const clean=s=>String(s||'').replace(/\s+/g,' ').trim()
+          const needles=['Your responsibilities','Your Experience and Skills','Why is this position attractive?','As Senior HR Business Partner','wp-block-paragraph','elementor-widget-theme-post-content','elementor-widget-text-editor','jet-listing-dynamic-post']
+          for(const needle of needles){
+            const i=low.indexOf(needle.toLowerCase())
+            console.log('\n===',needle,'INDEX',i,'===')
+            if(i>=0) console.log(clean(html.slice(Math.max(0,i-4500),i+6500)))
           }
-          if(!target) throw new Error('Target vacancy not found in paginated diagnostic query set')
-
-          const detailResponse=await fetch(target.detailUrl,{redirect:'follow'})
-          const detailHtml=await detailResponse.text()
-          const detail=extractJobindexDetail(detailHtml,{jobId:target.jobId})
-          const applicationUrl=detail.applicationUrl||jobindexApplyTrackerUrl(detailHtml)
-          const canonicalUrl=jobindexCanonicalFullJdUrl(detailHtml)
-          const result={target,detail:{title:detail.title,company:detail.company,location:detail.location,postedDate:detail.postedDate,applicationUrl,canonicalUrl,fullJdLength:String(detail.fullJd||'').length}}
-
-          if(canonicalUrl){
-            try{const r=await fetch(canonicalUrl,{redirect:'follow'});const html=await r.text();const parsed=extractJobindexExternalDetail(html,{url:r.url||canonicalUrl});result.canonical={status:r.status,finalUrl:r.url,length:html.length,parsedLength:String(parsed.fullJd||'').length,hasJsonLd:/application\/ld\+json/i.test(html)}}catch(error){result.canonical={error:String(error?.message||error)}}
-          }
-          if(applicationUrl){
-            try{
-              const r=await fetch(applicationUrl,{redirect:'follow'});const html=await r.text();const parsed=extractJobindexExternalDetail(html,{url:r.url||applicationUrl});const recovered=recoverExternalFullJd(html,r.url||applicationUrl)
-              const lower=html.toLowerCase();const snippets={}
-              for(const needle of ['Senior HR Business Partner','Struers','Teamtailor','job-description','job_description','application/ld+json']){const i=lower.indexOf(needle.toLowerCase());if(i>=0)snippets[needle]=html.slice(Math.max(0,i-1200),i+6000).replace(/\s+/g,' ').trim()}
-              result.application={status:r.status,finalUrl:r.url,contentType:r.headers.get('content-type'),length:html.length,parsedLength:String(parsed.fullJd||'').length,recoveredLength:String(recovered||'').length,hasJsonLd:/application\/ld\+json/i.test(html),snippets}
-            }catch(error){result.application={error:String(error?.message||error)}}
-          }
-          console.log('RESULT '+JSON.stringify(result,null,2))
+          const classes=[...new Set([...html.matchAll(/class=["']([^"']+)["']/gi)].map(m=>m[1]).filter(v=>/(post|content|vacan|job|stilling|elementor-widget-text-editor|wp-block)/i.test(v)).slice(0,200))]
+          console.log('\nCLASSES '+JSON.stringify(classes,null,2))
           NODE
