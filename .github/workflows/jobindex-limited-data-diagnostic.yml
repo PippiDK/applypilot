@@ -15,5 +15,5 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run LIMITED_DATA regression tests
-        run: node --test app/lib/jobindex-parser.test.mjs app/lib/jobindex-retrieval-fallbacks.test.mjs
+      - name: Run LIMITED_DATA recovery tests
+        run: node --test app/lib/jobindex-live-retrieval.test.mjs app/lib/jobindex-source-adapter.test.mjs
