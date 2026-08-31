@@ -32,16 +32,13 @@ function directions(plan={}){
     .filter(direction=>direction.role&&direction.query)
 }
 
-function exactJobindexQuery(value){
-  const query=String(value??'').trim().replace(/\s+/g,' ')
-  if(!query) return ''
-  if(/^"[^"]+"$/.test(query)||/[+]/.test(query)||/\b(?:AND|OR|NOT)\b/i.test(query)) return query
-  return `"${query.replace(/"/g,' ').replace(/\s+/g,' ').trim()}"`
+function jobindexQuery(value){
+  return String(value??'').trim().replace(/\s+/g,' ')
 }
 
 function searchUrl(query,page=1){
   const url=new URL(SEARCH_BASE)
-  url.searchParams.set('q',exactJobindexQuery(query))
+  url.searchParams.set('q',jobindexQuery(query))
   if(page>1) url.searchParams.set('page',String(page))
   return url.toString()
 }
@@ -56,7 +53,10 @@ function tokenEquivalent(a,b){return a===b||`${a}s`===b||`${b}s`===a}
 function discoveryTitleRelevant(record,direction){
   const title=String(record?.title??'').trim()
   if(!title) return true
-  const approved=roleTokens(direction?.role||direction?.query).filter(token=>!GENERIC_ROLE_TOKENS.has(token))
+  const role=String(direction?.role??'').trim()
+  const query=String(direction?.query??'').trim()
+  const basis=(direction?.discoveryMode==='expanded'||(query&&query.toLowerCase()!==role.toLowerCase()))?query:(role||query)
+  const approved=roleTokens(basis).filter(token=>!GENERIC_ROLE_TOKENS.has(token))
   if(!approved.length) return true
   const candidate=roleTokens(title)
   return approved.some(token=>candidate.some(candidateToken=>tokenEquivalent(token,candidateToken)))
@@ -110,8 +110,13 @@ function oracleCandidateExperienceRequest(value){
   }catch{return null}
 }
 
-export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},exclusionRules=[],filters={},fetcher=globalThis.fetch,maxPages=3}={}){
-  const plan=directions(unionSearchPlan)
+export async function searchJobindexSource({freshnessDays=7,unionSearchPlan={},exclusionRules=[],filters={},fetcher=globalThis.fetch,maxPages=3,dependencies={}}={}){
+  let discoverySearchPlan=unionSearchPlan
+  if(typeof dependencies?.buildDiscoverySearchPlan==='function'){
+    try{discoverySearchPlan=await dependencies.buildDiscoverySearchPlan({unionSearchPlan})}
+    catch{discoverySearchPlan=unionSearchPlan}
+  }
+  const plan=directions(discoverySearchPlan)
   if(!plan.length) return {source:'jobindex',status:'failed',jobs:[],stats:null,error:'Search Profile is required for Jobindex discovery.'}
   if(typeof fetcher!=='function') return {source:'jobindex',status:'failed',jobs:[],stats:null,error:'Jobindex fetcher unavailable.'}
 

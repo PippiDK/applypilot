@@ -41,7 +41,7 @@ function oraclePayload(){
   }]})
 }
 
-test('uses exact-phrase Jobindex RSS query and rejects obviously unrelated RSS titles before detail fetch',async()=>{
+test('uses broad Jobindex RSS query and rejects obviously unrelated RSS titles before detail fetch',async()=>{
   const seen=[]
   const fetcher=async url=>{
     seen.push(String(url))
@@ -57,12 +57,51 @@ test('uses exact-phrase Jobindex RSS query and rejects obviously unrelated RSS t
     fetcher,
     maxPages:1,
   })
-  assert.match(seen[0],/\/jobsoegning\.rss\?q=%22Project\+Manager%22/)
+  assert.equal(new URL(seen[0]).searchParams.get('q'),'Project Manager')
   assert.equal(result.jobs.length,1)
   assert.equal(result.jobs[0].sourceJobId,'h1002')
   assert.equal(result.stats.detailRequests,1)
   assert.equal(result.stats.discoveryTitleRejected,1)
   assert.ok(!seen.some(url=>url.includes('/vis-job/h1001')))
+})
+
+test('uses expanded discovery queries and preserves the approved source role',async()=>{
+  const seen=[]
+  const sourceDirection={key:'it-delivery-manager',role:'IT Delivery Manager',tier:'primary'}
+  const buildDiscoverySearchPlan=async({unionSearchPlan})=>({
+    ...unionSearchPlan,
+    directions:[
+      {...sourceDirection,query:'IT Delivery Manager',discoveryMode:'exact'},
+      {...sourceDirection,key:'it-delivery-manager|expanded|project-manager',query:'Project Manager',discoveryMode:'expanded'},
+    ],
+  })
+  const fetcher=async url=>{
+    seen.push(String(url))
+    if(String(url).includes('jobsoegning.rss')){
+      const query=new URL(String(url)).searchParams.get('q')
+      if(query==='IT Delivery Manager') return response(rss([]))
+      if(query==='Project Manager') return response(rss([
+        {id:'h2001',title:'Technical Project Manager',description:'Technology delivery role'},
+      ]))
+    }
+    if(String(url).includes('/vis-job/h2001')) return response(detail('h2001',{title:'Technical Project Manager'}))
+    throw new Error(`unexpected ${url}`)
+  }
+  const result=await searchJobindexSource({
+    unionSearchPlan:{directions:[sourceDirection]},
+    fetcher,
+    maxPages:1,
+    dependencies:{buildDiscoverySearchPlan},
+  })
+  const queries=seen.filter(url=>url.includes('jobsoegning.rss')).map(url=>new URL(url).searchParams.get('q'))
+  assert.deepEqual(queries,['IT Delivery Manager','Project Manager'])
+  assert.equal(result.jobs.length,1)
+  assert.equal(result.jobs[0].sourceJobId,'h2001')
+  assert.equal(result.jobs[0].foundBy[0].role,'IT Delivery Manager')
+  assert.equal(result.jobs[0].foundBy[0].query,'Project Manager')
+  assert.equal(result.jobs[0].foundBy[0].discoveryMode,'expanded')
+  assert.equal(result.stats.discoveryTitleRejected,0)
+  assert.equal(result.stats.detailRequests,1)
 })
 
 test('paginates Jobindex, accumulates unique ids and preserves discovery direction',async()=>{

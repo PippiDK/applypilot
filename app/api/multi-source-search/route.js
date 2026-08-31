@@ -30,18 +30,28 @@ export async function POST(request){
       return NextResponse.json({error:'Select at least one search source.'},{status:400})
     }
 
+    let discoverySearchPlanPromise=null
+    const sharedDiscoverySearchPlan=({unionSearchPlan:requestedPlan}={})=>{
+      if(!discoverySearchPlanPromise) discoverySearchPlanPromise=buildDiscoverySearchPlan({unionSearchPlan:requestedPlan})
+      return discoverySearchPlanPromise
+    }
+
     const sharedInput={freshnessDays,unionSearchPlan,exclusionRules,cvText,enabledSources,filters}
     const result=await runMultiSourceSearch(sharedInput,{
       linkedin:input=>searchLinkedInSource({
         ...input,
         dependencies:{
-          buildDiscoverySearchPlan,
+          buildDiscoverySearchPlan:sharedDiscoverySearchPlan,
           acquireLinkedInProfileJobs,
           createLinkedInStableFetcher,
           searchLinkedInStable,
         },
       }),
-      jobindex:input=>searchJobindexSource({...input,fetcher:globalThis.fetch}),
+      jobindex:input=>searchJobindexSource({
+        ...input,
+        fetcher:globalThis.fetch,
+        dependencies:{buildDiscoverySearchPlan:sharedDiscoverySearchPlan},
+      }),
     })
 
     if(result.allFailed){
