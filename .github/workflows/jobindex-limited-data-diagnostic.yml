@@ -6,7 +6,7 @@ on:
       - diag/jobindex-limited-data
 
 jobs:
-  inspect-brinch-container:
+  red:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -15,19 +15,5 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Inspect live Brinch Partners vacancy markup
-        shell: bash
-        run: |
-          node --input-type=module <<'NODE'
-          const url='https://brinchpartners.dk/stillinger/12-904/'
-          const r=await fetch(url,{redirect:'follow'});const html=await r.text();const low=html.toLowerCase()
-          const clean=s=>String(s||'').replace(/\s+/g,' ').trim()
-          const needles=['Your responsibilities','Your Experience and Skills','Why is this position attractive?','As Senior HR Business Partner','wp-block-paragraph','elementor-widget-theme-post-content','elementor-widget-text-editor','jet-listing-dynamic-post']
-          for(const needle of needles){
-            const i=low.indexOf(needle.toLowerCase())
-            console.log('\n===',needle,'INDEX',i,'===')
-            if(i>=0) console.log(clean(html.slice(Math.max(0,i-4500),i+6500)))
-          }
-          const classes=[...new Set([...html.matchAll(/class=["']([^"']+)["']/gi)].map(m=>m[1]).filter(v=>/(post|content|vacan|job|stilling|elementor-widget-text-editor|wp-block)/i.test(v)).slice(0,200))]
-          console.log('\nCLASSES '+JSON.stringify(classes,null,2))
-          NODE
+      - name: Run Brinch Partners retrieval regression
+        run: node --test app/lib/jobindex-live-retrieval.test.mjs
