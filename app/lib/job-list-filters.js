@@ -21,6 +21,14 @@ export const WORK_MODELS=[
   {id:'eu_remote_denmark',label:'EU / Europe — available from Denmark'},
 ]
 
+export const JOB_STATUS_FILTERS=[
+  {id:'none',label:'No status'},
+  {id:'considering',label:'Considering'},
+  {id:'applied',label:'Applied'},
+  {id:'ignore',label:'Ignored'},
+]
+export const DEFAULT_JOB_STATUS_FILTERS=['none','considering','applied']
+
 const AREA_ALIASES={
   greater_copenhagen:['greater copenhagen','ballerup','herlev','gladsaxe','soborg','rodovre','brondby','glostrup','taastrup','hoje-taastrup','hedehusene','albertslund','ishoj','vallensbaek','bagsvaerd','skovlunde','smorum'],
   copenhagen_north:['copenhagen metropolitan area','copenhagen','kobenhavn','frederiksberg','hellerup','gentofte','kongens lyngby','lyngby','virum','holte','naerum','vedbaek','horsholm','charlottenlund','klampenborg'],
@@ -62,6 +70,12 @@ export function classifyWorkModel(job={}){
   return null
 }
 
+export function classifyJobStatus(jobId,statuses={}){
+  const key=String(jobId??'').trim()
+  const status=key?statuses?.[key]:''
+  return status==='considering'||status==='applied'||status==='ignore'?status:'none'
+}
+
 export function filterJobItems(items=[],selectedAreas=[],selectedWorkModels=[]){
   const areaSet=new Set(selectedAreas)
   const workSet=new Set(selectedWorkModels)
@@ -79,6 +93,11 @@ export function filterJobItems(items=[],selectedAreas=[],selectedWorkModels=[]){
     const workMatch=allWorkModels||(workModel&&workSet.has(workModel))
     return Boolean(areaMatch&&workMatch)
   })
+}
+
+export function filterJobItemsByStatus(items=[],statuses={},selectedStatuses=DEFAULT_JOB_STATUS_FILTERS){
+  const selected=new Set(selectedStatuses)
+  return items.filter(item=>selected.has(classifyJobStatus(item?.job?.sourceJobId,statuses)))
 }
 
 export function filterIgnoredJobItems(items=[],statuses={},showIgnored=false){

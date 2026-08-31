@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {SEARCH_AREAS,WORK_MODELS,classifySearchArea,classifyWorkModel,filterJobItems,filterIgnoredJobItems} from './job-list-filters.js'
+import {SEARCH_AREAS,WORK_MODELS,JOB_STATUS_FILTERS,DEFAULT_JOB_STATUS_FILTERS,classifySearchArea,classifyWorkModel,classifyJobStatus,filterJobItems,filterJobItemsByStatus,filterIgnoredJobItems} from './job-list-filters.js'
 
 test('maps representative Danish locations into agreed search areas',()=>{
   assert.equal(classifySearchArea({location:'Nærum, Capital Region of Denmark'}),'copenhagen_north')
@@ -58,7 +58,46 @@ test('all selected is a no-op for the existing pool, including unclassified jobs
   assert.equal(filterJobItems(items,SEARCH_AREAS.map(x=>x.id),WORK_MODELS.map(x=>x.id)).length,1)
 })
 
-test('ignored jobs are hidden by default and restored when Show ignored is enabled',()=>{
+test('status filters expose no status, considering, applied and ignored in UI order',()=>{
+  assert.deepEqual(JOB_STATUS_FILTERS.map(({id,label})=>[id,label]),[
+    ['none','No status'],
+    ['considering','Considering'],
+    ['applied','Applied'],
+    ['ignore','Ignored'],
+  ])
+  assert.deepEqual(DEFAULT_JOB_STATUS_FILTERS,['none','considering','applied'])
+})
+
+test('status filter defaults to no status, considering and applied while hiding ignored',()=>{
+  const items=[
+    {job:{sourceJobId:'none'}},
+    {job:{sourceJobId:'considering'}},
+    {job:{sourceJobId:'applied'}},
+    {job:{sourceJobId:'ignored'}},
+  ]
+  const statuses={considering:'considering',applied:'applied',ignored:'ignore'}
+
+  assert.deepEqual(
+    filterJobItemsByStatus(items,statuses).map(item=>item.job.sourceJobId),
+    ['none','considering','applied']
+  )
+})
+
+test('status filter can isolate applied and explicitly include ignored',()=>{
+  const items=[
+    {job:{sourceJobId:'none'}},
+    {job:{sourceJobId:'considering'}},
+    {job:{sourceJobId:'applied'}},
+    {job:{sourceJobId:'ignored'}},
+  ]
+  const statuses={considering:'considering',applied:'applied',ignored:'ignore'}
+
+  assert.equal(classifyJobStatus('none',statuses),'none')
+  assert.deepEqual(filterJobItemsByStatus(items,statuses,['applied']).map(item=>item.job.sourceJobId),['applied'])
+  assert.deepEqual(filterJobItemsByStatus(items,statuses,['ignore']).map(item=>item.job.sourceJobId),['ignored'])
+})
+
+test('legacy ignored helper still preserves the old default behavior',()=>{
   const items=[
     {job:{sourceJobId:'keep'}},
     {job:{sourceJobId:'hide'}},
