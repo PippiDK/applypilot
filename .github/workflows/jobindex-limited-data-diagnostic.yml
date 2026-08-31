@@ -6,7 +6,7 @@ on:
       - diag/jobindex-limited-data
 
 jobs:
-  inspect-pages:
+  inspect-paths:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -15,46 +15,46 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Inspect raw LIMITED_DATA employer pages
+      - name: Trace Ennova Avature and Kalundborg paths
         shell: bash
         run: |
           node --input-type=module <<'NODE'
-          import {extractJobindexExternalDetail} from './app/lib/jobindex-parser.js'
-
-          const cases=[
-            ['Ennova','Studentermedhjælper til IT','https://www.ennova.com/en/ennova-career-job?VID=20260818'],
-            ['Ege Carpets','IT Supporter med ansvar for Servicedesk','https://www.egecarpets.com/da-dk/om-ege-carpets/job-og-karriere/it--supporter--med--ansvar--for--servicedesk-3410'],
-            ['Kalundborg Refinery','Selvdreven projektleder til Project Execution','https://career.kalundborgrefinery.com/administration/'],
-            ['DSE Test Solutions','Technical specialist - Wire testing instruments','https://cloudcruit.cruitconsult.dk/annonce.asp?AdvertID=255'],
-            ['Phillips-Medisize','Regulatory Affairs Specialist','https://koch.avature.net/en_US/careers/JobDetail/Regulatory-Affairs-Specialist/193263'],
-            ['Third.space','Sales & Project Coordinator til barselsvikariat hos Third.space','https://ilva.youngcrm.com/jobportal/12750'],
-          ]
-
           const clean=s=>String(s||'').replace(/\s+/g,' ').trim()
-          for(const [company,title,url] of cases){
-            const row={company,title,url}
-            try{
-              const response=await fetch(url,{redirect:'follow'})
-              const html=await response.text()
-              const parsed=extractJobindexExternalDetail(html,{url:response.url||url})
-              const low=html.toLowerCase()
-              row.status=response.status
-              row.finalUrl=response.url
-              row.contentType=response.headers.get('content-type')
-              row.length=html.length
-              row.parsedFullJdLength=String(parsed?.fullJd||'').length
-              row.parsedTitle=parsed?.title||''
-              row.hasJsonLd=/application\/ld\+json/i.test(html)
-              row.hasNextData=/__NEXT_DATA__/i.test(html)
-              row.hasNuxt=/__NUXT__/i.test(html)
-              row.hasTitleText=low.includes(title.toLowerCase())
-              row.scriptSrc=[...html.matchAll(/<script\b[^>]*src=["']([^"']+)["']/gi)].slice(0,12).map(m=>m[1])
-              const needle=title.split(/\s+/).filter(Boolean).slice(0,3).join(' ').toLowerCase()
-              const index=needle?low.indexOf(needle):-1
-              row.snippet=clean(index>=0?html.slice(Math.max(0,index-700),index+2500):html.slice(0,2500))
-            }catch(error){
-              row.error=String(error?.message||error)
-            }
-            console.log('CASE '+JSON.stringify(row,null,2))
+          const attr=(tag,name)=>String(tag||'').match(new RegExp(`\\b${name}=["']([^"']*)["']`,'i'))?.[1]||''
+          async function page(url){const r=await fetch(url,{redirect:'follow'});return {r,html:await r.text()}}
+
+          // Ennova: locate embedded/iframe job source or API references.
+          {
+            const url='https://www.ennova.com/en/ennova-career-job?VID=20260818'
+            const {r,html}=await page(url)
+            const frames=[...html.matchAll(/<iframe\b[^>]*>/gi)].map(m=>({tag:m[0],src:attr(m[0],'src')}))
+            const urls=[...new Set([...html.matchAll(/https?:\\?\/\\?\/[^\s"'<>]+/gi)].map(m=>m[0]).filter(v=>/mindkey|career|job|vacan|vid|api/i.test(v)).slice(0,80))]
+            const needles=['20260818','Mindkey','iframe','jobId','vacancy','vacan','career-job']
+            const snippets={}
+            for(const needle of needles){const i=html.toLowerCase().indexOf(needle.toLowerCase());if(i>=0)snippets[needle]=clean(html.slice(Math.max(0,i-1200),i+3500))}
+            console.log('ENNOVA '+JSON.stringify({status:r.status,finalUrl:r.url,frames,urls,snippets},null,2))
+          }
+
+          // Avature: locate the actual long job body and its enclosing classes.
+          {
+            const url='https://koch.avature.net/en_US/careers/JobDetail/Regulatory-Affairs-Specialist/193263'
+            const {r,html}=await page(url)
+            const needles=['Maintain a deep understanding','What You Will Do','Basic Qualifications','Registration Specialist','country-specific regulatory','193263']
+            const snippets={}
+            for(const needle of needles){const i=html.toLowerCase().indexOf(needle.toLowerCase());if(i>=0)snippets[needle]=clean(html.slice(Math.max(0,i-1800),i+6000))}
+            const classes=[...new Set([...html.matchAll(/class=["']([^"']*(?:job|description|detail|article|posting|field)[^"']*)["']/gi)].map(m=>m[1]).slice(0,100))]
+            console.log('AVATURE '+JSON.stringify({status:r.status,finalUrl:r.url,length:html.length,classes,snippets},null,2))
+          }
+
+          // Kalundborg: inspect Jobindex detail for canonical/mirror/embedded links, not the captcha page only.
+          {
+            const url='https://www.jobindex.dk/vis-job/h1693594'
+            const {r,html}=await page(url)
+            const links=[...html.matchAll(/<(?:a|link)\b[^>]*(?:href)=["']([^"']+)["'][^>]*>/gi)].map(m=>m[1])
+            const interesting=[...new Set(links.filter(v=>/jobannonce|kalundborg|career|administration|apply|ans|h1693594/i.test(v)).slice(0,100))]
+            const needles=['Selvdreven projektleder','Project Execution','jobannonce','canonical','kalundborgrefinery','administration']
+            const snippets={}
+            for(const needle of needles){const i=html.toLowerCase().indexOf(needle.toLowerCase());if(i>=0)snippets[needle]=clean(html.slice(Math.max(0,i-1800),i+6000))}
+            console.log('KALUNDBORG '+JSON.stringify({status:r.status,finalUrl:r.url,length:html.length,interesting,snippets},null,2))
           }
           NODE
