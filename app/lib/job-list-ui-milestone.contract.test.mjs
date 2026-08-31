@@ -23,14 +23,13 @@ test('manual job statuses are local informational metadata with three explicit s
   assert.match(css,/\.status-ignore/)
 })
 
-test('manual job statuses never enter Search and never filter Live matches',()=>{
+test('manual job statuses never enter Search and only filter the post-search list',()=>{
   const searchStart=page.indexOf('async function search(){')
   const searchEnd=page.indexOf('\n  function startProfile()',searchStart)
   assert.ok(searchStart>=0&&searchEnd>searchStart,'search() block must be found')
   const searchBlock=page.slice(searchStart,searchEnd)
-  assert.doesNotMatch(searchBlock,/jobStatuses|JOB_STATUS/)
-  assert.match(page,/\{jobs\.map\(/)
-  assert.doesNotMatch(page,/jobs\.filter\([^\n]*jobStatuses|jobStatuses[^\n]*jobs\.filter/)
+  assert.doesNotMatch(searchBlock,/jobStatuses|JOB_STATUS_FILTERS|selectedStatuses/)
+  assert.match(page,/filterJobItemsByStatus\(filterJobItems\(/)
 })
 
 test('Area, Employment type and Work model render directly under the vacancy header before Best CV',()=>{
@@ -46,7 +45,7 @@ test('Area, Employment type and Work model render directly under the vacancy hea
   assert.match(conditionBlock,/>Work model</)
 })
 
-test('All filters is the first filter row and controls every existing filter checkbox',()=>{
+test('All filters is the first filter row and controls only Search Areas and Work Model',()=>{
   const allFilters=page.indexOf('>All filters</span>')
   const searchAreas=page.indexOf('>SEARCH AREAS</small>')
   assert.ok(allFilters>=0,'All filters row is missing')
@@ -59,4 +58,16 @@ test('All filters is the first filter row and controls every existing filter che
   const handler=page.slice(handlerStart,handlerEnd)
   assert.match(handler,/setSelectedAreas\(checked\?SEARCH_AREAS\.map\(\(\{id\}\)=>id\):\[\]\)/)
   assert.match(handler,/setSelectedWorkModels\(checked\?WORK_MODELS\.map\(\(\{id\}\)=>id\):\[\]\)/)
+  assert.doesNotMatch(handler,/setSelectedStatuses/)
+})
+
+test('Status is a third independent filter group and replaces Show ignored',()=>{
+  const workModel=page.indexOf('>WORK MODEL</small>')
+  const status=page.indexOf('>STATUS</small>')
+  assert.ok(workModel>=0,'Work Model group is missing')
+  assert.ok(status>workModel,'Status must render after Work Model')
+  assert.match(page,/JOB_STATUS_FILTERS\.map/)
+  assert.match(page,/selectedStatuses\.includes/)
+  assert.match(page,/setSelectedStatuses/)
+  assert.doesNotMatch(page,/>Show ignored</)
 })

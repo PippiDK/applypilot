@@ -8,7 +8,7 @@ import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfile
 import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'
 import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'
 import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'
-import {SEARCH_AREAS,WORK_MODELS,classifySearchArea,classifyWorkModel,filterJobItems,filterIgnoredJobItems} from './lib/job-list-filters.js'
+import {SEARCH_AREAS,WORK_MODELS,JOB_STATUS_FILTERS,DEFAULT_JOB_STATUS_FILTERS,classifySearchArea,classifyWorkModel,classifyJobStatus,filterJobItems,filterJobItemsByStatus} from './lib/job-list-filters.js'
 import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
 import {sourceLabel} from './lib/normalized-job.js'
 import {selectAdaptationCv,selectedAdaptationCv} from './lib/cv-adaptation-selection.js'
@@ -49,11 +49,11 @@ export default function Home(){
   const [selectedSources,setSelectedSources]=useState(()=>[...DEFAULT_SEARCH_SOURCES])
   const [selectedAreas,setSelectedAreas]=useState(()=>SEARCH_AREAS.map(({id})=>id))
   const [selectedWorkModels,setSelectedWorkModels]=useState(()=>WORK_MODELS.map(({id})=>id))
+  const [selectedStatuses,setSelectedStatuses]=useState(()=>[...DEFAULT_JOB_STATUS_FILTERS])
   const allFiltersSelected=SEARCH_AREAS.every(({id})=>selectedAreas.includes(id))&&WORK_MODELS.every(({id})=>selectedWorkModels.includes(id))
   const someFiltersSelected=selectedAreas.length>0||selectedWorkModels.length>0
   const [selected,setSelected]=useState(null)
   const [jobStatuses,setJobStatuses]=useState({})
-  const [showIgnored,setShowIgnored]=useState(false)
   const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[],sourceStatuses:{}})
   const [shadowState,setShadowState]=useState({status:'idle',error:'',stats:null,coverage:null,comparison:null})
   const [cvData,setCvData]=useState(null)
@@ -75,7 +75,7 @@ export default function Home(){
   const [editedUpdates,setEditedUpdates]=useState({})
   const [sourceDocxFiles,setSourceDocxFiles]=useState({})
   const [exportState,setExportState]=useState({loading:false,error:'',baselineKey:''})
-  const visibleJobs=useMemo(()=>filterIgnoredJobItems(filterJobItems(jobs,selectedAreas,selectedWorkModels),jobStatuses,showIgnored),[jobs,selectedAreas,selectedWorkModels,jobStatuses,showIgnored])
+  const visibleJobs=useMemo(()=>filterJobItemsByStatus(filterJobItems(jobs,selectedAreas,selectedWorkModels),jobStatuses,selectedStatuses),[jobs,selectedAreas,selectedWorkModels,jobStatuses,selectedStatuses])
   const active=visibleJobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||visibleJobs[0]||null
 
   useEffect(()=>{
@@ -115,6 +115,7 @@ export default function Home(){
   const cvReadyCount=readyCvs.length
   const areaCounts=useMemo(()=>Object.fromEntries(SEARCH_AREAS.map(({id})=>[id,jobs.filter(item=>classifySearchArea(item.job)===id).length])),[jobs])
   const workModelCounts=useMemo(()=>Object.fromEntries(WORK_MODELS.map(({id})=>[id,jobs.filter(item=>classifyWorkModel(item.job)===id).length])),[jobs])
+  const statusCounts=useMemo(()=>Object.fromEntries(JOB_STATUS_FILTERS.map(({id})=>[id,jobs.filter(item=>classifyJobStatus(item?.job?.sourceJobId,jobStatuses)===id).length])),[jobs,jobStatuses])
   const savedUnionSearchPlan=profile?.unionSearchPlan
   const profileSearchPlanSummary=profileReady&&Array.isArray(savedUnionSearchPlan?.directions)&&savedUnionSearchPlan.directions.length
     ? `${savedUnionSearchPlan.directions.length} search directions · ${Number(savedUnionSearchPlan.primaryCount)||0} primary · ${Number(savedUnionSearchPlan.adjacentCount)||0} adjacent`
@@ -512,7 +513,7 @@ export default function Home(){
             <label className={filterStyles.option}><input type="checkbox" checked={allFiltersSelected} ref={node=>{if(node)node.indeterminate=someFiltersSelected&&!allFiltersSelected}} onChange={toggleAllJobFilters}/><span>All filters</span><b></b></label>
             <div className={filterStyles.group}><small className={filterStyles.groupTitle}>SEARCH AREAS</small>{SEARCH_AREAS.map(area=><label className={filterStyles.option} key={area.id}><input type="checkbox" checked={selectedAreas.includes(area.id)} onChange={()=>toggleJobFilter(setSelectedAreas,area.id)}/><span>{area.label}</span><b>{areaCounts[area.id]||0}</b></label>)}</div>
             <div className={filterStyles.group}><small className={filterStyles.groupTitle}>WORK MODEL</small>{WORK_MODELS.map(model=><label className={filterStyles.option} key={model.id}><input type="checkbox" checked={selectedWorkModels.includes(model.id)} onChange={()=>toggleJobFilter(setSelectedWorkModels,model.id)}/><span>{model.label}</span><b>{workModelCounts[model.id]||0}</b></label>)}</div>
-            <label className={filterStyles.option}><input type="checkbox" checked={showIgnored} onChange={event=>setShowIgnored(event.target.checked)}/><span>Show ignored</span><b></b></label>
+            <div className={filterStyles.group}><small className={filterStyles.groupTitle}>STATUS</small>{JOB_STATUS_FILTERS.map(status=><label className={filterStyles.option} key={status.id}><input type="checkbox" checked={selectedStatuses.includes(status.id)} onChange={()=>toggleJobFilter(setSelectedStatuses,status.id)}/><span>{status.label}</span><b>{statusCounts[status.id]||0}</b></label>)}</div>
           </div>
         </details>}
         {!state.loading&&!state.error&&!state.stats&&<div className="empty">Run search to find matching vacancies from the selected sources.</div>}
