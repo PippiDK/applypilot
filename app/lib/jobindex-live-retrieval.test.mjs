@@ -40,6 +40,21 @@ test('recovers long YoungCRM og description',()=>{
   assert.ok(jd.length>700); assert.match(jd,/project execution/i)
 })
 
+test('recovers Brinch Partners Elementor vacancy body without application or contact noise',()=>{
+  const body=long('As Senior HR Business Partner you advise leaders, drive organisational development, improve HR processes and implement the Cornerstone HR platform. ')
+  const html=`<html><body class="single-stillinger"><div class="elementor-widget-theme-post-content"><div class="elementor-widget-container"><p class="wp-block-paragraph">Senior HR Business Partner</p><p class="wp-block-paragraph"><strong>Your responsibilities</strong></p><div><p class="wp-block-paragraph">${body}</p></div><p class="wp-block-paragraph"><strong>Your Experience and Skills</strong></p></div></div><div class="elementor-widget-shortcode"><iframe src="https://brinchpartners.teamtailor.com/en/jobs/8023489/applications/new"></iframe><p>APPLICATION FORM NOISE</p></div><div class="jet-listing-grid">CONTACT TEAM NOISE</div></body></html>`
+  const jd=recoverExternalFullJd(html,'https://brinchpartners.dk/stillinger/12-904/')
+  assert.ok(jd.length>700)
+  assert.match(jd,/Your responsibilities/i)
+  assert.match(jd,/Cornerstone HR platform/i)
+  assert.doesNotMatch(jd,/APPLICATION FORM NOISE|CONTACT TEAM NOISE/i)
+})
+
+test('does not treat generic Brinch Partners pages as vacancy bodies',()=>{
+  const html=`<div class="elementor-widget-theme-post-content"><div class="elementor-widget-container"><p>${long('Company services and recruitment consulting information. ')}</p></div></div>`
+  assert.equal(recoverExternalFullJd(html,'https://brinchpartners.dk/ydelser/'),'')
+})
+
 test('recovers custom Jobindex jobadd canonical body',()=>{
   const body=long('Drive technical projects from scope and planning through safe execution, contractor management and stakeholder alignment. ')
   const html=`<div class="container-fluid jobcontent"><div class="jobadd"><div class="intro">Intro</div><p>${body}</p></div></div>`
