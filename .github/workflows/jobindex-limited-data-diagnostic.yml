@@ -1,0 +1,60 @@
+name: Jobindex LIMITED_DATA diagnostic
+
+on:
+  push:
+    branches:
+      - diag/jobindex-limited-data
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run broad Jobindex retrieval diagnostic
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import {searchJobindexSource} from './app/lib/jobindex-source-adapter.js'
+
+          const directions=[
+            {key:'senior-it-delivery-manager',role:'Senior IT Delivery Manager',query:'Senior IT Delivery Manager',tier:'primary'},
+            {key:'senior-it-project-manager',role:'Senior IT Project Manager',query:'Senior IT Project Manager',tier:'primary'},
+            {key:'technical-program-manager',role:'Technical Program Manager',query:'Technical Program Manager',tier:'primary'},
+            {key:'digital-transformation-manager',role:'Digital Transformation Manager',query:'Digital Transformation Manager',tier:'primary'},
+            {key:'it-delivery-manager',role:'IT Delivery Manager',query:'IT Delivery Manager',tier:'primary'},
+            {key:'it-programme-manager',role:'IT Programme Manager',query:'IT Programme Manager',tier:'primary'},
+            {key:'technology-program-manager',role:'Technology Program Manager',query:'Technology Program Manager',tier:'primary'},
+            {key:'enterprise-implementation-manager',role:'Enterprise Implementation Manager',query:'Enterprise Implementation Manager',tier:'primary'},
+            {key:'agile-delivery-manager',role:'Agile Delivery Manager',query:'Agile Delivery Manager',tier:'adjacent'},
+            {key:'pmo-manager',role:'PMO Manager',query:'PMO Manager',tier:'adjacent'},
+            {key:'regulatory-change-project-manager',role:'Regulatory Change Project Manager',query:'Regulatory Change Project Manager',tier:'adjacent'},
+            {key:'client-delivery-manager',role:'Client Delivery Manager',query:'Client Delivery Manager',tier:'adjacent'},
+            {key:'it-governance-manager',role:'IT Governance Manager',query:'IT Governance Manager',tier:'adjacent'},
+          ]
+
+          const source=await searchJobindexSource({
+            freshnessDays:1,
+            unionSearchPlan:{version:'limited-data-diagnostic',directions},
+            exclusionRules:[],
+            filters:{},
+            maxPages:3,
+          })
+
+          const rows=source.jobs.map(job=>({
+            jobId:job.sourceJobId,
+            title:job.title,
+            company:job.company,
+            location:job.location,
+            applicationUrl:job.applicationUrl,
+            detailUrl:job.detailUrl,
+            fullJdLength:String(job.fullJd||'').length,
+            limitedData:(job.sourceRecords||[]).some(record=>record?.limitedData===true),
+            foundBy:(job.foundBy||[]).map(direction=>direction.role),
+          }))
+          console.log(JSON.stringify({stats:source.stats,rows,limited:rows.filter(row=>row.limitedData)},null,2))
+          NODE

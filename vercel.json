@@ -2,7 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "git": {
     "deploymentEnabled": {
-      "feature/cv-library-3-slots": false
+      "feature/cv-library-3-slots": false,
+      "diag/jobindex-limited-data": false
     }
   }
 }
