@@ -1,13 +1,46 @@
 const WINDOWS=new Set([1,3,7,14])
 const GENERIC_ROLE_WORDS=new Set(['senior','sr','junior','jr','principal','global','regional','international','experienced','manager','lead','specialist','consultant','coordinator'])
+const TECH_CONTEXT=new Set(['it','software','digital','technology','tech','data','platform','application','applications','cloud','cyber','integration','network','networks','telecom','telecommunications','satellite','saas','erp','crm','api','devops'])
+const ROLE_ANCHOR_GROUPS={
+  it:TECH_CONTEXT,
+  digital:TECH_CONTEXT,
+  technology:TECH_CONTEXT,
+  agile:new Set(['agile','scrum','safe','kanban']),
+  governance:new Set(['governance','oversight']),
+  transformation:new Set(['transformation','transform','change','modernization','modernisation']),
+  implementation:new Set(['implementation','implement','rollout','deployment','migration','integration']),
+  pmo:new Set(['pmo','portfolio']),
+}
 
-const clean=value=>String(value??'').toLowerCase().replace(/[–—_/&]+/g,' ').replace(/[^a-z0-9æøå+.# -]/g,' ').replace(/\s+/g,' ').trim()
+const clean=value=>String(value??'').toLowerCase().replace(/[–—_\/&-]+/g,' ').replace(/[^a-z0-9æøå+.# -]/g,' ').replace(/\s+/g,' ').trim()
 const round1=value=>Math.round(value*10)/10
 
 function canonicalRoleTokens(value=''){
   const text=clean(value)
+    .replace(/\bproject management office\b/g,'pmo')
+    .replace(/\bprogramme management office\b/g,'pmo')
+    .replace(/\bprogram management office\b/g,'pmo')
     .replace(/\bprogramme\b/g,'program')
     .replace(/\bquality assurance\b/g,'qa')
+    .replace(/\bprojektledelse\b/g,'project manager')
+    .replace(/\bprojektleder(?:en|e)?\b/g,'project manager')
+    .replace(/\bprojekt(?:er)?\b/g,'project')
+    .replace(/\bprojects\b/g,'project')
+    .replace(/\bprogramledelse\b/g,'program manager')
+    .replace(/\bprogramleder(?:en|e)?\b/g,'program manager')
+    .replace(/\bleveranceledelse\b/g,'delivery manager')
+    .replace(/\bleveranceleder(?:en|e)?\b/g,'delivery manager')
+    .replace(/\bimplementering(?:en)?\b/g,'implementation')
+    .replace(/\bdigitalisering(?:en)?\b/g,'digital')
+    .replace(/\bteknologi(?:en)?\b/g,'technology')
+    .replace(/\bteknisk(?:e)?\b/g,'technical')
+    .replace(/\bsystemer\b/g,'system')
+    .replace(/\bplatforme\b/g,'platform')
+    .replace(/\bintegrationer\b/g,'integration')
+    .replace(/\bnetværk\b/g,'network')
+    .replace(/\binfrastruktur\b/g,'infrastructure')
+    .replace(/\bforandring(?:er)?\b/g,'change')
+    .replace(/\bportefølje\b/g,'portfolio')
   const raw=text.split(' ').filter(Boolean)
   const tokens=[]
   const hasSoftware=raw.includes('software')
@@ -38,9 +71,7 @@ function roleSimilarity(directionRole,title){
   const substantiveCommon=common.filter(token=>!GENERIC_ROLE_WORDS.has(token)).length
   const commonWeight=common.reduce((sum,token)=>sum+tokenWeight(token),0)
   const directionWeight=direction.reduce((sum,token)=>sum+tokenWeight(token),0)
-  const candidateWeight=candidate.reduce((sum,token)=>sum+tokenWeight(token),0)
-  const denominator=Math.min(directionWeight,candidateWeight)
-  return {score:denominator?Math.min(1,commonWeight/denominator):0,substantiveCommon}
+  return {score:directionWeight?Math.min(1,commonWeight/directionWeight):0,substantiveCommon}
 }
 
 function jdSupport(directionRole,job){
@@ -50,12 +81,35 @@ function jdSupport(directionRole,job){
   return direction.filter(token=>textTokens.has(token)).length/direction.length
 }
 
+function hasAny(tokens,values){
+  for(const value of values) if(tokens.has(value)) return true
+  return false
+}
+
+function requiredAnchorSupport(directionRole,job){
+  const direction=canonicalRoleTokens(directionRole)
+  const required=direction.filter(token=>token==='technical'||ROLE_ANCHOR_GROUPS[token])
+  if(!required.length) return true
+  const titleTokens=new Set(canonicalRoleTokens(job.title))
+  const textTokens=new Set(canonicalRoleTokens(`${job.title} ${job.description}`))
+
+  for(const anchor of required){
+    if(anchor==='technical'){
+      if(titleTokens.has('technical')||hasAny(textTokens,TECH_CONTEXT)) continue
+      return false
+    }
+    if(!hasAny(textTokens,ROLE_ANCHOR_GROUPS[anchor])) return false
+  }
+  return true
+}
+
 function profileEvaluation(job,foundBy=[]){
   let best=null
   for(const direction of Array.isArray(foundBy)?foundBy:[]){
     const similarity=roleSimilarity(direction?.role,job.title)
     const support=jdSupport(direction?.role,job)
-    const relevant=similarity.substantiveCommon>0 && (similarity.score>=0.45||support>=0.65)
+    const anchorsConfirmed=requiredAnchorSupport(direction?.role,job)
+    const relevant=anchorsConfirmed && similarity.substantiveCommon>0 && (similarity.score>=0.45||support>=0.65)
     if(!relevant) continue
     const tier=direction?.tier==='primary'?'primary':'adjacent'
     const base=tier==='primary'?6.5:5.9
