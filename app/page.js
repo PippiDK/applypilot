@@ -234,7 +234,7 @@ export default function Home(){
   const hasProfilePlan=Array.isArray(profile?.unionSearchPlan?.directions)&&profile.unionSearchPlan.directions.length>0
   try{
     const res=hasProfilePlan
-      ? await fetch('/api/linkedin-profile-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,unionSearchPlan:profile.unionSearchPlan,exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[],previousCandidates:readLinkedInMasterPool({storage:localStorage,fingerprint:profile.unionSearchPlanFingerprint||profile.unionSearchPlan?.fingerprint})})})
+      ? await fetch('/api/linkedin-profile-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,unionSearchPlan:profile.unionSearchPlan,exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[],previousCandidates:readLinkedInMasterPool({storage:localStorage,fingerprint:profile.unionSearchPlanFingerprint||profile.unionSearchPlan?.fingerprint})})})})
       : await fetch('/api/linkedin-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({freshnessDays,cvText:cvData.cvText})})
     const data=await res.json()
     if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
