@@ -15,6 +15,7 @@ export const COMPANY_CONNECTORS={
   'Danske Bank':{status:'connected',connector:'oracle',host:'https://ejqi.fa.ocs.oraclecloud.eu',site:'CX_1001',country:'Denmark'},
   'DLF':{status:'connected',connector:'successfactors',baseUrl:'https://careers.dlf.com',listingPath:'/go/Greater-Europe/8944455/'},
   'Ascendis Pharma':{status:'connected',connector:'workable',slug:'ascendis-pharma',country:'Denmark'},
+  'GN':{status:'connected',connector:'workday',host:'https://gn.wd3.myworkdayjobs.com',tenant:'gn',site:'GN-Careers',locationTokens:['ballerup','denmark']},
 }
 
 export const TARGET_COMPANIES=[
