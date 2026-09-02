@@ -30,3 +30,16 @@ test('rejects admin and hands-on specialist false positives',()=>{
   assert.equal(jobnetRoleContextGuard({title:'Sagsbehandler til administration og HR til Digital Backbone',fullJd:'Digital HR administration.'}).pass,false)
   assert.equal(jobnetRoleContextGuard({title:'IT-Infrastruktur specialist med mulighed for specialisering i netscaler',fullJd:'Hands-on network infrastructure specialist.'}).pass,false)
 })
+
+
+test('v2 requires multiple concrete IT delivery signals for generic project titles',()=>{
+  assert.equal(jobnetRoleContextGuard({title:'Senior Project Manager',fullJd:'Lead software platform implementation, releases and IT stakeholders.'}).pass,true)
+  assert.equal(jobnetRoleContextGuard({title:'Projektleder til udvikling af fremtidens palliative tilbud til børn og unge',fullJd:'Udvikling af palliative tilbud, samarbejde med kliniske interessenter og projektplanlægning.'}).pass,false)
+  assert.equal(jobnetRoleContextGuard({title:'International projektledelse i Miljøstyrelsen',fullJd:'Internationalt miljøarbejde, myndighedssamarbejde og projektledelse.'}).pass,false)
+  assert.equal(jobnetRoleContextGuard({title:'Junior projektleder inden for anskaffelser',fullJd:'Anskaffelser, udbud, kontrakter og leverandørsamarbejde.'}).pass,false)
+})
+
+test('v2 trusts explicit technology delivery titles without weakening generic-title gate',()=>{
+  assert.equal(jobnetRoleContextGuard({title:'Global Program Director - Digital Transformation',fullJd:'Transformation programme leadership.'}).pass,true)
+  assert.equal(jobnetRoleContextGuard({title:'IT Project Manager',fullJd:'Lead enterprise change and stakeholders.'}).pass,true)
+})
