@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireUser } from '../../lib/auth/require-user.js'
 import { searchTeamtailorCompanies } from '../../lib/teamtailor-company-source.js'
 import { searchSuccessFactorsCompanies } from '../../lib/successfactors-company-source.js'
+import { searchWorkdayCompanies } from '../../lib/workday-company-source.js'
 import { evaluateProfileJob } from '../../lib/job-profile-evaluator.js'
 
 export const runtime='nodejs'
@@ -19,18 +20,20 @@ export async function POST(request){
     const foundBy=Array.isArray(body?.unionSearchPlan?.directions)?body.unionSearchPlan.directions:[]
     if(!companies.length) return NextResponse.json({jobs:[],audit:[],stats:{discovered:0,fullJdVerified:0,evaluated:0,returned:0},coverage:{source:'Company sites',freshnessDays,status:'NO RELEVANT RESULTS'},fetchedAt:new Date().toISOString()})
 
-    const [teamtailor,successfactors]=await Promise.all([
+    const [teamtailor,successfactors,workday]=await Promise.all([
       searchTeamtailorCompanies({companies,freshnessDays,fetcher:globalThis.fetch}),
       searchSuccessFactorsCompanies({companies,freshnessDays,unionSearchPlan:body?.unionSearchPlan||{},fetcher:globalThis.fetch}),
+      searchWorkdayCompanies({companies,freshnessDays,unionSearchPlan:body?.unionSearchPlan||{},fetcher:globalThis.fetch}),
     ])
-    const sourceJobs=[...(Array.isArray(teamtailor.jobs)?teamtailor.jobs:[]),...(Array.isArray(successfactors.jobs)?successfactors.jobs:[])]
+    const sources=[teamtailor,successfactors,workday]
+    const sourceJobs=sources.flatMap(source=>Array.isArray(source.jobs)?source.jobs:[])
     const sourceStats={
-      discovered:Number(teamtailor.stats?.discovered||0)+Number(successfactors.stats?.discovered||0),
-      fullJdVerified:Number(teamtailor.stats?.fullJdVerified||0)+Number(successfactors.stats?.fullJdVerified||0),
-      detailRequests:Number(teamtailor.stats?.detailRequests||0)+Number(successfactors.stats?.detailRequests||0),
+      discovered:sources.reduce((sum,source)=>sum+Number(source.stats?.discovered||0),0),
+      fullJdVerified:sources.reduce((sum,source)=>sum+Number(source.stats?.fullJdVerified||0),0),
+      detailRequests:sources.reduce((sum,source)=>sum+Number(source.stats?.detailRequests||0),0),
     }
-    const sourceErrors=[teamtailor.error,successfactors.error].filter(Boolean).join(' · ')
-    const sourcePartial=teamtailor.status==='partial'||successfactors.status==='partial'
+    const sourceErrors=sources.map(source=>source.error).filter(Boolean).join(' · ')
+    const sourcePartial=sources.some(source=>source.status==='partial')
     const jobs=[]; const audit=[]; let evaluated=0
     for(const job of sourceJobs){
       evaluated++
