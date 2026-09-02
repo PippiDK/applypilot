@@ -95,3 +95,66 @@ test('7-day profile discovery uses repeated deep LinkedIn pages instead of shado
   assert.ok(Array.isArray(result.stats.discoveryPasses))
   assert.equal(result.jobs.length,1)
 })
+
+
+test('role evaluation uses the full approved Search Profile, not only the discovery path',async()=>{
+  const unionSearchPlan={version:'union-search-plan-v1',directions:[
+    {key:'senior-it-project-manager',role:'Senior IT Project Manager',tier:'primary',origin:'cv',cvSlots:[1]},
+    {key:'transformation-project-manager',role:'Transformation Project Manager',tier:'adjacent',origin:'cv',cvSlots:[1]},
+  ]}
+  const fetcher=async url=>{
+    if(url.includes('/seeMoreJobPostings/search')){
+      const query=new URL(url).searchParams.get('keywords')
+      return query==='Transformation Project Manager'
+        ?card('8888888888','Senior IT Project Manager','Stable Co')
+        :''
+    }
+    return detailHtml({
+      title:'Senior IT Project Manager',
+      company:'Stable Co',
+      description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies, governance and senior stakeholder delivery outcomes. '.repeat(5),
+    })
+  }
+  const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan,fetcher,now:new Date('2026-08-27T12:00:00Z')})
+  assert.equal(result.jobs.length,1)
+  assert.equal(result.jobs[0].evaluation.breakdown.roleDirection,'Senior IT Project Manager')
+  assert.equal(result.jobs[0].evaluation.breakdown.tier,'primary')
+})
+
+test('same verified job and Search Profile keep the same role decision and score across different discovery paths',async()=>{
+  const unionSearchPlan={version:'union-search-plan-v1',directions:[
+    {key:'senior-it-project-manager',role:'Senior IT Project Manager',tier:'primary',origin:'cv',cvSlots:[1]},
+    {key:'transformation-project-manager',role:'Transformation Project Manager',tier:'adjacent',origin:'cv',cvSlots:[1]},
+  ]}
+  const makeFetcher=visibleQuery=>async url=>{
+    if(url.includes('/seeMoreJobPostings/search')){
+      const query=new URL(url).searchParams.get('keywords')
+      return query===visibleQuery
+        ?card('9999999999','Senior IT Project Manager','Stable Co')
+        :''
+    }
+    return detailHtml({
+      title:'Senior IT Project Manager',
+      company:'Stable Co',
+      description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies, governance and senior stakeholder delivery outcomes. '.repeat(5),
+    })
+  }
+  const first=await searchLinkedInProfile({
+    freshnessDays:7,
+    unionSearchPlan,
+    fetcher:makeFetcher('Senior IT Project Manager'),
+    now:new Date('2026-08-27T12:00:00Z'),
+  })
+  const second=await searchLinkedInProfile({
+    freshnessDays:7,
+    unionSearchPlan,
+    fetcher:makeFetcher('Transformation Project Manager'),
+    now:new Date('2026-08-27T12:00:00Z'),
+  })
+  assert.equal(first.jobs.length,1)
+  assert.equal(second.jobs.length,1)
+  assert.equal(first.jobs[0].evaluation.breakdown.roleDirection,second.jobs[0].evaluation.breakdown.roleDirection)
+  assert.equal(first.jobs[0].evaluation.breakdown.tier,second.jobs[0].evaluation.breakdown.tier)
+  assert.equal(first.jobs[0].evaluation.score,second.jobs[0].evaluation.score)
+  assert.equal(first.jobs[0].evaluation.verdict,second.jobs[0].evaluation.verdict)
+})
