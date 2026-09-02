@@ -58,7 +58,8 @@ export async function searchWorkdayCompanies({companies=[],freshnessDays=7,union
         const fullJd=stripHtml(info.jobDescription||'')
         if(fullJd.length<500) continue
         const location=locationText(detail)||clean(summary?.locationsText)
-        if(company==='SimCorp'&&location&&!location.toLowerCase().includes('copenhagen')) continue
+        const locationTokens=Array.isArray(cfg.locationTokens)?cfg.locationTokens:[]
+        if(locationTokens.length&&location&&!locationTokens.some(token=>location.toLowerCase().includes(String(token).toLowerCase()))) continue
         fullJdVerified++
         const reqId=clean(info.jobReqId||path.split('_').pop()||path)
         const originalUrl=`${cfg.host}/en-US/${cfg.site}${path}`
