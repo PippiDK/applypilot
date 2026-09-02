@@ -1,8 +1,8 @@
 import { normalizeJob } from './normalized-job.js'
 import { companyConnection } from './company-watch.js'
+import { sourceWithinFreshness, stripSourceHtml } from './source-freshness.js'
 
 function clean(value){return String(value??'').replace(/\s+/g,' ').trim()}
-function stripHtml(html=''){return clean(String(html??'').replace(/<!--[sS]*?-->/g,' ').replace(/<script\b[sS]*?<\/script>/gi,' ').replace(/<style\b[sS]*?<\/style>/gi,' ').replace(/<br\s*\/?\s*>/gi,'\n').replace(/<\/p\s*>|<\/li\s*>|<\/h[1-6]\s*>/gi,'\n').replace(/<[^>]+>/g,' ').replace(/&nbsp;/gi,' ').replace(/&amp;/gi,'&').replace(/&quot;/gi,'"').replace(/&#39;|&apos;/gi,"'").replace(/&lt;/gi,'<').replace(/&gt;/gi,'>'))}
 function relativePostedToDate(value){
   const v=clean(value).toLowerCase()
   if(!v) return null
@@ -31,7 +31,7 @@ function locationText(detail={}){
 export async function searchWorkdayCompanies({companies=[],freshnessDays=7,unionSearchPlan={},fetcher=globalThis.fetch,limit=50}={}){
   const selected=(Array.isArray(companies)?companies:[]).filter(name=>companyConnection(name).connector==='workday')
   const queries=[...new Set((Array.isArray(unionSearchPlan?.directions)?unionSearchPlan.directions:[]).map(d=>clean(d?.query||d?.role)).filter(Boolean))]
-  const jobs=[];const errors=[];let discovered=0,fullJdVerified=0,detailRequests=0
+  const jobs=[];const errors=[];let rawDiscovered=0,discovered=0,fullJdVerified=0,detailRequests=0
   for(const company of selected){
     const cfg=companyConnection(company)
     const found=new Map()
@@ -46,7 +46,7 @@ export async function searchWorkdayCompanies({companies=[],freshnessDays=7,union
         }
       }catch(error){errors.push(`${company}: ${error.message}`)}
     }
-    discovered+=found.size
+    rawDiscovered+=found.size
     for(const [path,summary] of found){
       try{
         detailRequests++
@@ -54,12 +54,13 @@ export async function searchWorkdayCompanies({companies=[],freshnessDays=7,union
         const detail=await json(fetcher,detailUrl)
         const info=detail?.jobPostingInfo||{}
         const publishedAt=relativePostedToDate(info.postedOn||summary?.postedOn)
-        if(!withinFreshness(publishedAt,freshnessDays)) continue
-        const fullJd=stripHtml(info.jobDescription||'')
+        if(!sourceWithinFreshness(publishedAt,freshnessDays)) continue
+        const fullJd=stripSourceHtml(info.jobDescription||'')
         if(fullJd.length<500) continue
         const location=locationText(detail)||clean(summary?.locationsText)
         const locationTokens=Array.isArray(cfg.locationTokens)?cfg.locationTokens:[]
         if(locationTokens.length&&location&&!locationTokens.some(token=>location.toLowerCase().includes(String(token).toLowerCase()))) continue
+        discovered++
         fullJdVerified++
         const reqId=clean(info.jobReqId||path.split('_').pop()||path)
         const originalUrl=`${cfg.host}/en-US/${cfg.site}${path}`
@@ -80,5 +81,5 @@ export async function searchWorkdayCompanies({companies=[],freshnessDays=7,union
       }catch(error){errors.push(`${company}: ${error.message}`)}
     }
   }
-  return {source:'company_site',status:errors.length?'partial':'success',jobs,stats:{discovered,fullJdVerified,detailRequests,returned:jobs.length},error:errors.slice(0,3).join(' · ')}
+  return {source:'company_site',status:errors.length?'partial':'success',jobs,stats:{rawDiscovered,discovered,fullJdVerified,detailRequests,returned:jobs.length},error:errors.slice(0,3).join(' · ')}
 }
