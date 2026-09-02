@@ -4,6 +4,7 @@ const LINKEDIN_SEARCH='https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPo
 const WINDOWS=new Set([1,3,7,14])
 const SEARCH_PAGE_SIZE=25
 const MAX_SEARCH_PAGES=4
+const MAX_SEARCH_REQUESTS=64
 const text=value=>String(value??'').replace(/\s+/g,' ').trim()
 
 function cleanSlots(values=[]){
@@ -77,6 +78,7 @@ export async function searchLinkedInShadow({freshnessDays=7,unionSearchPlan={},f
   let searchRequests=0
   let searchFailures=0
   let searchRows=0
+  let requestBudgetReached=false
   const errors=[]
 
   const searchGroups=groupDirections(directions)
@@ -84,13 +86,13 @@ export async function searchLinkedInShadow({freshnessDays=7,unionSearchPlan={},f
     const rows=[]
     const seenIds=new Set()
     for(let page=0;page<MAX_SEARCH_PAGES;page++){
+      if(searchRequests>=MAX_SEARCH_REQUESTS){requestBudgetReached=true;break}
       searchRequests++
       const qs=new URLSearchParams({keywords:group.query,location:'Denmark',f_TPR:`r${days*86400}`,sortBy:'DD',start:String(page*SEARCH_PAGE_SIZE)})
       const html=await fetcher(`${LINKEDIN_SEARCH}?${qs}`)
       const pageRows=parseSearchHtml(html)
-      let newRows=0
-      for(const row of pageRows){const jobId=text(row?.jobId);if(!jobId||seenIds.has(jobId)) continue;seenIds.add(jobId);rows.push(row);newRows++}
-      if(pageRows.length<SEARCH_PAGE_SIZE||newRows===0) break
+      for(const row of pageRows){const jobId=text(row?.jobId);if(!jobId||seenIds.has(jobId)) continue;seenIds.add(jobId);rows.push(row)}
+      if(pageRows.length<SEARCH_PAGE_SIZE) break
     }
     return {group,rows}
   })
@@ -113,5 +115,5 @@ export async function searchLinkedInShadow({freshnessDays=7,unionSearchPlan={},f
   if(searchRequests>0&&searchFailures===searchRequests) throw new Error(`LinkedIn shadow search unavailable: ${errors[0]||'all search requests failed'}`)
   const candidates=[...byId.values()].map(({__foundByKeys,...candidate})=>candidate)
   const coverage=searchFailures?'ACCESS LIMITED':candidates.length?'SEARCHED':'NO RELEVANT RESULTS'
-  return {candidates,stats:{directions:directions.length,primaryDirections:directions.filter(d=>d.tier==='primary').length,adjacentDirections:directions.filter(d=>d.tier==='adjacent').length,searchRequests,searchFailures,searchRows,discovered:candidates.length},coverage:{status:coverage,detail:errors[0]||null}}
+  return {candidates,stats:{directions:directions.length,primaryDirections:directions.filter(d=>d.tier==='primary').length,adjacentDirections:directions.filter(d=>d.tier==='adjacent').length,searchRequests,searchFailures,searchRows,discovered:candidates.length,requestBudgetReached},coverage:{status:coverage,detail:errors[0]||(requestBudgetReached?'LinkedIn discovery request budget reached; partial discovery retained':null)}}
 }

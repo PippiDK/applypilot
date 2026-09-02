@@ -208,14 +208,20 @@ function mergeDiscoveryCandidates(current=[],previous=[],now=new Date()){
   return [...byId.values()]
 }
 
-export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},exclusionRules=[],previousCandidates=[],fetcher,now=new Date()}={}){
+export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},exclusionRules=[],previousCandidates=[],previousVerifiedJobs=[],skipDiscovery=false,fetcher,now=new Date()}={}){
   const days=WINDOWS.has(Number(freshnessDays))?Number(freshnessDays):7
   if(typeof fetcher!=='function') throw new Error('Profile-driven LinkedIn fetcher is required.')
   if(!Array.isArray(unionSearchPlan?.directions)||unionSearchPlan.directions.length===0) throw new Error('Search Profile requires at least one role direction.')
 
   // Discovery always uses one stable broad horizon. The user-selected
   // freshness window is applied locally to verified JobPosting dates below.
-  const discovery=await searchLinkedInShadow({freshnessDays:DISCOVERY_HORIZON_DAYS,unionSearchPlan,fetcher})
+  const discovery=skipDiscovery
+    ?{
+      candidates:[],
+      stats:{directions:unionSearchPlan.directions.length,primaryDirections:unionSearchPlan.directions.filter(item=>item?.tier==='primary').length,adjacentDirections:unionSearchPlan.directions.filter(item=>item?.tier!=='primary').length,searchRequests:0,searchFailures:0,searchRows:0,discovered:Array.isArray(previousCandidates)?previousCandidates.length:0,cacheOnly:true,requestBudgetReached:false},
+      coverage:{status:'SEARCHED',detail:null},
+    }
+    :await searchLinkedInShadow({freshnessDays:DISCOVERY_HORIZON_DAYS,unionSearchPlan,fetcher})
   const masterCandidates=mergeDiscoveryCandidates(discovery.candidates,previousCandidates,now)
   const auditMap=new Map(masterCandidates.map(candidate=>[String(candidate.jobId),createAuditRecord(candidate)]))
   let detailRequests=0
@@ -223,15 +229,27 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
   let incompleteDetails=0
   let fullJdVerified=0
   let evaluated=0
+  let cachedJdUsed=0
+  const cachedById=new Map()
+  for(const job of Array.isArray(previousVerifiedJobs)?previousVerifiedJobs:[]){
+    const id=String(job?.sourceJobId||'').trim()
+    if(id) cachedById.set(id,job)
+  }
 
   const settled=await mapLimit(masterCandidates,4,async candidate=>{
+    const cachedJob=cachedById.get(String(candidate.jobId))
+    if(cachedJob){
+      cachedJdUsed++
+      return {candidate,job:cachedJob,cached:true}
+    }
     detailRequests++
-    const html=await fetcher(`${LINKEDIN_JOB_DETAIL}${candidate.jobId}`)
+    const html=await fetcher(LINKEDIN_JOB_DETAIL+candidate.jobId)
     const job=parseDetailHtml(candidate,html,now)
-    return {candidate,job}
+    return {candidate,job,cached:false}
   })
 
   const jobs=[]
+  const verifiedById=new Map()
   const detailErrors=[]
   for(const item of settled){
     if(item.status==='rejected'){
@@ -249,6 +267,7 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
       continue
     }
     fullJdVerified++
+    verifiedById.set(String(candidate.jobId),job)
     updateAuditRecord(auditMap,candidate.jobId,{title:job.title,company:job.company,stage:'FULL_JD_VERIFIED',decision:'PENDING'})
 
     if(job.vacancyStatus==='CLOSED'){
@@ -279,6 +298,8 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
   }
 
   jobs.sort((a,b)=>b.evaluation.score-a.evaluation.score||(new Date(b.job.publishedAt||0)-new Date(a.job.publishedAt||0)))
+  const masterIds=new Set(masterCandidates.map(candidate=>String(candidate.jobId)))
+  const masterVerifiedJobs=[...verifiedById.entries()].filter(([id])=>masterIds.has(id)).map(([,job])=>job)
   const inaccessible=Number(discovery.stats?.searchFailures||0)+detailFailures+incompleteDetails
   const status=inaccessible?'ACCESS LIMITED':jobs.length?'SEARCHED':'NO RELEVANT RESULTS'
   const detail=inaccessible?(discovery.coverage?.detail||detailErrors[0]||`${inaccessible} LinkedIn item(s) could not be fully verified`):null
@@ -286,10 +307,12 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
   return {
     jobs,
     masterCandidates,
+    masterVerifiedJobs,
     audit:auditList(auditMap),
     stats:{
       ...discovery.stats,
       detailRequests,
+      cachedJdUsed,
       detailFailures,
       incompleteDetails,
       fullJdVerified,

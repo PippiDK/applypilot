@@ -94,3 +94,26 @@ test('continues to the next LinkedIn discovery page so wider windows do not lose
   assert.equal(result.stats.searchRequests,2)
   assert.equal(result.stats.discovered,26)
 })
+
+
+test('duplicate-only intermediate page does not stop bounded paging early',async()=>{
+  const urls=[]
+  const singlePlan={directions:[{key:'project manager',role:'Project Manager',tier:'primary',origin:'cv',cvSlots:[1]}]}
+  const first=Array.from({length:25},(_,index)=>card(String(4454900000+index),`Project Manager ${index}`)).join('')
+  const duplicatePage=first
+  const later=card('4454999999','Project Manager Later','Later Co')
+  const result=await searchLinkedInShadow({
+    freshnessDays:14,
+    unionSearchPlan:singlePlan,
+    fetcher:async url=>{
+      urls.push(url)
+      const start=new URL(url).searchParams.get('start')
+      if(start==='0') return first
+      if(start==='25') return duplicatePage
+      if(start==='50') return later
+      return ''
+    }
+  })
+  assert.deepEqual(urls.map(url=>new URL(url).searchParams.get('start')),['0','25','50'])
+  assert.equal(result.candidates.some(candidate=>candidate.jobId==='4454999999'),true)
+})
