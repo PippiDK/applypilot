@@ -21,6 +21,10 @@ export const COMPANY_CONNECTORS={
   'COWI':{status:'connected',connector:'custom_html',baseUrl:'https://www.cowi.com',listingPath:'/your-career/open-vacancies/?country=Denmark',detailPattern:'/your-career/open-vacancies/vacancy/?id='},
   'Ørsted':{status:'connected',connector:'custom_html',baseUrl:'https://orsted.com',listingPath:'/en/careers/vacancies-list',detailPattern:'/en/careers/vacancies-list/'},
   'Copenhagen Merchants':{status:'connected',connector:'teamtailor',baseUrl:'https://joinus.copmer.com'},
+  'EY':{status:'connected',connector:'successfactors',baseUrl:'https://careers.ey.com',searchPath:'/ey/search/'},
+  'Novo Holdings':{status:'connected',connector:'workable',slug:'novoholdings',country:'Denmark'},
+  'Microsoft':{status:'connected',connector:'custom_html',baseUrl:'https://apply.careers.microsoft.com',listingPath:'/careers?location=Denmark',detailPattern:'/careerhub/explore/jobs/'},
+  'Dassault Systèmes':{status:'connected',connector:'custom_html',baseUrl:'https://www.3ds.com',listingPath:'/careers/jobs',detailPattern:'/careers/jobs/'},
 }
 
 export const TARGET_COMPANIES=[
