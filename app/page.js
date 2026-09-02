@@ -22,6 +22,7 @@ import {JOB_STATUS_OPTIONS,readJobStatuses,writeJobStatus} from './lib/job-statu
 import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
 import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
 import {companyConnection,connectedCompanyNames,defaultCompanyWatch,readCompanyWatch,writeCompanyWatch,TARGET_COMPANIES} from './lib/company-watch.js'
+import {CONSULTANT_PORTALS,defaultConsultantPortals,readConsultantPortals,writeConsultantPortals} from './lib/consultant-portals.js'
 import SearchAudit from './components/search-audit.js'
 import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
@@ -52,6 +53,8 @@ export default function Home(){
   const [selectedSources,setSelectedSources]=useState(()=>[...DEFAULT_SEARCH_SOURCES])
   const [companyWatch,setCompanyWatch]=useState(()=>defaultCompanyWatch())
   const [companyWatchOpen,setCompanyWatchOpen]=useState(false)
+  const [consultantPortals,setConsultantPortals]=useState(()=>defaultConsultantPortals())
+  const [consultantPortalsOpen,setConsultantPortalsOpen]=useState(false)
   const [selectedAreas,setSelectedAreas]=useState(()=>SEARCH_AREAS.map(({id})=>id))
   const [selectedWorkModels,setSelectedWorkModels]=useState(()=>WORK_MODELS.map(({id})=>id))
   const [selectedStatuses,setSelectedStatuses]=useState(()=>[...DEFAULT_JOB_STATUS_FILTERS])
@@ -99,6 +102,7 @@ export default function Home(){
 
       setSelectedSources(readSearchSources(localStorage))
       setCompanyWatch(readCompanyWatch(localStorage))
+      setConsultantPortals(readConsultantPortals(localStorage))
       setCvLibrary(library)
       if(readyCvCount(library)>0) localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(library))
       if(primaryCv){
@@ -249,6 +253,17 @@ export default function Home(){
     setCompanyWatch(current=>{
       const selected=current.selected.includes(name)?current.selected.filter(value=>value!==name):[...current.selected,name]
       return writeCompanyWatch(localStorage,{...current,selected})
+    })
+  }
+
+  function toggleConsultantPortalsEnabled(){
+    setConsultantPortals(current=>writeConsultantPortals(localStorage,{...current,enabled:!current.enabled}))
+  }
+
+  function toggleConsultantPortal(id){
+    setConsultantPortals(current=>{
+      const selected=current.selected.includes(id)?current.selected.filter(value=>value!==id):[...current.selected,id]
+      return writeConsultantPortals(localStorage,{...current,selected})
     })
   }
 
@@ -629,6 +644,16 @@ export default function Home(){
       </div>
       {companyWatchOpen&&<div className="companyWatchList">
         {TARGET_COMPANIES.map(name=>{const connection=companyConnection(name);return <label key={name}><input type="checkbox" checked={companyWatch.selected.includes(name)} onChange={()=>toggleCompany(name)}/><span>{name}</span><small className={connection.status==='connected'?'ready':''}>{connection.status==='connected'?('Connected · '+connection.connector):'Connection pending'}</small></label>})}
+      </div>}
+    </section>
+
+    <section className="companyWatch consultantPortals">
+      <div className="companyWatchMain">
+        <label className="companyWatchToggle"><input type="checkbox" checked={consultantPortals.enabled} onChange={toggleConsultantPortalsEnabled}/><span><small>CONSULTANT PORTALS</small><b>Freelance & consulting assignments</b></span></label>
+        <div className="companyWatchActions"><span>{consultantPortals.selected.length} portals selected</span><button className="secondary companyManage" onClick={()=>setConsultantPortalsOpen(open=>!open)}>{consultantPortalsOpen?'Close':'Manage'}</button></div>
+      </div>
+      {consultantPortalsOpen&&<div className="companyWatchList consultantPortalList">
+        {CONSULTANT_PORTALS.map(portal=><label key={portal.id}><input type="checkbox" checked={consultantPortals.selected.includes(portal.id)} onChange={()=>toggleConsultantPortal(portal.id)}/><span>{portal.name}</span><small>Connection pending</small></label>)}
       </div>}
     </section>
 
