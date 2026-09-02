@@ -3,6 +3,7 @@ import { requireUser } from '../../lib/auth/require-user.js'
 import { buildDiscoverySearchPlan } from '../../lib/search-query-expansion-ai.js'
 import { searchJobnetSource } from '../../lib/jobnet-source-adapter.js'
 import { evaluateProfileJob } from '../../lib/job-profile-evaluator.js'
+import { jobnetRoleContextGuard } from '../../lib/jobnet-role-context-guard.js'
 
 export const runtime='nodejs'
 export const dynamic='force-dynamic'
@@ -41,6 +42,11 @@ export async function POST(request){
       if(isLimited(job)){
         unverified++
         audit.push({jobId,title:job?.title||'',company:job?.company||'',stage:'FULL_JD_UNVERIFIED',decision:'UNVERIFIED',score:null,reason:'Full Job Description could not be verified'})
+        continue
+      }
+      const context=jobnetRoleContextGuard(job)
+      if(!context.pass){
+        audit.push({jobId,title:job?.title||'',company:job?.company||'',stage:context.stage,decision:'REJECT',score:null,reason:context.reason})
         continue
       }
       evaluated++
