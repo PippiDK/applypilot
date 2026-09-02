@@ -17,6 +17,7 @@ export const COMPANY_CONNECTORS={
   'Ascendis Pharma':{status:'connected',connector:'workable',slug:'ascendis-pharma',country:'Denmark'},
   'GN':{status:'connected',connector:'workday',host:'https://gn.wd3.myworkdayjobs.com',tenant:'gn',site:'GN-Careers',locationTokens:['ballerup','denmark']},
   'Ambu':{status:'connected',connector:'successfactors',baseUrl:'https://jobs.ambu.com',searchPath:'/search/'},
+  'PFA':{status:'connected',connector:'successfactors_legacy',baseUrl:'https://career2.successfactors.eu',company:'pfa',country:'Denmark'},
 }
 
 export const TARGET_COMPANIES=[
