@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireUser } from '../../lib/auth/require-user.js'
 import { searchTeamtailorCompanies } from '../../lib/teamtailor-company-source.js'
+import { searchSuccessFactorsCompanies } from '../../lib/successfactors-company-source.js'
 import { evaluateProfileJob } from '../../lib/job-profile-evaluator.js'
 
 export const runtime='nodejs'
@@ -18,9 +19,20 @@ export async function POST(request){
     const foundBy=Array.isArray(body?.unionSearchPlan?.directions)?body.unionSearchPlan.directions:[]
     if(!companies.length) return NextResponse.json({jobs:[],audit:[],stats:{discovered:0,fullJdVerified:0,evaluated:0,returned:0},coverage:{source:'Company sites',freshnessDays,status:'NO RELEVANT RESULTS'},fetchedAt:new Date().toISOString()})
 
-    const source=await searchTeamtailorCompanies({companies,freshnessDays,fetcher:globalThis.fetch})
+    const [teamtailor,successfactors]=await Promise.all([
+      searchTeamtailorCompanies({companies,freshnessDays,fetcher:globalThis.fetch}),
+      searchSuccessFactorsCompanies({companies,freshnessDays,unionSearchPlan:body?.unionSearchPlan||{},fetcher:globalThis.fetch}),
+    ])
+    const sourceJobs=[...(Array.isArray(teamtailor.jobs)?teamtailor.jobs:[]),...(Array.isArray(successfactors.jobs)?successfactors.jobs:[])]
+    const sourceStats={
+      discovered:Number(teamtailor.stats?.discovered||0)+Number(successfactors.stats?.discovered||0),
+      fullJdVerified:Number(teamtailor.stats?.fullJdVerified||0)+Number(successfactors.stats?.fullJdVerified||0),
+      detailRequests:Number(teamtailor.stats?.detailRequests||0)+Number(successfactors.stats?.detailRequests||0),
+    }
+    const sourceErrors=[teamtailor.error,successfactors.error].filter(Boolean).join(' · ')
+    const sourcePartial=teamtailor.status==='partial'||successfactors.status==='partial'
     const jobs=[]; const audit=[]; let evaluated=0
-    for(const job of Array.isArray(source.jobs)?source.jobs:[]){
+    for(const job of sourceJobs){
       evaluated++
       const result=evaluateProfileJob({job,foundBy,exclusionRules,freshnessDays})
       audit.push({jobId:job?.jobId||job?.sourceJobId||'',title:job?.title||'',company:job?.company||'',stage:result.stage,decision:result.decision,score:result.evaluation?.score??null,reason:result.reason})
@@ -29,8 +41,8 @@ export async function POST(request){
     jobs.sort((a,b)=>b.evaluation.score-a.evaluation.score||(new Date(b.job.publishedAt||0)-new Date(a.job.publishedAt||0)))
     return NextResponse.json({
       jobs,audit,
-      stats:{...source.stats,evaluated,returned:jobs.length},
-      coverage:{source:'Company sites',freshnessDays,status:source.status==='partial'?'ACCESS LIMITED':jobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:source.error||null},
+      stats:{...sourceStats,evaluated,returned:jobs.length},
+      coverage:{source:'Company sites',freshnessDays,status:sourcePartial?'ACCESS LIMITED':jobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:sourceErrors||null},
       fetchedAt:new Date().toISOString(),
     })
   }catch(error){
