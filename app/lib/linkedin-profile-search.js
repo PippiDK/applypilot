@@ -59,6 +59,40 @@ function jdSupport(directionRole,job){
   return direction.filter(token=>textTokens.has(token)).length/direction.length
 }
 
+const ENTERPRISE_CONTEXT_CATEGORIES={
+  enterprise_it:/\b(?:enterprise|corporate|group) it\b|\binformation technology\b|\bit systems?\b/i,
+  software_platform:/\bsoftware\b|\bsaas\b|\b(?:digital|technology|data|cloud) platform\b/i,
+  cloud_data:/\bcloud\b|\bazure\b|\baws\b|\bdata platform\b|\bdata warehouse\b|\bdwh\b/i,
+  integration:/\bsystems? integration\b|\bapi(?:s)?\b|\bintegration platform\b/i,
+  business_apps:/\benterprise applications?\b|\bbusiness applications?\b|\bbusiness systems?\b/i,
+  cyber_it:/\bcybersecurity\b|\binformation security\b|\bit infrastructure\b|\bnetwork infrastructure\b/i,
+}
+
+const SPECIALIST_CONTEXT_CATEGORIES={
+  erp:/\b(?:sap|s\/?4hana|d365|dynamics 365|oracle erp|erp)\b/i,
+  payroll_hr:/\bpayroll\b|\bhuman resources\b|\bhr systems?\b/i,
+  finance:/\bfinance transformation\b|\btax technology\b|\bbilling\b/i,
+  industrial_power:/\bpower engineering\b|\bgrid consultancy\b|\bgrid\b|\bscada\b|\bot security\b|\bindustrial automation\b/i,
+  physical_delivery:/\bhardware\b|\bconstruction\b|\bdata cent(?:er|re)\b|\bmanufacturing\b|\bmaterial handling\b|\bcomponent exchanges?\b|\boffshore\b|\bwind industry\b/i,
+  r_and_d:/\bresearch\s*(?:&|and)\s*development\b|\br&d\b|\bprototypes?\b/i,
+}
+
+function matchedContextCategories(value,categories){
+  const text=String(value??'')
+  return Object.entries(categories).filter(([,rx])=>rx.test(text)).map(([name])=>name)
+}
+
+function domainContextModifier(job={}){
+  const text=`${job?.title||''}\n${job?.description||''}`
+  const specialist=matchedContextCategories(text,SPECIALIST_CONTEXT_CATEGORIES)
+  if(!specialist.length) return {penalty:0,specialist,enterprise:[]}
+  const enterprise=matchedContextCategories(text,ENTERPRISE_CONTEXT_CATEGORIES)
+  // Context never rejects a vacancy. It only prevents a specialist/non-enterprise
+  // title from receiving a top score based on title similarity alone.
+  const penalty=enterprise.length>=2?.2:enterprise.length===1?.5:.9
+  return {penalty,specialist,enterprise}
+}
+
 function profileEvaluation(job,profileDirections=[]){
   let best=null
   // Evaluation must depend only on the verified JD + approved Search Profile.
@@ -74,8 +108,10 @@ function profileEvaluation(job,profileDirections=[]){
     // Keep recall broad, but spread scores so weak/adjacent matches do not all look "High".
     // A primary role still gets a modest prior, while title/JD evidence must earn the rest.
     const base=tier==='primary'?5.5:5.0
-    const score=Math.min(9.6,round1(base+similarity.score*2.8+support*1.3))
-    const candidate={direction,tier,similarity:similarity.score,support,score}
+    const context=domainContextModifier(job)
+    const rawScore=base+similarity.score*2.8+support*1.3
+    const score=Math.max(6.5,Math.min(9.6,round1(rawScore-context.penalty)))
+    const candidate={direction,tier,similarity:similarity.score,support,score,context}
     if(!best||candidate.score>best.score) best=candidate
   }
 
@@ -100,6 +136,9 @@ function profileEvaluation(job,profileDirections=[]){
         tier:best.tier,
         titleAlignment:Math.round(best.similarity*100),
         jdSupport:Math.round(best.support*100),
+        domainContextPenalty:best.context?.penalty||0,
+        specialistContext:best.context?.specialist||[],
+        enterpriseContext:best.context?.enterprise||[],
       },
     },
   }

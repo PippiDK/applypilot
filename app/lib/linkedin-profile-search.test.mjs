@@ -369,3 +369,56 @@ test('adjacent exact role stays visible but does not automatically outrank a str
   assert.ok(result.jobs[0].evaluation.score<=9.1)
   assert.equal(result.jobs[0].evaluation.breakdown.tier,'adjacent')
 })
+
+
+test('exact Technical Project Manager in a non-enterprise engineering context is demoted but kept',async()=>{
+  const searchPlan=plan('Technical Project Manager')
+  const fetcher=scenarioFetcher({
+    searchHtml:card('2323232301','Technical Project Manager | Lead project delivery for Grid Consultancy and Power Engineering','Grid Co'),
+    details:{'2323232301':detailHtml({
+      title:'Technical Project Manager | Lead project delivery for Grid Consultancy and Power Engineering',
+      company:'Grid Co',
+      description:'Lead grid consultancy and power engineering projects, coordinate electrical engineering specialists, customer schedules, risks, dependencies and technical delivery. '.repeat(5)
+    })}
+  })
+  const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:searchPlan,fetcher,now:new Date('2026-08-27T12:00:00Z')})
+  assert.equal(result.jobs.length,1)
+  assert.ok(result.jobs[0].evaluation.score>=8)
+  assert.ok(result.jobs[0].evaluation.score<9)
+  assert.equal(result.jobs[0].evaluation.breakdown.domainContextPenalty,.9)
+})
+
+test('exact Technical Project Manager with strong enterprise IT context remains High',async()=>{
+  const searchPlan=plan('Technical Project Manager')
+  const fetcher=scenarioFetcher({
+    searchHtml:card('2323232302','Technical Project Manager','Enterprise Co'),
+    details:{'2323232302':detailHtml({
+      title:'Technical Project Manager',
+      company:'Enterprise Co',
+      description:'Lead enterprise IT delivery for a cloud software platform, systems integration, business applications, data migration, risks, dependencies, cutover and go-live. '.repeat(5)
+    })}
+  })
+  const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:searchPlan,fetcher,now:new Date('2026-08-27T12:00:00Z')})
+  assert.equal(result.jobs.length,1)
+  assert.ok(result.jobs[0].evaluation.score>=9)
+  assert.equal(result.jobs[0].evaluation.breakdown.domainContextPenalty,.2)
+})
+
+test('specialist adjacent Implementation Manager remains visible but payroll context lowers top-score inflation',async()=>{
+  const unionSearchPlan={version:'union-search-plan-v1',directions:[
+    {key:'implementation-manager',role:'Implementation Manager',tier:'adjacent',origin:'cv',cvSlots:[1]},
+  ]}
+  const fetcher=scenarioFetcher({
+    searchHtml:card('2323232303','Payroll Implementation Manager | Denmark','Payroll Co'),
+    details:{'2323232303':detailHtml({
+      title:'Payroll Implementation Manager | Denmark',
+      company:'Payroll Co',
+      description:'Lead payroll implementation for customers, coordinate configuration, integrations, timelines, stakeholders, testing and go-live. '.repeat(5)
+    })}
+  })
+  const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan,fetcher,now:new Date('2026-08-27T12:00:00Z')})
+  assert.equal(result.jobs.length,1)
+  assert.ok(result.jobs[0].evaluation.score>=8)
+  assert.ok(result.jobs[0].evaluation.score<9)
+  assert.ok(result.jobs[0].evaluation.breakdown.domainContextPenalty>=.5)
+})
