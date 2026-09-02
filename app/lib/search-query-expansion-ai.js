@@ -82,20 +82,20 @@ export function buildDeterministicSearchQueryExpansions({roles}={}){
     seenRoles.add(key);sourceRoles.push(role)
   }
 
-  const seniorityPrefix=/^(?:senior|sr\\.?|principal|global|regional|international|experienced)\\s+/i
+  const seniorityPrefix=/^(?:senior|sr\.?|principal|global|regional|international|experienced)\s+/i
   const swaps=[
-    [/\\bproject manager\\b/i,'Project Lead'],
-    [/\\bproject lead\\b/i,'Project Manager'],
-    [/\\bdelivery manager\\b/i,'Delivery Lead'],
-    [/\\bdelivery lead\\b/i,'Delivery Manager'],
-    [/\\bprogramme manager\\b/i,'Program Manager'],
-    [/\\bprogram manager\\b/i,'Programme Manager'],
-    [/\\bintegration project manager\\b/i,'Integration Manager'],
-    [/\\bintegration manager\\b/i,'Integration Project Manager'],
-    [/\\bimplementation project manager\\b/i,'Implementation Manager'],
-    [/\\bimplementation manager\\b/i,'Implementation Project Manager'],
-    [/\\btransformation project manager\\b/i,'Transformation Manager'],
-    [/\\btransformation manager\\b/i,'Transformation Project Manager'],
+    [/\bproject manager\b/i,'Project Lead'],
+    [/\bproject lead\b/i,'Project Manager'],
+    [/\bdelivery manager\b/i,'Delivery Lead'],
+    [/\bdelivery lead\b/i,'Delivery Manager'],
+    [/\bprogramme manager\b/i,'Program Manager'],
+    [/\bprogram manager\b/i,'Programme Manager'],
+    [/\bintegration project manager\b/i,'Integration Manager'],
+    [/\bintegration manager\b/i,'Integration Project Manager'],
+    [/\bimplementation project manager\b/i,'Implementation Manager'],
+    [/\bimplementation manager\b/i,'Implementation Project Manager'],
+    [/\btransformation project manager\b/i,'Transformation Manager'],
+    [/\btransformation manager\b/i,'Transformation Project Manager'],
   ]
 
   const expansions=[]
