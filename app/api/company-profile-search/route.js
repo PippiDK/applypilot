@@ -36,6 +36,7 @@ export async function POST(request){
     const sources=[teamtailor,successfactors,workday,oracle,workable,legacySuccessfactors,customHtml]
     const sourceJobs=sources.flatMap(source=>Array.isArray(source.jobs)?source.jobs:[])
     const sourceStats={
+      rawDiscovered:sources.reduce((sum,source)=>sum+Number(source.stats?.rawDiscovered??source.stats?.discovered??0),0),
       discovered:sources.reduce((sum,source)=>sum+Number(source.stats?.discovered||0),0),
       fullJdVerified:sources.reduce((sum,source)=>sum+Number(source.stats?.fullJdVerified||0),0),
       detailRequests:sources.reduce((sum,source)=>sum+Number(source.stats?.detailRequests||0),0),
