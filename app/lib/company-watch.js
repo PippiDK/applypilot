@@ -6,6 +6,8 @@ export const COMPANY_CONNECTORS={
   'Coloplast':{status:'connected',connector:'successfactors',baseUrl:'https://careers.coloplast.com',listingPath:'/go/BusSupport_it/4775001/'},
   'Vestas':{status:'connected',connector:'successfactors',baseUrl:'https://careers.vestas.com',listingPath:'/go/All-Jobs/3298601/'},
   'DSV':{status:'connected',connector:'successfactors',baseUrl:'https://jobs.dsv.com',listingPath:'/go/Jobs%40DSV/2713001/'},
+  'NKT':{status:'connected',connector:'successfactors',baseUrl:'https://jobs.nkt.com',searchPath:'/search/'},
+  'Tryg':{status:'connected',connector:'successfactors',baseUrl:'https://careers.tryg.com',searchPath:'/Tryg/search/'},
 }
 
 export const TARGET_COMPANIES=[
