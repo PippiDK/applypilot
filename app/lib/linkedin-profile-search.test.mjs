@@ -212,3 +212,64 @@ test('1/3/7/14-day views are local subsets over the same discovered jobs',async(
   assert.deepEqual(companies(seven),['Seven Day Co','Three Day Co','Today Co'])
   assert.deepEqual(companies(fourteen),['Fourteen Day Co','Seven Day Co','Three Day Co','Today Co'])
 })
+
+
+test('previous in-window candidate remains in the 14-day master pool when LinkedIn omits it on refresh',async()=>{
+  const previous=[{
+    jobId:'1717171717',
+    url:'https://www.linkedin.com/jobs/view/1717171717/',
+    title:'Senior IT Project Manager',
+    company:'Remembered Co',
+    location:'Copenhagen',
+    publishedAt:'2026-08-25',
+    foundBy:[]
+  }]
+  const fetcher=async url=>{
+    if(url.includes('/seeMoreJobPostings/search')) return ''
+    return detailHtml({
+      title:'Senior IT Project Manager',
+      company:'Remembered Co',
+      description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies and governance. '.repeat(5)
+    }).replace('"datePosted":"2026-08-27"','"datePosted":"2026-08-25"')
+  }
+  const result=await searchLinkedInProfile({
+    freshnessDays:7,
+    unionSearchPlan:plan('Senior IT Project Manager'),
+    previousCandidates:previous,
+    fetcher,
+    now:new Date('2026-08-27T12:00:00Z')
+  })
+  assert.equal(result.masterCandidates.length,1)
+  assert.equal(result.masterCandidates[0].jobId,'1717171717')
+  assert.equal(result.jobs.length,1)
+  assert.equal(result.jobs[0].job.company,'Remembered Co')
+  assert.equal(result.stats.masterPoolSize,1)
+})
+
+test('master pool drops a previous candidate once its known posting date is outside 14 days',async()=>{
+  let detailRequests=0
+  const previous=[{
+    jobId:'1818181818',
+    url:'https://www.linkedin.com/jobs/view/1818181818/',
+    title:'Senior IT Project Manager',
+    company:'Expired Co',
+    location:'Copenhagen',
+    publishedAt:'2026-08-01',
+    foundBy:[]
+  }]
+  const fetcher=async url=>{
+    if(url.includes('/seeMoreJobPostings/search')) return ''
+    detailRequests++
+    return detailHtml({title:'Senior IT Project Manager',company:'Expired Co'})
+  }
+  const result=await searchLinkedInProfile({
+    freshnessDays:14,
+    unionSearchPlan:plan('Senior IT Project Manager'),
+    previousCandidates:previous,
+    fetcher,
+    now:new Date('2026-08-27T12:00:00Z')
+  })
+  assert.deepEqual(result.masterCandidates,[])
+  assert.equal(result.jobs.length,0)
+  assert.equal(detailRequests,0)
+})
