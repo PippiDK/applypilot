@@ -3,6 +3,7 @@ import { requireUser } from '../../lib/auth/require-user.js'
 import { searchTeamtailorCompanies } from '../../lib/teamtailor-company-source.js'
 import { searchSuccessFactorsCompanies } from '../../lib/successfactors-company-source.js'
 import { searchWorkdayCompanies } from '../../lib/workday-company-source.js'
+import { searchOracleCompanies } from '../../lib/oracle-company-source.js'
 import { evaluateProfileJob } from '../../lib/job-profile-evaluator.js'
 
 export const runtime='nodejs'
@@ -20,12 +21,13 @@ export async function POST(request){
     const foundBy=Array.isArray(body?.unionSearchPlan?.directions)?body.unionSearchPlan.directions:[]
     if(!companies.length) return NextResponse.json({jobs:[],audit:[],stats:{discovered:0,fullJdVerified:0,evaluated:0,returned:0},coverage:{source:'Company sites',freshnessDays,status:'NO RELEVANT RESULTS'},fetchedAt:new Date().toISOString()})
 
-    const [teamtailor,successfactors,workday]=await Promise.all([
+    const [teamtailor,successfactors,workday,oracle]=await Promise.all([
       searchTeamtailorCompanies({companies,freshnessDays,fetcher:globalThis.fetch}),
       searchSuccessFactorsCompanies({companies,freshnessDays,unionSearchPlan:body?.unionSearchPlan||{},fetcher:globalThis.fetch}),
       searchWorkdayCompanies({companies,freshnessDays,unionSearchPlan:body?.unionSearchPlan||{},fetcher:globalThis.fetch}),
+      searchOracleCompanies({companies,freshnessDays,unionSearchPlan:body?.unionSearchPlan||{},fetcher:globalThis.fetch}),
     ])
-    const sources=[teamtailor,successfactors,workday]
+    const sources=[teamtailor,successfactors,workday,oracle]
     const sourceJobs=sources.flatMap(source=>Array.isArray(source.jobs)?source.jobs:[])
     const sourceStats={
       discovered:sources.reduce((sum,source)=>sum+Number(source.stats?.discovered||0),0),
