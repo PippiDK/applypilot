@@ -16,6 +16,7 @@ export const COMPANY_CONNECTORS={
   'DLF':{status:'connected',connector:'successfactors',baseUrl:'https://careers.dlf.com',listingPath:'/go/Greater-Europe/8944455/'},
   'Ascendis Pharma':{status:'connected',connector:'workable',slug:'ascendis-pharma',country:'Denmark'},
   'GN':{status:'connected',connector:'workday',host:'https://gn.wd3.myworkdayjobs.com',tenant:'gn',site:'GN-Careers',locationTokens:['ballerup','denmark']},
+  'Ambu':{status:'connected',connector:'successfactors',baseUrl:'https://jobs.ambu.com',searchPath:'/search/'},
 }
 
 export const TARGET_COMPANIES=[
