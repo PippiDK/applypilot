@@ -24,6 +24,10 @@ function publishedFrom(portalId,text=''){
     const title=String(text).match(/\((\d{2}\.\d{2}\.\d{4})\)/)
     if(title){const [d,m,y]=title[1].split('.').map(Number);return new Date(Date.UTC(y,m-1,d)).toISOString()}
   }
+  if(portalId==='7n'){
+    const m=String(text).match(/Published\s*:?\s*(?:on\s*)?(\d{2})\/(\d{2})\/(\d{4})/i)
+    if(m)return new Date(Date.UTC(Number(m[3]),Number(m[2])-1,Number(m[1]))).toISOString()
+  }
   return dateField(text,['Posted','Published','Date posted'])
 }
 function relevantDenmark(location,text){const joined=(location+' '+text).toLowerCase();return /(denmark|copenhagen|københavn|storkøbenhavn|greater copenhagen|lyngby|hellerup|gentofte|ballerup|nærum)/i.test(joined)}
@@ -43,6 +47,7 @@ export async function searchConsultantHtmlPortals({portalIds=[],freshnessDays=7,
           const html=await fetchText(fetcher,link)
           const fullJd=stripHtml(html)
           if(fullJd.length<500)continue
+          if(portalId==='epico'&&/(Deadline\s*:?\s*Exceeded|Deadline\s*:?\s*Udløbet|Udløbet)/i.test(fullJd))continue
           const location=locationFrom(portalId,fullJd)
           if(!relevantDenmark(location,fullJd))continue
           const publishedAt=publishedFrom(portalId,fullJd)
