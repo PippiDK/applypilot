@@ -90,34 +90,9 @@ export async function searchLinkedInShadow({freshnessDays=7,unionSearchPlan={},f
     const jobId=text(row?.jobId)
     if(!jobId) continue
     const candidate={...row,jobId,foundBy:[],__foundByKeys:new Set()}
-    byId.set(jobId,candidate)
-  }
-
-  // Reconstruct provenance deterministically from the queries in which each job
-  // was observed. collectDiscoveryPasses returns the union; fetch-page rows keep
-  // their query marker below so discovery path never affects later evaluation.
-  const observedById=new Map()
-  await collectDiscoveryPasses({
-    queries:searchGroups.map(group=>group.query),
-    passes:[{group:`${days}d-provenance`,days,starts,label:`${days}d-provenance`}],
-    fetchPage:async({query,start,seconds})=>{
-      const qs=new URLSearchParams({keywords:query,location:'Denmark',f_TPR:`r${seconds}`,sortBy:'DD',start:String(start)})
-      const html=await fetcher(`${LINKEDIN_SEARCH}?${qs}`)
-      const rows=parseSearchHtml(html)
-      for(const row of rows){
-        const id=text(row?.jobId)
-        if(!id) continue
-        if(!observedById.has(id)) observedById.set(id,new Set())
-        observedById.get(id).add(query.toLowerCase())
-      }
-      return rows
-    },
-  })
-
-  for(const [jobId,candidate] of byId){
-    const observed=observedById.get(jobId)||new Set()
-    for(const queryKey of observed){
-      const group=groupByQuery.get(queryKey)
+    const observed=Array.isArray(row?.__discoveryQueries)?row.__discoveryQueries:[]
+    for(const query of observed){
+      const group=groupByQuery.get(text(query).toLowerCase())
       if(!group) continue
       for(const direction of group.directions){
         const key=foundByKey(direction)
@@ -126,6 +101,8 @@ export async function searchLinkedInShadow({freshnessDays=7,unionSearchPlan={},f
         candidate.foundBy.push(direction)
       }
     }
+    delete candidate.__discoveryQueries
+    byId.set(jobId,candidate)
   }
 
   const candidates=[...byId.values()].map(({__foundByKeys,...candidate})=>candidate)
