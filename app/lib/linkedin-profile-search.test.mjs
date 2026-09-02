@@ -160,7 +160,7 @@ test('same verified job and Search Profile keep the same role decision and score
 })
 
 
-test('all freshness views use the same 14-day LinkedIn discovery horizon',async()=>{
+test('each freshness view performs fresh LinkedIn discovery for its selected window',async()=>{
   const horizons=[]
   const fetcher=async url=>{
     if(url.includes('/seeMoreJobPostings/search')){
@@ -175,9 +175,10 @@ test('all freshness views use the same 14-day LinkedIn discovery horizon',async(
   }
   const searchPlan=plan('Senior IT Project Manager')
   await searchLinkedInProfile({freshnessDays:1,unionSearchPlan:searchPlan,fetcher,now:new Date('2026-08-27T12:00:00Z')})
+  await searchLinkedInProfile({freshnessDays:3,unionSearchPlan:searchPlan,fetcher,now:new Date('2026-08-27T12:00:00Z')})
   await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:searchPlan,fetcher,now:new Date('2026-08-27T12:00:00Z')})
-  assert.ok(horizons.length>=2)
-  assert.deepEqual([...new Set(horizons)],['r1209600'])
+  await searchLinkedInProfile({freshnessDays:14,unionSearchPlan:searchPlan,fetcher,now:new Date('2026-08-27T12:00:00Z')})
+  assert.deepEqual(new Set(horizons),new Set(['r86400','r259200','r604800','r1209600']))
 })
 
 test('1/3/7/14-day views are local subsets over the same discovered jobs',async()=>{
@@ -288,16 +289,33 @@ test('cached verified JD is reused without another LinkedIn detail request',asyn
   assert.equal(result.masterVerifiedJobs.length,1)
 })
 
-test('cache-only freshness view makes zero LinkedIn requests and filters the verified pool locally',async()=>{
-  let calls=0
+test('fresh discovery always runs while cached verified JDs avoid repeat detail fetches',async()=>{
+  let searchCalls=0
+  let detailCalls=0
   const previousCandidates=[
     {jobId:'2020202020',url:'u1',title:'Senior IT Project Manager',company:'Today Co',location:'Copenhagen',publishedAt:'2026-08-27',foundBy:[]},
     {jobId:'2121212121',url:'u2',title:'Senior IT Project Manager',company:'Old Co',location:'Copenhagen',publishedAt:'2026-08-20',foundBy:[]}
   ]
   const mk=(id,company,date)=>({source:'LinkedIn Jobs',sourceJobId:id,originalUrl:'https://www.linkedin.com/jobs/view/'+id+'/',officialUrl:null,title:'Senior IT Project Manager',company,location:'Copenhagen',country:'Denmark',description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies and governance. '.repeat(5),publishedAt:date,deadline:'2026-09-30T00:00:00.000Z',remoteType:'unknown',remoteEligibility:'UNVERIFIED',employmentType:'permanent',salaryMinDkkMonth:null,salaryMaxDkkMonth:null,vacancyStatus:'ACTIVE VIA THIRD PARTY',fullJdVerified:true})
-  const result=await searchLinkedInProfile({freshnessDays:3,unionSearchPlan:plan('Senior IT Project Manager'),previousCandidates,previousVerifiedJobs:[mk('2020202020','Today Co','2026-08-27'),mk('2121212121','Old Co','2026-08-20')],skipDiscovery:true,fetcher:async()=>{calls++;throw new Error('network should not be called')},now:new Date('2026-08-27T12:00:00Z')})
-  assert.equal(calls,0)
-  assert.equal(result.stats.searchRequests,0)
+  const fetcher=async url=>{
+    if(url.includes('/seeMoreJobPostings/search')){
+      searchCalls++
+      assert.equal(new URL(url).searchParams.get('f_TPR'),'r259200')
+      return card('2020202020','Senior IT Project Manager','Today Co')
+    }
+    detailCalls++
+    throw new Error('cached detail should not be fetched')
+  }
+  const result=await searchLinkedInProfile({
+    freshnessDays:3,
+    unionSearchPlan:plan('Senior IT Project Manager'),
+    previousCandidates,
+    previousVerifiedJobs:[mk('2020202020','Today Co','2026-08-27'),mk('2121212121','Old Co','2026-08-20')],
+    fetcher,
+    now:new Date('2026-08-27T12:00:00Z')
+  })
+  assert.ok(searchCalls>0)
+  assert.equal(detailCalls,0)
   assert.equal(result.stats.detailRequests,0)
   assert.equal(result.stats.cachedJdUsed,2)
   assert.deepEqual(result.jobs.map(item=>item.job.company),['Today Co'])

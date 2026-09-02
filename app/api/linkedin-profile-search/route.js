@@ -19,12 +19,11 @@ export async function POST(request){
     const exclusionRules=Array.isArray(body?.exclusionRules)?body.exclusionRules:[]
     const previousCandidates=Array.isArray(body?.previousCandidates)?body.previousCandidates.slice(0,500):[]
     const previousVerifiedJobs=Array.isArray(body?.previousVerifiedJobs)?body.previousVerifiedJobs.slice(0,500):[]
-    const skipDiscovery=body?.skipDiscovery===true
     if(!Array.isArray(unionSearchPlan?.directions)||unionSearchPlan.directions.length===0){
       return NextResponse.json({error:'Search Profile is not configured.'},{status:400})
     }
     const discoverySearchPlan=await buildDiscoverySearchPlan({unionSearchPlan})
-    const result=await searchLinkedInProfile({freshnessDays,unionSearchPlan:discoverySearchPlan,exclusionRules,previousCandidates,previousVerifiedJobs,skipDiscovery,fetcher:createLinkedInStableFetcher()})
+    const result=await searchLinkedInProfile({freshnessDays,unionSearchPlan:discoverySearchPlan,exclusionRules,previousCandidates,previousVerifiedJobs,fetcher:createLinkedInStableFetcher()})
     return NextResponse.json({...result,fetchedAt:new Date().toISOString()})
   }catch(error){
     console.error('linkedin-profile-search error',error)

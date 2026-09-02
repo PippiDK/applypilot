@@ -19,7 +19,7 @@ import {evaluateJobConditions} from './lib/job-conditions.js'
 import {fitLabel} from './lib/fit-label.js'
 import {compareShadowToLegacy} from './lib/shadow-search-compare.js'
 import {JOB_STATUS_OPTIONS,readJobStatuses,writeJobStatus} from './lib/job-statuses.js'
-import {readLinkedInMasterPoolSnapshot,isLinkedInMasterPoolFresh,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
+import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
 import SearchAudit from './components/search-audit.js'
 import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
@@ -237,7 +237,6 @@ export default function Home(){
     if(hasProfilePlan){
       const fingerprint=profile.unionSearchPlanFingerprint||profile.unionSearchPlan?.fingerprint
       const poolSnapshot=readLinkedInMasterPoolSnapshot({storage:localStorage,fingerprint})
-      const skipDiscovery=freshnessDays!==14&&poolSnapshot.candidates.length>0&&poolSnapshot.verifiedJobs.length>0&&isLinkedInMasterPoolFresh(poolSnapshot)
       res=await fetch('/api/linkedin-profile-search',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
@@ -247,7 +246,6 @@ export default function Home(){
           exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[],
           previousCandidates:poolSnapshot.candidates,
           previousVerifiedJobs:poolSnapshot.verifiedJobs,
-          skipDiscovery,
         }),
       })
     }else{

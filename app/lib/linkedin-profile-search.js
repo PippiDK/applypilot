@@ -208,20 +208,15 @@ function mergeDiscoveryCandidates(current=[],previous=[],now=new Date()){
   return [...byId.values()]
 }
 
-export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},exclusionRules=[],previousCandidates=[],previousVerifiedJobs=[],skipDiscovery=false,fetcher,now=new Date()}={}){
+export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},exclusionRules=[],previousCandidates=[],previousVerifiedJobs=[],fetcher,now=new Date()}={}){
   const days=WINDOWS.has(Number(freshnessDays))?Number(freshnessDays):7
   if(typeof fetcher!=='function') throw new Error('Profile-driven LinkedIn fetcher is required.')
   if(!Array.isArray(unionSearchPlan?.directions)||unionSearchPlan.directions.length===0) throw new Error('Search Profile requires at least one role direction.')
 
-  // Discovery always uses one stable broad horizon. The user-selected
-  // freshness window is applied locally to verified JobPosting dates below.
-  const discovery=skipDiscovery
-    ?{
-      candidates:[],
-      stats:{directions:unionSearchPlan.directions.length,primaryDirections:unionSearchPlan.directions.filter(item=>item?.tier==='primary').length,adjacentDirections:unionSearchPlan.directions.filter(item=>item?.tier!=='primary').length,searchRequests:0,searchFailures:0,searchRows:0,discovered:Array.isArray(previousCandidates)?previousCandidates.length:0,cacheOnly:true,requestBudgetReached:false},
-      coverage:{status:'SEARCHED',detail:null},
-    }
-    :await searchLinkedInShadow({freshnessDays:DISCOVERY_HORIZON_DAYS,unionSearchPlan,fetcher})
+  // Every user-selected freshness window performs a fresh LinkedIn discovery.
+  // The persistent 14-day master pool is only a cache for already known jobs/JDs:
+  // fresh discovery finds deltas, while verified JDs are reused by stable job ID.
+  const discovery=await searchLinkedInShadow({freshnessDays:days,unionSearchPlan,fetcher})
   const masterCandidates=mergeDiscoveryCandidates(discovery.candidates,previousCandidates,now)
   const auditMap=new Map(masterCandidates.map(candidate=>[String(candidate.jobId),createAuditRecord(candidate)]))
   let detailRequests=0
