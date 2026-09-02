@@ -2,7 +2,7 @@
 
 function scoreText(value){
   if(value==null||value==='') return '—'
-  return Number.isFinite(Number(value))?`${Number(value)}%`:'—'
+  return Number.isFinite(Number(value))?`${Number(value).toFixed(1)}/10`:'—'
 }
 
 export default function SearchAudit({audit=[]}){
