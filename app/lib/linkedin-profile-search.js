@@ -175,7 +175,40 @@ async function mapLimit(items,limit,fn){
   return results
 }
 
-export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},exclusionRules=[],fetcher,now=new Date()}={}){
+function compactCandidate(candidate={}){
+  const jobId=String(candidate?.jobId||'').trim()
+  if(!jobId) return null
+  return {
+    jobId,
+    url:String(candidate?.url||''),
+    title:String(candidate?.title||''),
+    company:String(candidate?.company||''),
+    location:String(candidate?.location||''),
+    publishedAt:candidate?.publishedAt||null,
+    foundBy:Array.isArray(candidate?.foundBy)?candidate.foundBy:[],
+  }
+}
+
+function mergeDiscoveryCandidates(current=[],previous=[],now=new Date()){
+  const byId=new Map()
+  const add=(candidate,isCurrent=false)=>{
+    const normalized=compactCandidate(candidate)
+    if(!normalized) return
+    if(!isCurrent&&normalized.publishedAt&&!withinFreshness(normalized.publishedAt,DISCOVERY_HORIZON_DAYS,now)) return
+    const existing=byId.get(normalized.jobId)
+    if(!existing){byId.set(normalized.jobId,normalized);return}
+    byId.set(normalized.jobId,{
+      ...existing,
+      ...Object.fromEntries(Object.entries(normalized).filter(([,value])=>value!==''&&value!==null&&value!==undefined)),
+      foundBy:[...(Array.isArray(existing.foundBy)?existing.foundBy:[]),...(Array.isArray(normalized.foundBy)?normalized.foundBy:[])],
+    })
+  }
+  for(const candidate of Array.isArray(previous)?previous:[]) add(candidate,false)
+  for(const candidate of Array.isArray(current)?current:[]) add(candidate,true)
+  return [...byId.values()]
+}
+
+export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},exclusionRules=[],previousCandidates=[],fetcher,now=new Date()}={}){
   const days=WINDOWS.has(Number(freshnessDays))?Number(freshnessDays):7
   if(typeof fetcher!=='function') throw new Error('Profile-driven LinkedIn fetcher is required.')
   if(!Array.isArray(unionSearchPlan?.directions)||unionSearchPlan.directions.length===0) throw new Error('Search Profile requires at least one role direction.')
@@ -183,14 +216,15 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
   // Discovery always uses one stable broad horizon. The user-selected
   // freshness window is applied locally to verified JobPosting dates below.
   const discovery=await searchLinkedInShadow({freshnessDays:DISCOVERY_HORIZON_DAYS,unionSearchPlan,fetcher})
-  const auditMap=new Map(discovery.candidates.map(candidate=>[String(candidate.jobId),createAuditRecord(candidate)]))
+  const masterCandidates=mergeDiscoveryCandidates(discovery.candidates,previousCandidates,now)
+  const auditMap=new Map(masterCandidates.map(candidate=>[String(candidate.jobId),createAuditRecord(candidate)]))
   let detailRequests=0
   let detailFailures=0
   let incompleteDetails=0
   let fullJdVerified=0
   let evaluated=0
 
-  const settled=await mapLimit(discovery.candidates,4,async candidate=>{
+  const settled=await mapLimit(masterCandidates,4,async candidate=>{
     detailRequests++
     const html=await fetcher(`${LINKEDIN_JOB_DETAIL}${candidate.jobId}`)
     const job=parseDetailHtml(candidate,html,now)
@@ -251,6 +285,7 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
 
   return {
     jobs,
+    masterCandidates,
     audit:auditList(auditMap),
     stats:{
       ...discovery.stats,
@@ -259,6 +294,8 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
       incompleteDetails,
       fullJdVerified,
       evaluated,
+      masterPoolSize:masterCandidates.length,
+      newlyDiscovered:Math.max(0,masterCandidates.length-(Array.isArray(previousCandidates)?previousCandidates.length:0)),
       returned:jobs.length,
     },
     coverage:{source:'LinkedIn Jobs',freshnessDays:days,status,detail},
