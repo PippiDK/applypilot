@@ -13,6 +13,8 @@ export const COMPANY_CONNECTORS={
   'Novo Nordisk':{status:'connected',connector:'successfactors',baseUrl:'https://careers.novonordisk.com',searchPath:'/search/'},
   'Nordea':{status:'connected',connector:'successfactors',baseUrl:'https://careers.nordea.com',searchPath:'/search/'},
   'Danske Bank':{status:'connected',connector:'oracle',host:'https://ejqi.fa.ocs.oraclecloud.eu',site:'CX_1001',country:'Denmark'},
+  'DLF':{status:'connected',connector:'successfactors',baseUrl:'https://careers.dlf.com',listingPath:'/go/Greater-Europe/8944455/'},
+  'Ascendis Pharma':{status:'connected',connector:'workable',slug:'ascendis-pharma',country:'Denmark'},
 }
 
 export const TARGET_COMPANIES=[
