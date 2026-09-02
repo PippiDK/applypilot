@@ -55,9 +55,13 @@ function jdSupport(directionRole,job){
   return direction.filter(token=>textTokens.has(token)).length/direction.length
 }
 
-function profileEvaluation(job,foundBy=[]){
+function profileEvaluation(job,profileDirections=[]){
   let best=null
-  for(const direction of Array.isArray(foundBy)?foundBy:[]){
+  // Evaluation must depend only on the verified JD + approved Search Profile.
+  // Discovery provenance (candidate.foundBy) is intentionally excluded here so
+  // the same job cannot change role direction or score based on which LinkedIn
+  // query happened to surface it in a particular run.
+  for(const direction of Array.isArray(profileDirections)?profileDirections:[]){
     const similarity=roleSimilarity(direction?.role,job.title)
     const support=jdSupport(direction?.role,job)
     const relevant=similarity.substantiveCommon>0 && (similarity.score>=0.45||support>=0.65)
@@ -226,7 +230,7 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
     }
 
     evaluated++
-    const result=profileEvaluation(job,candidate.foundBy)
+    const result=profileEvaluation(job,unionSearchPlan.directions)
     if(!result.pass){
       updateAuditRecord(auditMap,candidate.jobId,{stage:'PROFILE_ROLE_REJECT',decision:'REJECT',reason:result.reason,score:0})
       continue
