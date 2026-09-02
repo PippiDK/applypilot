@@ -21,6 +21,7 @@ import {compareShadowToLegacy} from './lib/shadow-search-compare.js'
 import {JOB_STATUS_OPTIONS,readJobStatuses,writeJobStatus} from './lib/job-statuses.js'
 import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
 import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
+import {defaultCompanyWatch,readCompanyWatch,writeCompanyWatch,TARGET_COMPANIES} from './lib/company-watch.js'
 import SearchAudit from './components/search-audit.js'
 import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
@@ -49,6 +50,8 @@ export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(7)
   const [jobs,setJobs]=useState([])
   const [selectedSources,setSelectedSources]=useState(()=>[...DEFAULT_SEARCH_SOURCES])
+  const [companyWatch,setCompanyWatch]=useState(()=>defaultCompanyWatch())
+  const [companyWatchOpen,setCompanyWatchOpen]=useState(false)
   const [selectedAreas,setSelectedAreas]=useState(()=>SEARCH_AREAS.map(({id})=>id))
   const [selectedWorkModels,setSelectedWorkModels]=useState(()=>WORK_MODELS.map(({id})=>id))
   const [selectedStatuses,setSelectedStatuses]=useState(()=>[...DEFAULT_JOB_STATUS_FILTERS])
@@ -95,6 +98,7 @@ export default function Home(){
       const hydrated={...resumeToProfile(savedProfile,primaryCv),...preferences,geography:legacyGeographyFromPreferences(preferences.locations,preferences.workModels)}
 
       setSelectedSources(readSearchSources(localStorage))
+      setCompanyWatch(readCompanyWatch(localStorage))
       setCvLibrary(library)
       if(readyCvCount(library)>0) localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(library))
       if(primaryCv){
@@ -234,6 +238,17 @@ export default function Home(){
     setSelectedSources(current=>{
       const next=current.includes(source)?current.filter(value=>value!==source):[...current,source]
       return writeSearchSources(localStorage,next)
+    })
+  }
+
+  function toggleCompanyWatchEnabled(){
+    setCompanyWatch(current=>writeCompanyWatch(localStorage,{...current,enabled:!current.enabled}))
+  }
+
+  function toggleCompany(name){
+    setCompanyWatch(current=>{
+      const selected=current.selected.includes(name)?current.selected.filter(value=>value!==name):[...current.selected,name]
+      return writeCompanyWatch(localStorage,{...current,selected})
     })
   }
 
@@ -587,6 +602,16 @@ export default function Home(){
       <div><small>POSTED WITHIN</small><div className="choices">{WINDOWS.map(days=><button key={days} className={freshnessDays===days?'choice selected':'choice'} onClick={()=>setFreshnessDays(days)}>{days} day{days===1?'':'s'}</button>)}</div></div>
       <div><small>SEARCH SOURCES</small><div className="choices"><label className="choice"><input type="checkbox" checked={selectedSources.includes('linkedin')} onChange={()=>toggleSource('linkedin')}/> LinkedIn</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobindex')} onChange={()=>toggleSource('jobindex')}/> Jobindex</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobnet')} onChange={()=>toggleSource('jobnet')}/> Jobnet</label></div></div>
       <button className="primary" onClick={search} disabled={state.loading}>{state.loading?'Searching…':'Search'}</button>
+    </section>
+
+    <section className="companyWatch">
+      <div className="companyWatchMain">
+        <label className="companyWatchToggle"><input type="checkbox" checked={companyWatch.enabled} onChange={toggleCompanyWatchEnabled}/><span><small>DIRECT COMPANY WATCH</small><b>Company career sites</b></span></label>
+        <div className="companyWatchActions"><span>{companyWatch.selected.length} companies selected</span><button className="secondary companyManage" onClick={()=>setCompanyWatchOpen(open=>!open)}>{companyWatchOpen?'Close':'Manage'}</button></div>
+      </div>
+      {companyWatchOpen&&<div className="companyWatchList">
+        {TARGET_COMPANIES.map(name=><label key={name}><input type="checkbox" checked={companyWatch.selected.includes(name)} onChange={()=>toggleCompany(name)}/><span>{name}</span><small>Connection pending</small></label>)}
+      </div>}
     </section>
 
     {state.error&&<div className="errorBox"><b>{state.error==='Please Upload Your CV'?'Please Upload Your CV':'Search failed'}</b>{state.error!=='Please Upload Your CV'&&<span>{state.error}</span>}</div>}
