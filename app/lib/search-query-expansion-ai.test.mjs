@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {validateSearchQueryExpansions,buildSearchQueryExpansions,buildExpandedSearchPlan} from './search-query-expansion-ai.js'
+import {validateSearchQueryExpansions,buildSearchQueryExpansions,buildExpandedSearchPlan,buildDeterministicSearchQueryExpansions,buildDiscoverySearchPlan} from './search-query-expansion-ai.js'
 
 test('normalizes, removes exact and duplicate queries, and caps each role at three',()=>{
   const result=validateSearchQueryExpansions({expansions:[
@@ -45,4 +45,38 @@ test('falls back to exact-only discovery when expansion fails',async()=>{
   const plan={directions:[{key:'senior concept artist',role:'Senior Concept Artist',tier:'primary',origin:'cv',cvSlots:[1]}]}
   const result=await buildDiscoverySearchPlan({unionSearchPlan:plan,queryExpander:async()=>{throw new Error('provider down')}})
   assert.deepEqual(result.directions.map(x=>[x.role,x.query,x.discoveryMode]),[['Senior Concept Artist','Senior Concept Artist','exact']])
+})
+
+
+test('deterministic discovery expansion returns the same queries for the same roles on every call',()=>{
+  const roles=['Senior IT Project Manager','Senior IT Delivery Manager','Transformation Project Manager']
+  const first=buildDeterministicSearchQueryExpansions({roles})
+  const second=buildDeterministicSearchQueryExpansions({roles})
+  assert.deepEqual(second,first)
+  assert.deepEqual(first[0],{
+    sourceRole:'Senior IT Project Manager',
+    queries:['IT Project Manager','Senior IT Project Lead','IT Project Lead']
+  })
+})
+
+test('default discovery search plan is deterministic and does not depend on AI output',async()=>{
+  const plan={fingerprint:'usp1-test',directions:[
+    {key:'senior it project manager',role:'Senior IT Project Manager',tier:'primary',origin:'cv',cvSlots:[1]},
+    {key:'transformation project manager',role:'Transformation Project Manager',tier:'adjacent',origin:'cv',cvSlots:[1]}
+  ]}
+  const first=await buildDiscoverySearchPlan({unionSearchPlan:plan})
+  const second=await buildDiscoverySearchPlan({unionSearchPlan:plan})
+  assert.deepEqual(second,first)
+  assert.deepEqual(
+    first.directions.map(x=>[x.role,x.query,x.discoveryMode]),
+    [
+      ['Senior IT Project Manager','Senior IT Project Manager','exact'],
+      ['Senior IT Project Manager','IT Project Manager','expanded'],
+      ['Senior IT Project Manager','Senior IT Project Lead','expanded'],
+      ['Senior IT Project Manager','IT Project Lead','expanded'],
+      ['Transformation Project Manager','Transformation Project Manager','exact'],
+      ['Transformation Project Manager','Transformation Manager','expanded'],
+      ['Transformation Project Manager','Transformation Project Lead','expanded']
+    ]
+  )
 })
