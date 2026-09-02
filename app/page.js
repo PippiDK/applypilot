@@ -371,7 +371,7 @@ export default function Home(){
         let data
         try{data=raw?JSON.parse(raw):{}}catch{throw new Error(res.ok?'Company site search returned invalid response':`Company site search failed (HTTP ${res.status})`)}
         if(!res.ok) throw new Error(data.error||`Company site search failed (HTTP ${res.status})`)
-        return {source:'company_site',data}
+        return {source:'company_site',data,label:`Company sites · ${companies.join(', ')}`}
       })()))
     }
 
@@ -389,7 +389,7 @@ export default function Home(){
       })
       const data=await res.json()
       if(!res.ok) throw new Error(data.error||'Consultant portal search failed')
-      return {source:'consultant_portal',data}
+      return {source:'consultant_portal',data,label:'Consultant portals'}
     })())
 
     const settled=await Promise.allSettled(tasks)
@@ -406,11 +406,22 @@ export default function Home(){
       returned:mergedJobs.length,
     }
     const audit=successful.flatMap(result=>(Array.isArray(result.data.audit)?result.data.audit:[]).map(row=>({...row,source:result.source})))
-    const limited=failed.length>0||successful.some(result=>result.data.coverage?.status==='ACCESS LIMITED')
+    const limitedDetails=[
+      ...failed.map(item=>item?.reason?.message).filter(Boolean).map(message=>`Request failed · ${message}`),
+      ...successful
+        .filter(result=>result.data.coverage?.status==='ACCESS LIMITED')
+        .map(result=>result.data.coverage?.detail?`${result.label||result.source} · ${result.data.coverage.detail}`:`${result.label||result.source} · limited access`),
+    ]
+    const limited=limitedDetails.length>0
     setState({
       loading:false,
       error:'',
-      coverage:{source:[...selectedSources,...(activeCompanySites.length?['company-sites']:[]),...(activeConsultantPortals.length?['consultant-portals']:[])].join('+'),freshnessDays,status:limited?'ACCESS LIMITED':mergedJobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:failed[0]?.reason?.message||null},
+      coverage:{
+        source:[...selectedSources,...(activeCompanySites.length?['company-sites']:[]),...(activeConsultantPortals.length?['consultant-portals']:[])].join('+'),
+        freshnessDays,
+        status:limited?'ACCESS LIMITED':mergedJobs.length?'SEARCHED':'NO RELEVANT RESULTS',
+        detail:limitedDetails.join(' | ')||null,
+      },
       stats,
       fetchedAt:new Date().toISOString(),
       audit,
@@ -683,7 +694,7 @@ export default function Home(){
 
     {state.error&&<div className="errorBox"><b>{state.error==='Please Upload Your CV'?'Please Upload Your CV':'Search failed'}</b>{state.error!=='Please Upload Your CV'&&<span>{state.error}</span>}</div>}
     {state.stats&&<div className="searchMeta"><span><b>{state.stats.masterPoolSize??state.stats.discovered}</b> jobs discovered</span><span><b>{state.stats.fullJdVerified}</b> full JDs read</span><span><b>{state.stats.returned??jobs.length}</b> worthwhile after evaluation</span><span>Coverage: <b>{state.coverage?.status}</b></span></div>}
-    {state.coverage?.detail&&<div className="warningBox">Partial source access: {state.coverage.detail}</div>}
+    {state.coverage?.detail&&<div className="warningBox"><b>Partial source access</b><span>{state.coverage.detail}</span></div>}
 
     <section className="grid">
       <div className="list">
