@@ -20,6 +20,7 @@ import {fitLabel} from './lib/fit-label.js'
 import {compareShadowToLegacy} from './lib/shadow-search-compare.js'
 import {JOB_STATUS_OPTIONS,readJobStatuses,writeJobStatus} from './lib/job-statuses.js'
 import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
+import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
 import SearchAudit from './components/search-audit.js'
 import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
@@ -40,10 +41,14 @@ function roleList(value){return Array.isArray(value)?value.map(item=>String(item
 function legacyRoles(value=''){return String(value??'').split(',').map(item=>item.trim()).filter(Boolean)}
 function combinedRoles(primary=[],adjacent=[]){return [...roleList(primary),...roleList(adjacent)].join(', ')}
 function workModelText(values=[]){return values.map(value=>value==='onsite'?'On-site':value==='hybrid'?'Hybrid':'Remote').join(' · ')}
+function jobSourceLabel(job={}){const source=String(job?.source||job?.sourceRecords?.[0]?.source||'').toLowerCase();if(source==='jobindex')return 'Jobindex';if(source==='linkedin')return 'LinkedIn';return String(job?.originalUrl||'').includes('linkedin.com')?'LinkedIn':'Source'}
+function sourceDedupeKey(job={}){const company=String(job.company||'').toLowerCase().replace(/\b(a\/s|as)\b/g,'as').replace(/[.,]/g,'').trim();const title=String(job.title||'').toLowerCase().replace(/\s+/g,' ').trim();const location=String(job.location||'').toLowerCase().replace(/\s+/g,' ').trim();return company&&title?company+'|'+title+'|'+location:''}
+function mergeSourceItems(groups=[]){const out=[];const byKey=new Map();for(const item of groups.flat()){const key=sourceDedupeKey(item?.job);if(key&&byKey.has(key)){const index=byKey.get(key);const current=out[index];const richer=String(item?.job?.description||item?.job?.fullJd||'').length>String(current?.job?.description||current?.job?.fullJd||'').length?item:current;out[index]=richer;continue}if(key)byKey.set(key,out.length);out.push(item)}return out}
 
 export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(7)
   const [jobs,setJobs]=useState([])
+  const [selectedSources,setSelectedSources]=useState(()=>[...DEFAULT_SEARCH_SOURCES])
   const [selectedAreas,setSelectedAreas]=useState(()=>SEARCH_AREAS.map(({id})=>id))
   const [selectedWorkModels,setSelectedWorkModels]=useState(()=>WORK_MODELS.map(({id})=>id))
   const [selectedStatuses,setSelectedStatuses]=useState(()=>[...DEFAULT_JOB_STATUS_FILTERS])
@@ -89,6 +94,7 @@ export default function Home(){
       const preferences=normalizeSearchPreferences(savedProfile)
       const hydrated={...resumeToProfile(savedProfile,primaryCv),...preferences,geography:legacyGeographyFromPreferences(preferences.locations,preferences.workModels)}
 
+      setSelectedSources(readSearchSources(localStorage))
       setCvLibrary(library)
       if(readyCvCount(library)>0) localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(library))
       if(primaryCv){
@@ -224,50 +230,104 @@ export default function Home(){
     setSelectedWorkModels(checked?WORK_MODELS.map(({id})=>id):[])
   }
 
+  function toggleSource(source){
+    setSelectedSources(current=>{
+      const next=current.includes(source)?current.filter(value=>value!==source):[...current,source]
+      return writeSearchSources(localStorage,next)
+    })
+  }
+
   async function search(){
   if(!resumeLoaded){
     setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[]})
+    return
+  }
+  if(!selectedSources.length){
+    setState({loading:false,error:'Select at least one search source.',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
   }
   setJobs([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
   setShadowState({status:'skipped',error:'',stats:null,coverage:null,comparison:null})
   const hasProfilePlan=Array.isArray(profile?.unionSearchPlan?.directions)&&profile.unionSearchPlan.directions.length>0
   try{
-    let res
-    if(hasProfilePlan){
-      const fingerprint=profile.unionSearchPlanFingerprint||profile.unionSearchPlan?.fingerprint
-      const poolSnapshot=readLinkedInMasterPoolSnapshot({storage:localStorage,fingerprint})
-      res=await fetch('/api/linkedin-profile-search',{
+    const tasks=[]
+
+    if(selectedSources.includes('linkedin')) tasks.push((async()=>{
+      let res
+      if(hasProfilePlan){
+        const fingerprint=profile.unionSearchPlanFingerprint||profile.unionSearchPlan?.fingerprint
+        const poolSnapshot=readLinkedInMasterPoolSnapshot({storage:localStorage,fingerprint})
+        res=await fetch('/api/linkedin-profile-search',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            freshnessDays,
+            unionSearchPlan:profile.unionSearchPlan,
+            exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[],
+            previousCandidates:poolSnapshot.candidates,
+            previousVerifiedJobs:poolSnapshot.verifiedJobs,
+          }),
+        })
+      }else{
+        res=await fetch('/api/linkedin-search',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({freshnessDays,cvText:cvData.cvText}),
+        })
+      }
+      const data=await res.json()
+      if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
+      if(hasProfilePlan&&Array.isArray(data.masterCandidates)){
+        writeLinkedInMasterPool({
+          storage:localStorage,
+          fingerprint:profile.unionSearchPlanFingerprint||profile.unionSearchPlan?.fingerprint,
+          candidates:data.masterCandidates,
+          verifiedJobs:Array.isArray(data.masterVerifiedJobs)?data.masterVerifiedJobs:[],
+        })
+      }
+      return {source:'linkedin',data}
+    })())
+
+    if(selectedSources.includes('jobindex')) tasks.push((async()=>{
+      if(!hasProfilePlan) throw new Error('Jobindex requires a saved Search Profile.')
+      const res=await fetch('/api/jobindex-profile-search',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           freshnessDays,
           unionSearchPlan:profile.unionSearchPlan,
           exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[],
-          previousCandidates:poolSnapshot.candidates,
-          previousVerifiedJobs:poolSnapshot.verifiedJobs,
         }),
       })
-    }else{
-      res=await fetch('/api/linkedin-search',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({freshnessDays,cvText:cvData.cvText}),
-      })
+      const data=await res.json()
+      if(!res.ok) throw new Error(data.error||'Jobindex search failed')
+      return {source:'jobindex',data}
+    })())
+
+    const settled=await Promise.allSettled(tasks)
+    const successful=settled.filter(item=>item.status==='fulfilled').map(item=>item.value)
+    const failed=settled.filter(item=>item.status==='rejected')
+    if(!successful.length) throw failed[0]?.reason||new Error('Search failed')
+
+    const mergedJobs=mergeSourceItems(successful.map(result=>Array.isArray(result.data.jobs)?result.data.jobs:[]))
+    setJobs(mergedJobs)
+
+    const stats={
+      masterPoolSize:successful.reduce((sum,result)=>sum+Number(result.data.stats?.masterPoolSize??result.data.stats?.discovered??0),0),
+      fullJdVerified:successful.reduce((sum,result)=>sum+Number(result.data.stats?.fullJdVerified??0),0),
+      returned:mergedJobs.length,
     }
-    const data=await res.json()
-    if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
-    setJobs(Array.isArray(data.jobs)?data.jobs:[])
-    if(hasProfilePlan&&Array.isArray(data.masterCandidates)){
-      writeLinkedInMasterPool({
-        storage:localStorage,
-        fingerprint:profile.unionSearchPlanFingerprint||profile.unionSearchPlan?.fingerprint,
-        candidates:data.masterCandidates,
-        verifiedJobs:Array.isArray(data.masterVerifiedJobs)?data.masterVerifiedJobs:[],
-      })
-    }
-    setState({loading:false,error:'',coverage:data.coverage||null,stats:data.stats||null,fetchedAt:data.fetchedAt||null,audit:Array.isArray(data.audit)?data.audit:[]})
-  }catch(error){ setState({loading:false,error:error.message||'LinkedIn search failed',coverage:null,stats:null,fetchedAt:null,audit:[]}) }
+    const audit=successful.flatMap(result=>(Array.isArray(result.data.audit)?result.data.audit:[]).map(row=>({...row,source:result.source})))
+    const limited=failed.length>0||successful.some(result=>result.data.coverage?.status==='ACCESS LIMITED')
+    setState({
+      loading:false,
+      error:'',
+      coverage:{source:selectedSources.join('+'),freshnessDays,status:limited?'ACCESS LIMITED':mergedJobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:failed[0]?.reason?.message||null},
+      stats,
+      fetchedAt:new Date().toISOString(),
+      audit,
+    })
+  }catch(error){ setState({loading:false,error:error.message||'Search failed',coverage:null,stats:null,fetchedAt:null,audit:[]}) }
 }
   function startProfile(){
     const base=resumeToProfile(profile,cvData)
@@ -498,10 +558,10 @@ export default function Home(){
   }
 
   return <main>
-    <header><div><div className="brand">ApplyPilot</div><div className="tag">Search less. Apply better.</div></div><div className="headerActions"><div className={`sourceBadge profileStatus ${resumeLoaded?'statusReady':'statusEmpty'}`}>{resumeLoaded?'Profile ready':'Profile empty'}</div><div className="sourceBadge">LINKEDIN · PUBLIC</div></div></header>
+    <header><div><div className="brand">ApplyPilot</div><div className="tag">Search less. Apply better.</div></div><div className="headerActions"><div className={`sourceBadge profileStatus ${resumeLoaded?'statusReady':'statusEmpty'}`}>{resumeLoaded?'Profile ready':'Profile empty'}</div><div className="sourceBadge">LINKEDIN + JOBINDEX · TEST</div></div></header>
 
     <section className="hero">
-      <div><p className="eyebrow">ONE SOURCE · END-TO-END</p><h1>Find the right roles for your Search Profile in Denmark.</h1><p>Search Profile → LinkedIn discovery → full job description → worthwhile matches only.</p></div>
+      <div><p className="eyebrow">MULTI-SOURCE · END-TO-END</p><h1>Find the right roles for your Search Profile in Denmark.</h1><p>Search Profile → selected sources → full job description → worthwhile matches only.</p></div>
       <div className="metric"><b>{state.loading?'…':jobs.length}</b><span>matches</span></div>
     </section>
 
@@ -509,10 +569,11 @@ export default function Home(){
 
     <section className="controls">
       <div><small>POSTED WITHIN</small><div className="choices">{WINDOWS.map(days=><button key={days} className={freshnessDays===days?'choice selected':'choice'} onClick={()=>setFreshnessDays(days)}>{days} day{days===1?'':'s'}</button>)}</div></div>
-      <button className="primary" onClick={search} disabled={state.loading}>{state.loading?'Reading LinkedIn JDs…':'Search LinkedIn'}</button>
+      <div><small>SEARCH SOURCES</small><div className="choices"><label className="choice"><input type="checkbox" checked={selectedSources.includes('linkedin')} onChange={()=>toggleSource('linkedin')}/> LinkedIn</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobindex')} onChange={()=>toggleSource('jobindex')}/> Jobindex</label></div></div>
+      <button className="primary" onClick={search} disabled={state.loading}>{state.loading?'Searching…':'Search'}</button>
     </section>
 
-    {state.error&&<div className="errorBox"><b>{state.error==='Please Upload Your CV'?'Please Upload Your CV':'LinkedIn search failed'}</b>{state.error!=='Please Upload Your CV'&&<span>{state.error}</span>}</div>}
+    {state.error&&<div className="errorBox"><b>{state.error==='Please Upload Your CV'?'Please Upload Your CV':'Search failed'}</b>{state.error!=='Please Upload Your CV'&&<span>{state.error}</span>}</div>}
     {state.stats&&<div className="searchMeta"><span><b>{state.stats.masterPoolSize??state.stats.discovered}</b> jobs discovered</span><span><b>{state.stats.fullJdVerified}</b> full JDs read</span><span><b>{state.stats.returned??jobs.length}</b> worthwhile after evaluation</span><span>Coverage: <b>{state.coverage?.status}</b></span></div>}
     {state.coverage?.detail&&<div className="warningBox">Partial source access: {state.coverage.detail}</div>}
 
@@ -528,14 +589,14 @@ export default function Home(){
             <div className={filterStyles.group}><small className={filterStyles.groupTitle}>STATUS</small>{JOB_STATUS_FILTERS.map(status=><label className={filterStyles.option} key={status.id}><input type="checkbox" checked={selectedStatuses.includes(status.id)} onChange={()=>toggleJobFilter(setSelectedStatuses,status.id)}/><span>{status.label}</span><b>{statusCounts[status.id]||0}</b></label>)}</div>
           </div>
         </details>}
-        {!state.loading&&!state.error&&!state.stats&&<div className="empty">Run the LinkedIn search. No other source is used in this milestone.</div>}
-        {state.loading&&<div className="empty">Searching LinkedIn public pages and reading full job descriptions…</div>}
+        {!state.loading&&!state.error&&!state.stats&&<div className="empty">Run search to find matching vacancies from the selected sources.</div>}
+        {state.loading&&<div className="empty">Searching selected sources and reading full job descriptions…</div>}
         {!state.loading&&state.stats&&jobs.length===0&&<div className="empty">NO STRONG NEW MATCHES FOUND.</div>}
         {!state.loading&&state.stats&&jobs.length>0&&visibleJobs.length===0&&<div className="empty">NO MATCHES IN SELECTED FILTERS.</div>}
         {visibleJobs.map(item=>{const {job,evaluation}=item; const score=Math.round(evaluation.score*10); const manualStatus=jobStatuses[job.sourceJobId]||''; return <div className="jobWrap" key={job.sourceJobId}>
           <button onClick={()=>setSelected(item)} className={'job '+(active?.job.sourceJobId===job.sourceJobId?'active':'')}>
             <span className="score">{fitLabel(score)}</span>
-            <span><b>{job.title}</b><small>{job.company} · {job.location}</small><small className="sourceLine">LinkedIn · {dateText(job.publishedAt)}</small></span>
+            <span><b>{job.title}</b><small>{job.company} · {job.location}</small><small className="sourceLine">{jobSourceLabel(job)} · {dateText(job.publishedAt)}</small></span>
             <span>→</span>
           </button>
           <select aria-label={`Status for ${job.title}`} className={`jobStatusSelect status-${manualStatus||'none'}`} value={manualStatus} onChange={event=>changeJobStatus(job.sourceJobId,event.target.value)}>
@@ -546,14 +607,14 @@ export default function Home(){
 
       <div className="panel">
         {active?(()=>{const {job}=active; const expertise=expertiseState.jobKey===jobKey?expertiseState.analysis:null; return <>
-          <div className="panelTop expertiseHeader"><div><h2>{job.title}</h2><p>{job.company} · {job.location}</p><small className="sourceLine">Source: LinkedIn · {dateText(job.publishedAt)}</small></div></div>
+          <div className="panelTop expertiseHeader"><div><h2>{job.title}</h2><p>{job.company} · {job.location}</p><small className="sourceLine">Source: {jobSourceLabel(job)} · {dateText(job.publishedAt)}</small></div></div>
 
           <div className="conditionGrid">
             <div className="conditionCard"><small>Area</small><b>{conditionScore(jobConditions?.area.score)}</b><span>{jobConditions?.area.value||'Not stated'}</span></div>
             <div className="conditionCard"><small>Salary</small><b>{conditionScore(jobConditions?.salary.score)}</b><span>{jobConditions?.salary.value||'Not stated'}</span></div>
             <div className="conditionCard"><small>Employment type</small><b>{conditionScore(jobConditions?.employmentType.score)}</b><span>{jobConditions?.employmentType.value||'Not stated'}</span></div>
             <div className="conditionCard"><small>Work model</small><b>{conditionScore(jobConditions?.workModel.score)}</b><span>{jobConditions?.workModel.value||'Not stated'}</span></div>
-            <a className="secondary openLink" style={{gridColumn:'1 / -1',justifySelf:'start'}} href={job.originalUrl} target="_blank" rel="noreferrer">Open LinkedIn vacancy</a>
+            <a className="secondary openLink" style={{gridColumn:'1 / -1',justifySelf:'start'}} href={job.originalUrl||job.detailUrl||job.applicationUrl} target="_blank" rel="noreferrer">Open vacancy</a>
           </div>
 
           <BestCvPanel
@@ -599,7 +660,7 @@ export default function Home(){
       <ShadowSearchAudit shadowState={shadowState}/>
     </section>}
 
-    <footer>Milestone: LinkedIn public search only · no CVR · no Jobnet · no additional sources</footer>
+    <footer>TEST · LinkedIn + Jobindex multi-source search</footer>
 
     {profileOpen&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget&&!profileSaveState.loading)closeProfile()}}><div className="modal profileModal">
       <div className="modalHead"><div><p className="eyebrow">BUILD YOUR SEARCH AGENT</p><h2>Search profile</h2></div><button className="close" onClick={closeProfile} disabled={profileSaveState.loading}>×</button></div>
