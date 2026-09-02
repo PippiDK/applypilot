@@ -33,8 +33,13 @@ export async function collectDiscoveryPasses({queries=[],passes=[],fetchPage}={}
             const id=String(row?.jobId||'')
             if(!id) continue
             if(!byId.has(id)){
-              byId.set(id,row)
+              byId.set(id,{...row,__discoveryQueries:[String(query)]})
               newJobIds++
+            }else{
+              const existing=byId.get(id)
+              const observed=new Set(Array.isArray(existing.__discoveryQueries)?existing.__discoveryQueries:[])
+              observed.add(String(query))
+              existing.__discoveryQueries=[...observed]
             }
           }
           if(list.length===0) break
