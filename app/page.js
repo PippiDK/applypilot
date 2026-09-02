@@ -21,7 +21,7 @@ import {compareShadowToLegacy} from './lib/shadow-search-compare.js'
 import {JOB_STATUS_OPTIONS,readJobStatuses,writeJobStatus} from './lib/job-statuses.js'
 import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
 import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
-import {defaultCompanyWatch,readCompanyWatch,writeCompanyWatch,TARGET_COMPANIES} from './lib/company-watch.js'
+import {companyConnection,connectedCompanyNames,defaultCompanyWatch,readCompanyWatch,writeCompanyWatch,TARGET_COMPANIES} from './lib/company-watch.js'
 import SearchAudit from './components/search-audit.js'
 import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
@@ -42,9 +42,9 @@ function roleList(value){return Array.isArray(value)?value.map(item=>String(item
 function legacyRoles(value=''){return String(value??'').split(',').map(item=>item.trim()).filter(Boolean)}
 function combinedRoles(primary=[],adjacent=[]){return [...roleList(primary),...roleList(adjacent)].join(', ')}
 function workModelText(values=[]){return values.map(value=>value==='onsite'?'On-site':value==='hybrid'?'Hybrid':'Remote').join(' · ')}
-function jobSourceLabel(job={}){const source=String(job?.source||job?.sourceRecords?.[0]?.source||'').toLowerCase();if(source==='jobindex')return 'Jobindex';if(source==='jobnet')return 'Jobnet';if(source==='linkedin')return 'LinkedIn';const url=String(job?.originalUrl||'');if(url.includes('jobnet.dk'))return 'Jobnet';if(url.includes('linkedin.com'))return 'LinkedIn';return 'Source'}
+function jobSourceLabel(job={}){const source=String(job?.source||job?.sourceRecords?.[0]?.source||'').toLowerCase();if(source==='company_site')return `Company site · ${job?.company||'Official'}`;if(source==='jobindex')return 'Jobindex';if(source==='jobnet')return 'Jobnet';if(source==='linkedin')return 'LinkedIn';const url=String(job?.originalUrl||'');if(url.includes('jobnet.dk'))return 'Jobnet';if(url.includes('linkedin.com'))return 'LinkedIn';return 'Source'}
 function sourceDedupeKey(job={}){const company=String(job.company||'').toLowerCase().replace(/\b(a\/s|as)\b/g,'as').replace(/[.,]/g,'').trim();const title=String(job.title||'').toLowerCase().replace(/\s+/g,' ').trim();const location=String(job.location||'').toLowerCase().replace(/\s+/g,' ').trim();return company&&title?company+'|'+title+'|'+location:''}
-function mergeSourceItems(groups=[]){const out=[];const byKey=new Map();for(const item of groups.flat()){const key=sourceDedupeKey(item?.job);if(key&&byKey.has(key)){const index=byKey.get(key);const current=out[index];const richer=String(item?.job?.description||item?.job?.fullJd||'').length>String(current?.job?.description||current?.job?.fullJd||'').length?item:current;out[index]=richer;continue}if(key)byKey.set(key,out.length);out.push(item)}return out}
+function mergeSourceItems(groups=[]){const out=[];const byKey=new Map();for(const item of groups.flat()){const key=sourceDedupeKey(item?.job);if(key&&byKey.has(key)){const index=byKey.get(key);const current=out[index];const currentOfficial=String(current?.job?.source||'')==='company_site';const itemOfficial=String(item?.job?.source||'')==='company_site';if(itemOfficial&&!currentOfficial){out[index]=item;continue}if(currentOfficial&&!itemOfficial)continue;const richer=String(item?.job?.description||item?.job?.fullJd||'').length>String(current?.job?.description||current?.job?.fullJd||'').length?item:current;out[index]=richer;continue}if(key)byKey.set(key,out.length);out.push(item)}return out}
 
 export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(7)
@@ -257,7 +257,8 @@ export default function Home(){
     setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
   }
-  if(!selectedSources.length){
+  const activeCompanySites=companyWatch.enabled?companyWatch.selected.filter(name=>connectedCompanyNames().includes(name)):[]
+  if(!selectedSources.length&&!activeCompanySites.length){
     setState({loading:false,error:'Select at least one search source.',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
   }
@@ -335,6 +336,23 @@ export default function Home(){
       return {source:'jobnet',data}
     })())
 
+    if(activeCompanySites.length) tasks.push((async()=>{
+      if(!hasProfilePlan) throw new Error('Company Watch requires a saved Search Profile.')
+      const res=await fetch('/api/company-profile-search',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          freshnessDays,
+          companies:activeCompanySites,
+          unionSearchPlan:profile.unionSearchPlan,
+          exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[],
+        }),
+      })
+      const data=await res.json()
+      if(!res.ok) throw new Error(data.error||'Company site search failed')
+      return {source:'company_site',data}
+    })())
+
     const settled=await Promise.allSettled(tasks)
     const successful=settled.filter(item=>item.status==='fulfilled').map(item=>item.value)
     const failed=settled.filter(item=>item.status==='rejected')
@@ -353,7 +371,7 @@ export default function Home(){
     setState({
       loading:false,
       error:'',
-      coverage:{source:selectedSources.join('+'),freshnessDays,status:limited?'ACCESS LIMITED':mergedJobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:failed[0]?.reason?.message||null},
+      coverage:{source:[...selectedSources,...(activeCompanySites.length?['company-sites']:[])].join('+'),freshnessDays,status:limited?'ACCESS LIMITED':mergedJobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:failed[0]?.reason?.message||null},
       stats,
       fetchedAt:new Date().toISOString(),
       audit,
@@ -589,7 +607,7 @@ export default function Home(){
   }
 
   return <main>
-    <header><div><div className="brand">ApplyPilot</div><div className="tag">Search less. Apply better.</div></div><div className="headerActions"><div className={`sourceBadge profileStatus ${resumeLoaded?'statusReady':'statusEmpty'}`}>{resumeLoaded?'Profile ready':'Profile empty'}</div><div className="sourceBadge">LINKEDIN + JOBINDEX + JOBNET · TEST</div></div></header>
+    <header><div><div className="brand">ApplyPilot</div><div className="tag">Search less. Apply better.</div></div><div className="headerActions"><div className={`sourceBadge profileStatus ${resumeLoaded?'statusReady':'statusEmpty'}`}>{resumeLoaded?'Profile ready':'Profile empty'}</div><div className="sourceBadge">MULTI-SOURCE + COMPANY WATCH · TEST</div></div></header>
 
     <section className="hero">
       <div><p className="eyebrow">MULTI-SOURCE · END-TO-END</p><h1>Find the right roles for your Search Profile in Denmark.</h1><p>Search Profile → selected sources → full job description → worthwhile matches only.</p></div>
@@ -610,7 +628,7 @@ export default function Home(){
         <div className="companyWatchActions"><span>{companyWatch.selected.length} companies selected</span><button className="secondary companyManage" onClick={()=>setCompanyWatchOpen(open=>!open)}>{companyWatchOpen?'Close':'Manage'}</button></div>
       </div>
       {companyWatchOpen&&<div className="companyWatchList">
-        {TARGET_COMPANIES.map(name=><label key={name}><input type="checkbox" checked={companyWatch.selected.includes(name)} onChange={()=>toggleCompany(name)}/><span>{name}</span><small>Connection pending</small></label>)}
+        {TARGET_COMPANIES.map(name=>{const connection=companyConnection(name);return <label key={name}><input type="checkbox" checked={companyWatch.selected.includes(name)} onChange={()=>toggleCompany(name)}/><span>{name}</span><small className={connection.status==='connected'?'ready':''}>{connection.status==='connected'?('Connected · '+connection.connector):'Connection pending'}</small></label>})}
       </div>}
     </section>
 
