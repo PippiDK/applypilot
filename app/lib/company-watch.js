@@ -12,6 +12,7 @@ export const COMPANY_CONNECTORS={
   'Saxo Bank':{status:'connected',connector:'workday',host:'https://saxobank.wd3.myworkdayjobs.com',tenant:'saxobank',site:'CareeratSaxoBank',locationTokens:['copenhagen','hellerup','denmark']},
   'Novo Nordisk':{status:'connected',connector:'successfactors',baseUrl:'https://careers.novonordisk.com',searchPath:'/search/'},
   'Nordea':{status:'connected',connector:'successfactors',baseUrl:'https://careers.nordea.com',searchPath:'/search/'},
+  'Danske Bank':{status:'connected',connector:'oracle',host:'https://ejqi.fa.ocs.oraclecloud.eu',site:'CX_1001',country:'Denmark'},
 }
 
 export const TARGET_COMPANIES=[
