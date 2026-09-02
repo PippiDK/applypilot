@@ -158,3 +158,57 @@ test('same verified job and Search Profile keep the same role decision and score
   assert.equal(first.jobs[0].evaluation.score,second.jobs[0].evaluation.score)
   assert.equal(first.jobs[0].evaluation.verdict,second.jobs[0].evaluation.verdict)
 })
+
+
+test('all freshness views use the same 14-day LinkedIn discovery horizon',async()=>{
+  const horizons=[]
+  const fetcher=async url=>{
+    if(url.includes('/seeMoreJobPostings/search')){
+      horizons.push(new URL(url).searchParams.get('f_TPR'))
+      return card('1212121212','Senior IT Project Manager','Stable Co')
+    }
+    return detailHtml({
+      title:'Senior IT Project Manager',
+      company:'Stable Co',
+      description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies and governance. '.repeat(5)
+    })
+  }
+  const searchPlan=plan('Senior IT Project Manager')
+  await searchLinkedInProfile({freshnessDays:1,unionSearchPlan:searchPlan,fetcher,now:new Date('2026-08-27T12:00:00Z')})
+  await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:searchPlan,fetcher,now:new Date('2026-08-27T12:00:00Z')})
+  assert.ok(horizons.length>=2)
+  assert.deepEqual([...new Set(horizons)],['r1209600'])
+})
+
+test('1/3/7/14-day views are local subsets over the same discovered jobs',async()=>{
+  const datedDetail=(title,company,datePosted)=>detailHtml({
+    title,
+    company,
+    description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies and governance. '.repeat(5)
+  }).replace('"datePosted":"2026-08-27"',`"datePosted":"${datePosted}"`)
+
+  const searchHtml=[
+    card('1313131313','Senior IT Project Manager','Today Co'),
+    card('1414141414','Senior IT Project Manager','Three Day Co'),
+    card('1515151515','Senior IT Project Manager','Seven Day Co'),
+    card('1616161616','Senior IT Project Manager','Fourteen Day Co')
+  ].join('')
+
+  const details={
+    '1313131313':datedDetail('Senior IT Project Manager','Today Co','2026-08-27'),
+    '1414141414':datedDetail('Senior IT Project Manager','Three Day Co','2026-08-25'),
+    '1515151515':datedDetail('Senior IT Project Manager','Seven Day Co','2026-08-22'),
+    '1616161616':datedDetail('Senior IT Project Manager','Fourteen Day Co','2026-08-15')
+  }
+
+  const fetcher=scenarioFetcher({searchHtml,details})
+  const searchPlan=plan('Senior IT Project Manager')
+  const run=days=>searchLinkedInProfile({freshnessDays:days,unionSearchPlan:searchPlan,fetcher,now:new Date('2026-08-27T12:00:00Z')})
+  const [one,three,seven,fourteen]=await Promise.all([run(1),run(3),run(7),run(14)])
+  const ids=result=>result.jobs.map(item=>item.job.jobId).sort()
+
+  assert.deepEqual(ids(one),['1313131313'])
+  assert.deepEqual(ids(three),['1313131313','1414141414'])
+  assert.deepEqual(ids(seven),['1313131313','1414141414','1515151515'])
+  assert.deepEqual(ids(fourteen),['1313131313','1414141414','1515151515','1616161616'])
+})
