@@ -8,6 +8,7 @@ export const COMPANY_CONNECTORS={
   'DSV':{status:'connected',connector:'successfactors',baseUrl:'https://jobs.dsv.com',listingPath:'/go/Jobs%40DSV/2713001/'},
   'NKT':{status:'connected',connector:'successfactors',baseUrl:'https://jobs.nkt.com',searchPath:'/search/'},
   'Tryg':{status:'connected',connector:'successfactors',baseUrl:'https://careers.tryg.com',searchPath:'/Tryg/search/'},
+  'SimCorp':{status:'connected',connector:'workday',host:'https://simcorp.wd3.myworkdayjobs.com',tenant:'simcorp',site:'SimCorp_Jobs'},
 }
 
 export const TARGET_COMPANIES=[
