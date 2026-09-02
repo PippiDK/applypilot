@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/cv-library-3-slots
+      - fix/search-stability-step3-stable-query-plan
 
 jobs:
   verify:
