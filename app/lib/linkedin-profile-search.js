@@ -4,6 +4,7 @@ import {createAuditRecord,updateAuditRecord,auditList} from './linkedin-search-a
 
 const LINKEDIN_JOB_DETAIL='https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/'
 const WINDOWS=new Set([1,3,7,14])
+const DISCOVERY_HORIZON_DAYS=14
 const GENERIC_ROLE_WORDS=new Set(['senior','sr','junior','jr','principal','global','regional','international','experienced','manager','lead','specialist','consultant','coordinator'])
 
 const clean=value=>String(value??'').toLowerCase().replace(/[–—_/&]+/g,' ').replace(/[^a-z0-9æøå+.# -]/g,' ').replace(/\s+/g,' ').trim()
@@ -179,7 +180,9 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
   if(typeof fetcher!=='function') throw new Error('Profile-driven LinkedIn fetcher is required.')
   if(!Array.isArray(unionSearchPlan?.directions)||unionSearchPlan.directions.length===0) throw new Error('Search Profile requires at least one role direction.')
 
-  const discovery=await searchLinkedInShadow({freshnessDays:days,unionSearchPlan,fetcher})
+  // Discovery always uses one stable broad horizon. The user-selected
+  // freshness window is applied locally to verified JobPosting dates below.
+  const discovery=await searchLinkedInShadow({freshnessDays:DISCOVERY_HORIZON_DAYS,unionSearchPlan,fetcher})
   const auditMap=new Map(discovery.candidates.map(candidate=>[String(candidate.jobId),createAuditRecord(candidate)]))
   let detailRequests=0
   let detailFailures=0
