@@ -45,7 +45,10 @@ function roleSimilarity(directionRole,title){
   const commonWeight=common.reduce((sum,token)=>sum+tokenWeight(token),0)
   const directionWeight=direction.reduce((sum,token)=>sum+tokenWeight(token),0)
   const candidateWeight=candidate.reduce((sum,token)=>sum+tokenWeight(token),0)
-  const denominator=Math.min(directionWeight,candidateWeight)
+  // Score coverage of the approved role direction, not merely overlap with the
+  // shorter title. This prevents a generic "Project Manager" title from looking
+  // identical to a more specific "Senior IT Project Manager" direction.
+  const denominator=directionWeight
   return {score:denominator?Math.min(1,commonWeight/denominator):0,substantiveCommon}
 }
 
