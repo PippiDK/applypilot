@@ -42,7 +42,7 @@ export async function collectDiscoveryPasses({queries=[],passes=[],fetchPage}={}
               existing.__discoveryQueries=[...observed]
             }
           }
-          if(list.length===0) break
+          if(list.length===0) continue
         }catch(error){
           searchFailures++
           passFailures++
