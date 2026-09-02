@@ -4,6 +4,7 @@ const clean=value=>String(value??'').replace(/\s+/g,' ').trim()
 const unsafeQuery=value=>/[(){}\[\]]/.test(value)||/\b(remote|hybrid|on[- ]site|denmark|salary)\b/i.test(value)
 
 export const SEARCH_QUERY_EXPANSION_VERSION='query-expansion-v1'
+export const DETERMINISTIC_QUERY_EXPANSION_VERSION='deterministic-query-expansion-v1'
 export const searchQueryExpansionSchema={
   type:'object',
   additionalProperties:false,
@@ -71,6 +72,59 @@ export function validateSearchQueryExpansions(value,sourceRoles=[]){
   return roles.map(sourceRole=>({sourceRole,queries:byRole.get(sourceRole.toLowerCase())})).filter(item=>item.queries.length)
 }
 
+export function buildDeterministicSearchQueryExpansions({roles}={}){
+  const sourceRoles=[]
+  const seenRoles=new Set()
+  for(const raw of Array.isArray(roles)?roles:[]){
+    const role=clean(raw)
+    const key=role.toLowerCase()
+    if(role.length<2||role.length>80||seenRoles.has(key)) continue
+    seenRoles.add(key);sourceRoles.push(role)
+  }
+
+  const seniorityPrefix=/^(?:senior|sr\\.?|principal|global|regional|international|experienced)\\s+/i
+  const swaps=[
+    [/\\bproject manager\\b/i,'Project Lead'],
+    [/\\bproject lead\\b/i,'Project Manager'],
+    [/\\bdelivery manager\\b/i,'Delivery Lead'],
+    [/\\bdelivery lead\\b/i,'Delivery Manager'],
+    [/\\bprogramme manager\\b/i,'Program Manager'],
+    [/\\bprogram manager\\b/i,'Programme Manager'],
+    [/\\bintegration project manager\\b/i,'Integration Manager'],
+    [/\\bintegration manager\\b/i,'Integration Project Manager'],
+    [/\\bimplementation project manager\\b/i,'Implementation Manager'],
+    [/\\bimplementation manager\\b/i,'Implementation Project Manager'],
+    [/\\btransformation project manager\\b/i,'Transformation Manager'],
+    [/\\btransformation manager\\b/i,'Transformation Project Manager'],
+  ]
+
+  const expansions=[]
+  for(const sourceRole of sourceRoles){
+    const out=[]
+    const seen=new Set([sourceRole.toLowerCase()])
+    const add=value=>{
+      const query=clean(value)
+      const key=query.toLowerCase()
+      if(out.length>=3||query.length<2||query.length>80||unsafeQuery(query)||seen.has(key)) return
+      seen.add(key);out.push(query)
+    }
+
+    const stripped=clean(sourceRole.replace(seniorityPrefix,''))
+    if(stripped&&stripped.toLowerCase()!==sourceRole.toLowerCase()) add(stripped)
+
+    const bases=[sourceRole,stripped].filter(Boolean)
+    for(const base of bases){
+      for(const [rx,replacement] of swaps){
+        if(!rx.test(base)) continue
+        add(base.replace(rx,replacement))
+      }
+    }
+
+    if(out.length) expansions.push({sourceRole,queries:out})
+  }
+  return expansions
+}
+
 export async function buildSearchQueryExpansions({roles,modelCall}={}){
   const sourceRoles=[]
   const seen=new Set()
@@ -119,7 +173,7 @@ export function buildExpandedSearchPlan(unionSearchPlan={},expansions=[]){
   return {...unionSearchPlan,directions}
 }
 
-export async function buildDiscoverySearchPlan({unionSearchPlan={},queryExpander=buildSearchQueryExpansions}={}){
+export async function buildDiscoverySearchPlan({unionSearchPlan={},queryExpander=buildDeterministicSearchQueryExpansions}={}){
   const roles=[]
   const seen=new Set()
   for(const direction of Array.isArray(unionSearchPlan?.directions)?unionSearchPlan.directions:[]){
