@@ -257,7 +257,13 @@ export default function Home(){
     const data=await res.json()
     if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
     setJobs(Array.isArray(data.jobs)?data.jobs:[])
-    if(hasProfilePlan&&Array.isArray(data.masterCandidates)) writeLinkedInMasterPool({storage:localStorage,fingerprint:profile.unionSearchPlanFingerprint||profile.unionSearchPlan?.fingerprint,candidates:data.masterCandidates})
+    if(hasProfilePlan&&Array.isArray(data.masterCandidates)){
+      writeLinkedInMasterPool({
+        storage:localStorage,
+        fingerprint:profile.unionSearchPlanFingerprint||profile.unionSearchPlan?.fingerprint,
+        candidates:data.masterCandidates,
+      })
+    }
     setState({loading:false,error:'',coverage:data.coverage||null,stats:data.stats||null,fetchedAt:data.fetchedAt||null,audit:Array.isArray(data.audit)?data.audit:[]})
   }catch(error){ setState({loading:false,error:error.message||'LinkedIn search failed',coverage:null,stats:null,fetchedAt:null,audit:[]}) }
 }
@@ -378,3 +384,248 @@ export default function Home(){
     setExpertiseState({loading:true,error:'',analysis:null,jobKey:runKey})
     try{
       const analysis=await requestExpertiseMatch({job:active.job,cvText:cvData.cvText})
+      writeExpertiseMatchCache({...cacheArgs,analysis})
+      setExpertiseState({loading:false,error:'',analysis,jobKey:runKey})
+    }catch(error){
+      setExpertiseState({loading:false,error:error.message||'Expertise Match analysis failed safely. Please try again.',analysis:null,jobKey:runKey})
+    }
+  }
+
+  function chooseAdaptationCv(cv){
+    if(!active||!jobKey||!cv) return
+    const baseline=buildAdaptationBaseline({job:active.job,cv})
+    setAdaptationSelections(current=>selectAdaptationCv(current,{jobKey,cvId:cv.id,readyCvs}))
+    setAdaptationBaselines(current=>({...current,[jobKey]:baseline}))
+    setAdaptationRun({loading:false,error:'',jobKey:'',baselineKey:''})
+    setExportState({loading:false,error:'',baselineKey:''})
+    setReviewOpen(false)
+  }
+
+  async function runCvAdaptationReview(){
+    if(!active||!activeAdaptationBaseline||adaptationRun.loading||currentAdaptationResult) return
+    const runJobKey=jobKey
+    const runBaseline=activeAdaptationBaseline
+    const runBaselineKey=baselineKey(runBaseline)
+    setReviewOpen(true)
+    setAdaptationRun({loading:true,error:'',jobKey:runJobKey,baselineKey:runBaselineKey})
+    try{
+      const result=await requestCvAdaptation({baseline:runBaseline,job:active.job})
+      setAdaptationResults(current=>({...current,[runBaselineKey]:result}))
+      setAdaptationRun({loading:false,error:'',jobKey:runJobKey,baselineKey:runBaselineKey})
+    }catch(error){
+      setAdaptationRun({loading:false,error:error.message||'CV adaptation failed safely. Please try again.',jobKey:runJobKey,baselineKey:runBaselineKey})
+    }
+  }
+
+  function decisionIdentity(blockId){
+    if(!activeAdaptationBaseline) return null
+    return {jobId:activeAdaptationBaseline.jobId,cvId:activeAdaptationBaseline.cvId,sourceVersion:activeAdaptationBaseline.sourceVersion,blockId}
+  }
+
+  function decisionFor(blockId){
+    const identity=decisionIdentity(blockId)
+    return identity?readAdaptationDecision(decisions,identity):null
+  }
+
+  function editedUpdateKey(blockId){
+    return activeBaselineKey&&blockId?`${activeBaselineKey}|${blockId}`:''
+  }
+
+  function editedUpdateFor(change){
+    const key=editedUpdateKey(change?.blockId)
+    return key&&Object.prototype.hasOwnProperty.call(editedUpdates,key)?editedUpdates[key]:change?.updated||''
+  }
+
+  function setEditedUpdate(blockId,value){
+    const key=editedUpdateKey(blockId)
+    if(!key) return
+    setEditedUpdates(current=>({...current,[key]:value}))
+  }
+
+  function setDecision(blockId,value){
+    const identity=decisionIdentity(blockId)
+    if(!identity) return
+    setDecisions(current=>setAdaptationDecision(current,identity,value))
+  }
+
+  function acceptAll(){
+    if(!activeAdaptationBaseline) return
+    setDecisions(current=>reviewChanges.reduce((next,change)=>setAdaptationDecision(next,decisionIdentity(change.blockId),ADAPTATION_DECISION.ACCEPTED),current))
+  }
+
+  function attachSourceDocx(file){
+    if(!file||!activeAdaptationBaseline) return
+    if(!String(file.name||'').toLowerCase().endsWith('.docx')){ setExportState({loading:false,error:'Please choose the matching source DOCX file.',baselineKey:activeBaselineKey}); return }
+    setSourceDocxFiles(current=>({...current,[activeAdaptationBaseline.sourceVersion]:file}))
+    setExportState({loading:false,error:'',baselineKey:activeBaselineKey})
+  }
+
+  async function downloadTailoredCv(){
+    if(!active||!activeAdaptationBaseline||!selectedSourceDocx||!allReviewDecisionsMade||exportState.loading) return
+    const replacements=reviewChanges
+      .filter(change=>decisionFor(change.blockId)===ADAPTATION_DECISION.ACCEPTED)
+      .map(change=>({blockId:change.blockId,originalText:change.original,newText:editedUpdateFor(change)}))
+    const company=String(active.job.company||'tailored').replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'')||'tailored'
+    const base=String(activeAdaptationBaseline.fileName||'CV').replace(/\.docx$/i,'')
+    const outputName=`${base}_${company}_TAILORED.docx`
+    setExportState({loading:true,error:'',baselineKey:activeBaselineKey})
+    try{
+      const form=new FormData()
+      form.append('file',selectedSourceDocx)
+      form.append('replacements',JSON.stringify(replacements))
+      form.append('outputName',outputName)
+      const res=await fetch('/api/export-tailored-cv',{method:'POST',body:form})
+      if(!res.ok){
+        let message='Tailored DOCX could not be created.'
+        try{const data=await res.json();message=data.error||message}catch{}
+        throw new Error(message)
+      }
+      const blob=await res.blob()
+      const url=URL.createObjectURL(blob)
+      const anchor=document.createElement('a')
+      anchor.href=url
+      anchor.download=outputName
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+      setExportState({loading:false,error:'',baselineKey:activeBaselineKey})
+    }catch(error){
+      setExportState({loading:false,error:error.message||'Tailored DOCX could not be created.',baselineKey:activeBaselineKey})
+    }
+  }
+
+  return <main>
+    <header><div><div className="brand">ApplyPilot</div><div className="tag">Search less. Apply better.</div></div><div className="headerActions"><div className={`sourceBadge profileStatus ${resumeLoaded?'statusReady':'statusEmpty'}`}>{resumeLoaded?'Profile ready':'Profile empty'}</div><div className="sourceBadge">LINKEDIN · PUBLIC</div></div></header>
+
+    <section className="hero">
+      <div><p className="eyebrow">ONE SOURCE · END-TO-END</p><h1>Find the right roles for your Search Profile in Denmark.</h1><p>Search Profile → LinkedIn discovery → full job description → worthwhile matches only.</p></div>
+      <div className="metric"><b>{state.loading?'…':jobs.length}</b><span>matches</span></div>
+    </section>
+
+    <div className="profileStrip"><span className="profileSearchSummary">{profileSearchPlanSummary}</span><button className="profileEditButton" onClick={startProfile}>{profileReady?'Edit profile':'Search profile'}</button><button className="cvButton" onClick={startProfile}>{cvReadyCount?`✓ CVs ${cvReadyCount}/${MAX_CVS}`:'Upload CVs'}</button></div>
+
+    <section className="controls">
+      <div><small>POSTED WITHIN</small><div className="choices">{WINDOWS.map(days=><button key={days} className={freshnessDays===days?'choice selected':'choice'} onClick={()=>setFreshnessDays(days)}>{days} day{days===1?'':'s'}</button>)}</div></div>
+      <button className="primary" onClick={search} disabled={state.loading}>{state.loading?'Reading LinkedIn JDs…':'Search LinkedIn'}</button>
+    </section>
+
+    {state.error&&<div className="errorBox"><b>{state.error==='Please Upload Your CV'?'Please Upload Your CV':'LinkedIn search failed'}</b>{state.error!=='Please Upload Your CV'&&<span>{state.error}</span>}</div>}
+    {state.stats&&<div className="searchMeta"><span><b>{state.stats.discovered}</b> jobs discovered</span><span><b>{state.stats.fullJdVerified}</b> full JDs read</span><span><b>{state.stats.evaluated}</b> worthwhile after evaluation</span><span>Coverage: <b>{state.coverage?.status}</b></span></div>}
+    {state.coverage?.detail&&<div className="warningBox">Partial source access: {state.coverage.detail}</div>}
+
+    <section className="grid">
+      <div className="list">
+        <div className="listHead"><div><h2>Live matches</h2>{jobs.length>0&&<small className={filterStyles.resultCount}>{visibleJobs.length} of {jobs.length}</small>}</div><small>Newest {freshnessDays} days</small></div>
+        {jobs.length>0&&<details className={filterStyles.filters}>
+          <summary><span>FILTERS</span><span>{visibleJobs.length} of {jobs.length}</span></summary>
+          <div className={filterStyles.body}>
+            <label className={filterStyles.option}><input type="checkbox" checked={allFiltersSelected} ref={node=>{if(node)node.indeterminate=someFiltersSelected&&!allFiltersSelected}} onChange={toggleAllJobFilters}/><span>All filters</span><b></b></label>
+            <div className={filterStyles.group}><small className={filterStyles.groupTitle}>SEARCH AREAS</small>{SEARCH_AREAS.map(area=><label className={filterStyles.option} key={area.id}><input type="checkbox" checked={selectedAreas.includes(area.id)} onChange={()=>toggleJobFilter(setSelectedAreas,area.id)}/><span>{area.label}</span><b>{areaCounts[area.id]||0}</b></label>)}</div>
+            <div className={filterStyles.group}><small className={filterStyles.groupTitle}>WORK MODEL</small>{WORK_MODELS.map(model=><label className={filterStyles.option} key={model.id}><input type="checkbox" checked={selectedWorkModels.includes(model.id)} onChange={()=>toggleJobFilter(setSelectedWorkModels,model.id)}/><span>{model.label}</span><b>{workModelCounts[model.id]||0}</b></label>)}</div>
+            <div className={filterStyles.group}><small className={filterStyles.groupTitle}>STATUS</small>{JOB_STATUS_FILTERS.map(status=><label className={filterStyles.option} key={status.id}><input type="checkbox" checked={selectedStatuses.includes(status.id)} onChange={()=>toggleJobFilter(setSelectedStatuses,status.id)}/><span>{status.label}</span><b>{statusCounts[status.id]||0}</b></label>)}</div>
+          </div>
+        </details>}
+        {!state.loading&&!state.error&&!state.stats&&<div className="empty">Run the LinkedIn search. No other source is used in this milestone.</div>}
+        {state.loading&&<div className="empty">Searching LinkedIn public pages and reading full job descriptions…</div>}
+        {!state.loading&&state.stats&&jobs.length===0&&<div className="empty">NO STRONG NEW MATCHES FOUND.</div>}
+        {!state.loading&&state.stats&&jobs.length>0&&visibleJobs.length===0&&<div className="empty">NO MATCHES IN SELECTED FILTERS.</div>}
+        {visibleJobs.map(item=>{const {job,evaluation}=item; const score=Math.round(evaluation.score*10); const manualStatus=jobStatuses[job.sourceJobId]||''; return <div className="jobWrap" key={job.sourceJobId}>
+          <button onClick={()=>setSelected(item)} className={'job '+(active?.job.sourceJobId===job.sourceJobId?'active':'')}>
+            <span className="score">{fitLabel(score)}</span>
+            <span><b>{job.title}</b><small>{job.company} · {job.location}</small><small className="sourceLine">LinkedIn · {dateText(job.publishedAt)}</small></span>
+            <span>→</span>
+          </button>
+          <select aria-label={`Status for ${job.title}`} className={`jobStatusSelect status-${manualStatus||'none'}`} value={manualStatus} onChange={event=>changeJobStatus(job.sourceJobId,event.target.value)}>
+            {JOB_STATUS_OPTIONS.map(option=><option key={option.value||'none'} value={option.value}>{option.label}</option>)}
+          </select>
+        </div>})}
+      </div>
+
+      <div className="panel">
+        {active?(()=>{const {job}=active; const expertise=expertiseState.jobKey===jobKey?expertiseState.analysis:null; return <>
+          <div className="panelTop expertiseHeader"><div><h2>{job.title}</h2><p>{job.company} · {job.location}</p><small className="sourceLine">Source: LinkedIn · {dateText(job.publishedAt)}</small></div></div>
+
+          <div className="conditionGrid">
+            <div className="conditionCard"><small>Area</small><b>{conditionScore(jobConditions?.area.score)}</b><span>{jobConditions?.area.value||'Not stated'}</span></div>
+            <div className="conditionCard"><small>Salary</small><b>{conditionScore(jobConditions?.salary.score)}</b><span>{jobConditions?.salary.value||'Not stated'}</span></div>
+            <div className="conditionCard"><small>Employment type</small><b>{conditionScore(jobConditions?.employmentType.score)}</b><span>{jobConditions?.employmentType.value||'Not stated'}</span></div>
+            <div className="conditionCard"><small>Work model</small><b>{conditionScore(jobConditions?.workModel.score)}</b><span>{jobConditions?.workModel.value||'Not stated'}</span></div>
+            <a className="secondary openLink" style={{gridColumn:'1 / -1',justifySelf:'start'}} href={job.originalUrl} target="_blank" rel="noreferrer">Open LinkedIn vacancy</a>
+          </div>
+
+          <BestCvPanel
+            job={job}
+            cvLibrary={cvLibrary}
+            selectedCvId={activeAdaptationBaseline?.cvId||''}
+            onSelectCv={chooseAdaptationCv}
+            adaptationActions={<div className="actions reviewActions">
+              <button className="primary" onClick={runCvAdaptationReview} disabled={!activeAdaptationBaseline||adaptationRun.loading||Boolean(currentAdaptationResult)}>{adaptationRun.loading&&adaptationRun.jobKey===jobKey?'Generating…':currentAdaptationResult?'Generated':'Generate CV update'}</button>
+              <button className="secondary" onClick={()=>setReviewOpen(true)} disabled={!currentAdaptationResult}>View CV update</button>
+              {job.officialUrl&&<a className="secondary openLink" href={job.officialUrl} target="_blank" rel="noreferrer">Employer link</a>}
+            </div>}
+          />
+
+          <div className="expertiseHero">
+            <div className="expertiseHeroHead"><div><p className="eyebrow">EXPERTISE MATCH</p><p className="expertiseIntro">Full JD ↔ Source CV professional expertise only</p></div><div className="expertiseScore">{expertiseState.loading&&expertiseState.jobKey===jobKey?'…':expertise?`${expertise.expertiseMatch}%`:'N/A'}</div></div>
+            {expertiseState.loading&&expertiseState.jobKey===jobKey&&<div className="expertiseLoading">Analysing professional requirements and Source CV evidence…</div>}
+            {expertiseState.error&&expertiseState.jobKey===jobKey&&<div className="errorBox"><b>Expertise Match analysis failed safely</b><span>{expertiseState.error}</span></div>}
+            {!expertise&&!expertiseState.loading&&<button className="primary" onClick={runExpertiseMatch}>Run Expertise Match</button>}
+            {expertise&&<>
+              <div className="expertiseSection"><h3>Why you fit</h3>{expertise.whyYouFit.length?expertise.whyYouFit.map((item,index)=><p key={index}>✓ {item}</p>):<p className="muted">No direct professional match evidence returned.</p>}</div>
+              {expertise.transferableStrengths?.length>0&&<div className="expertiseSection"><h3>Transferable strengths</h3>{expertise.transferableStrengths.map((item,index)=><p key={index}>↔ {item}</p>)}</div>}
+              <div className="expertiseSection"><h3>Expertise gaps</h3>{expertise.expertiseGaps.length?expertise.expertiseGaps.map((item,index)=><p key={index}>⚠ {item}</p>):<p>✓ No material expertise gap detected in the analysed requirements.</p>}</div>
+              <div className="expertiseSection"><h3>Expertise breakdown</h3><div className="expertiseBreakdown">
+                <div><span>Delivery / execution</span><b>{conditionScore(expertise.breakdown.delivery_execution?.score)}</b></div>
+                <div><span>Domain & functional expertise</span><b>{conditionScore(expertise.breakdown.domain_functional_expertise?.score)}</b></div>
+                <div><span>Technical / platform capabilities</span><b>{conditionScore(expertise.breakdown.technical_platform_capabilities?.score)}</b></div>
+                <div><span>Leadership & stakeholder scope</span><b>{conditionScore(expertise.breakdown.leadership_stakeholder_scope?.score)}</b></div>
+                <div><span>Required experience / qualifications</span><b>{conditionScore(expertise.breakdown.required_experience_qualifications?.score)}</b></div>
+              </div></div>
+            </>}
+          </div>
+
+
+          <div className="section"><h3>Application pack</h3><div className="docs"><div>{pack.cvReady?'✓':'○'} Tailored CV <span className={pack.cvReady?'ready':'pending'}>{pack.tailoredCvLabel}</span></div><div>○ Cover letter <span className="pending">{pack.coverLetterLabel}</span></div></div></div>
+        </>})():<div className="emptyPanel"><h2>No selected vacancy</h2><p>{state.loading?'Searching LinkedIn public pages…':'Run the LinkedIn search to see matching vacancies.'}</p></div>}
+      </div>
+    </section>
+
+    {(state.audit.length>0||(shadowState.status!=='idle'&&shadowState.status!=='skipped'))&&<section className="auditLog">
+      <div className="auditLogTitle">AUDIT LOG</div>
+      <SearchAudit audit={state.audit}/>
+      <ShadowSearchAudit shadowState={shadowState}/>
+    </section>}
+
+    <footer>Milestone: LinkedIn public search only · no CVR · no Jobnet · no additional sources</footer>
+
+    {profileOpen&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget&&!profileSaveState.loading)closeProfile()}}><div className="modal profileModal">
+      <div className="modalHead"><div><p className="eyebrow">BUILD YOUR SEARCH AGENT</p><h2>Search profile</h2></div><button className="close" onClick={closeProfile} disabled={profileSaveState.loading}>×</button></div>
+      <div className="progress"><span style={{width:`${profileStep/4*100}%`}}></span></div><div className="stepMeta"><span>Step {profileStep} of 4</span><span>{profileCompletion}% profile data</span></div>
+      {profileStep===1&&<CvLibraryStep library={cvLibrary} loadingSlot={cvState.loadingSlot} error={cvState.error} primarySkills={draft.skills} onUpload={parseCv} onRemove={removeCv}/>} 
+      {profileStep===2&&<SearchProfileRolesStep primaryRoles={draftPrimaryRoles} adjacentRoles={draftAdjacentRoles} status={profileRoleState.status} error={profileRoleState.error} source={profileRoleState.source} totalCount={profileRoleState.totalCount||cvReadyCount} analysedCount={profileRoleState.analysedCount} failedCvs={profileRoleState.failedCvs} onPrimaryChange={roles=>updateDraftRoles('primaryRoles',roles)} onAdjacentChange={roles=>updateDraftRoles('adjacentRoles',roles)} onRetry={()=>buildProfileRoles({forceCvIds:(profileRoleState.failedCvs||[]).map(cv=>cv.cvId)})}/>} 
+      {profileStep===3&&<div className="wizard"><h3>What should ApplyPilot exclude?</h3><p>Optional. Write any hard no-go roles, industries, languages or working conditions. ApplyPilot interprets this text only when you save the profile.</p><textarea value={draft.exclusions} onChange={event=>setDraft(current=>({...current,exclusions:event.target.value}))} rows="6"/></div>}
+      {profileStep===4&&<div className="wizard review"><h3>Confirm your search profile</h3><p>This saves your Search Profile and activates profile-driven LinkedIn discovery for future searches.</p><div className="reviewRow"><span>Primary Search CV</span><b>{resumeLoaded?cvData.fileName:cvData?.fileName?'Re-upload required':'Not uploaded yet'}</b></div><div className="reviewRow"><span>CV preparation</span><b>{resumeLoaded?'Ready — complete Source CV prepared':'CV not ready'}</b></div><div className="reviewRow"><span>Role profiles</span><b>{cvReadyCount?`${analysedRoleProfileCount}/${cvReadyCount} CVs analysed`:'Not generated'}</b></div><div className="reviewRow"><span>Target roles</span><b>{draft.roles||'Not set'}</b></div><div className="reviewRow"><span>Where</span><b>{draftLocations.length?draftLocations.join(' · '):'Not set'}</b></div><div className="reviewRow"><span>Work model</span><b>{draftWorkModels.length?workModelText(draftWorkModels):'Not set'}</b></div><div className="reviewRow"><span>Exclude</span><b>{draft.exclusions||'None'}</b></div><SearchPlanPreview plan={draftUnionSearchPlan}/>{profileSaveState.error&&<div className="errorBox"><b>Search Profile save failed</b><span>{profileSaveState.error}</span></div>}<div className="truth"><b>Truth rule</b><span>ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.</span></div></div>}
+      <div className="modalActions"><button className="secondary" disabled={profileSaveState.loading} onClick={()=>profileStep===1?closeProfile():setProfileStep(step=>step-1)}>{profileStep===1?'Cancel':'Back'}</button>{profileStep<4?<button className="primary" disabled={(profileStep===1&&(Boolean(cvState.loadingSlot)||cvReadyCount===0))||(profileStep===2&&profileRoleState.status==='loading')} onClick={nextProfileStep}>Continue</button>:<button className="primary" disabled={profileSaveState.loading} onClick={saveProfile}>{profileSaveState.loading?'Saving profile…':'Save profile'}</button>}</div>
+    </div></div>}
+
+    {reviewOpen&&active&&activeAdaptationBaseline&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget&&!adaptationRun.loading)setReviewOpen(false)}}><div className="modal reviewModal"><div className="modalHead"><div><p className="eyebrow">CV UPDATE REVIEW</p><h2>{active.job.title}</h2><p className="muted">{active.job.company} · {active.job.location}</p><p className="reviewBaseline">CV {selectedAdaptationCvRecord?.slot} · {activeAdaptationBaseline.fileName}</p></div><button className="close" onClick={()=>setReviewOpen(false)} disabled={adaptationRun.loading}>×</button></div>
+      <div className="reviewScopeLine">Professional Summary · Latest role overview · Previous role overview</div>
+      {adaptationRun.loading&&adaptationRun.jobKey===jobKey&&adaptationRun.baselineKey===activeBaselineKey&&<div className="adaptationLoading"><b>Adapting selected CV…</b><span>Selected CV + JD → three AI updates.</span></div>}
+      {adaptationRun.error&&adaptationRun.jobKey===jobKey&&adaptationRun.baselineKey===activeBaselineKey&&<div className="errorBox"><b>CV adaptation failed safely</b><span>{adaptationRun.error}</span></div>}
+      {currentAdaptationResult&&<>
+        <div className="adaptationRunStatus"><b>✓ Adaptation complete</b><span>{reviewChanges.length} change{reviewChanges.length===1?'':'s'} available for review · {reviewedCount}/{reviewChanges.length} decided</span></div>
+        <div className="reviewToolbar"><div><h3>Selected-CV changes</h3><p>AI UPDATED text is shown directly. Source CV remains unchanged.</p></div>{reviewChanges.length>0&&<button className="secondary" onClick={acceptAll}>Accept all changes</button>}</div>
+        {reviewChanges.map(change=>{const decision=decisionFor(change.blockId);return <div className={'changeCard '+(decision?'decided':'')} key={change.blockId}>
+          <div className="changeHead"><span>{change.label}</span><b>{decision===ADAPTATION_DECISION.ACCEPTED?'Accepted':decision===ADAPTATION_DECISION.ORIGINAL?'Original kept':'Review needed'}</b></div>
+          <div className="compareGrid"><div className="compareBox"><small>ORIGINAL</small><p>{change.original}</p></div><div className="compareArrow">→</div><div className="compareBox updatedBox"><small>UPDATED · EDITABLE</small><textarea className="updatedTextEditor" value={editedUpdateFor(change)} onChange={event=>setEditedUpdate(change.blockId,event.target.value)} rows="8"/></div></div>
+          <div className="changeWhy"><div><small>WHY CHANGED</small><p>{change.why}</p></div></div>
+          <div className="evidenceActions"><button className={'secondary '+(decision===ADAPTATION_DECISION.ORIGINAL?'chosen':'')} onClick={()=>setDecision(change.blockId,ADAPTATION_DECISION.ORIGINAL)}>{decision===ADAPTATION_DECISION.ORIGINAL?'✓ Original kept':'Keep original'}</button><button className={'primary smallPrimary '+(decision===ADAPTATION_DECISION.ACCEPTED?'chosenPrimary':'')} onClick={()=>setDecision(change.blockId,ADAPTATION_DECISION.ACCEPTED)}>{decision===ADAPTATION_DECISION.ACCEPTED?'✓ Accepted':'Accept change'}</button></div>
+        </div>})}
+        {!reviewChanges.length&&<div className="reviewEmpty"><b>No changes to review.</b><span>AI returned no changed block. The selected Source CV remains unchanged.</span></div>}
+      </>}
+      {exportState.error&&exportState.baselineKey===activeBaselineKey&&<div className="errorBox"><b>DOCX update failed</b><span>{exportState.error}</span></div>}
+      <div className="reviewFooter"><button className="secondary" onClick={()=>setReviewOpen(false)} disabled={adaptationRun.loading||exportState.loading}>Close review</button>{allReviewDecisionsMade&&(selectedSourceDocx?<button className="primary" onClick={downloadTailoredCv} disabled={exportState.loading}>{exportState.loading?'Creating DOCX…':'Download tailored DOCX'}</button>:<label className="secondary">Re-upload source DOCX<input type="file" accept=".docx" hidden onChange={event=>{const file=event.target.files?.[0];if(file)attachSourceDocx(file);event.target.value=''}}/></label>)}</div>
+    </div></div>}
+  </main>
+}
