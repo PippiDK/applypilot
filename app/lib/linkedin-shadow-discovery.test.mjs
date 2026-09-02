@@ -100,16 +100,16 @@ test('continues to the next LinkedIn discovery page so wider windows do not lose
 
 test('one search run unions reshuffled LinkedIn result sets until two consecutive passes add no new IDs',async()=>{
   const singlePlan={directions:[{key:'project manager',role:'Project Manager',tier:'primary',origin:'cv',cvSlots:[1]}]}
-  let pass=0
+  let pageZeroCalls=0
   const result=await searchLinkedInShadow({
     freshnessDays:14,
     unionSearchPlan:singlePlan,
     fetcher:async url=>{
       const start=Number(new URL(url).searchParams.get('start')||0)
       if(start!==0) return ''
-      pass++
-      if(pass===1) return card('4454800001','Project Manager A')+card('4454800002','Project Manager B')
-      if(pass===2) return card('4454800002','Project Manager B')+card('4454800003','Project Manager C')
+      pageZeroCalls++
+      if(pageZeroCalls===1) return card('4454800001','Project Manager A')+card('4454800002','Project Manager B')
+      if(pageZeroCalls===2) return card('4454800002','Project Manager B')+card('4454800003','Project Manager C')
       return card('4454800001','Project Manager A')+card('4454800002','Project Manager B')+card('4454800003','Project Manager C')
     }
   })
