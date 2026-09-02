@@ -8,8 +8,8 @@ export const COMPANY_CONNECTORS={
   'DSV':{status:'connected',connector:'successfactors',baseUrl:'https://jobs.dsv.com',listingPath:'/go/Jobs%40DSV/2713001/'},
   'NKT':{status:'connected',connector:'successfactors',baseUrl:'https://jobs.nkt.com',searchPath:'/search/'},
   'Tryg':{status:'connected',connector:'successfactors',baseUrl:'https://careers.tryg.com',searchPath:'/Tryg/search/'},
-  'SimCorp':{status:'connected',connector:'workday',host:'https://simcorp.wd3.myworkdayjobs.com',tenant:'simcorp',site:'SimCorp_Jobs'},
-  'Saxo Bank':{status:'connected',connector:'workday',host:'https://saxobank.wd3.myworkdayjobs.com',tenant:'saxobank',site:'CareeratSaxoBank'},
+  'SimCorp':{status:'connected',connector:'workday',host:'https://simcorp.wd3.myworkdayjobs.com',tenant:'simcorp',site:'SimCorp_Jobs',locationTokens:['copenhagen','denmark']},
+  'Saxo Bank':{status:'connected',connector:'workday',host:'https://saxobank.wd3.myworkdayjobs.com',tenant:'saxobank',site:'CareeratSaxoBank',locationTokens:['copenhagen','hellerup','denmark']},
   'Novo Nordisk':{status:'connected',connector:'successfactors',baseUrl:'https://careers.novonordisk.com',searchPath:'/search/'},
   'Nordea':{status:'connected',connector:'successfactors',baseUrl:'https://careers.nordea.com',searchPath:'/search/'},
 }
