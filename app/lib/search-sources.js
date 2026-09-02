@@ -1,5 +1,5 @@
-export const SEARCH_SOURCE_IDS = ['linkedin', 'jobindex']
-export const DEFAULT_SEARCH_SOURCES = [...SEARCH_SOURCE_IDS]
+export const SEARCH_SOURCE_IDS = ['linkedin', 'jobindex', 'jobnet']
+export const DEFAULT_SEARCH_SOURCES = ['linkedin', 'jobindex']
 export const SEARCH_SOURCES_STORAGE_KEY = 'applypilot-search-sources'
 
 export function normalizeSearchSources(value, { defaultWhenMissing = true } = {}) {
