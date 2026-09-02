@@ -18,7 +18,7 @@ test('runs repeated Denmark discovery passes per approved direction until the re
     return role==='Integration Project Manager'?card('1111111111','Integration Programme Manager'):card('2222222222','Programme Delivery Manager')
   }
   const result=await searchLinkedInShadow({freshnessDays:7,unionSearchPlan:plan,fetcher})
-  assert.equal(urls.length,16)
+  assert.equal(urls.length,6)
   assert.deepEqual(new Set(urls.map(url=>new URL(url).searchParams.get('keywords'))),new Set(['Integration Project Manager','Programme Delivery Manager']))
   for(const url of urls){
     const parsed=new URL(url)
@@ -26,11 +26,11 @@ test('runs repeated Denmark discovery passes per approved direction until the re
     assert.equal(parsed.searchParams.get('location'),'Denmark')
     assert.equal(parsed.searchParams.get('f_TPR'),'r604800')
     assert.equal(parsed.searchParams.get('sortBy'),'DD')
-    assert.ok(['0','25','50','75'].includes(parsed.searchParams.get('start')))
+    assert.equal(parsed.searchParams.get('start'),'0')
     assert.equal(url.includes('/jobPosting/'),false)
   }
-  assert.equal(result.stats.searchRequests,16)
-  assert.equal(result.stats.discoveryPasses,2)
+  assert.equal(result.stats.searchRequests,6)
+  assert.equal(result.stats.discoveryPasses,3)
   assert.equal(result.stats.discoveryStable,true)
 })
 
@@ -91,9 +91,9 @@ test('continues to the next LinkedIn discovery page so wider windows do not lose
     }
   })
 
-  assert.deepEqual(urls.map(url=>new URL(url).searchParams.get('start')),['0','25','50','75','0','25','50','75'])
+  assert.deepEqual(urls.map(url=>new URL(url).searchParams.get('start')),['0','25','0','25','0','25'])
   assert.equal(result.candidates.some(candidate=>candidate.jobId==='4454799999'),true)
-  assert.equal(result.stats.searchRequests,8)
+  assert.equal(result.stats.searchRequests,6)
   assert.equal(result.stats.discovered,26)
 })
 

@@ -42,7 +42,7 @@ export async function collectDiscoveryPasses({queries=[],passes=[],fetchPage}={}
               existing.__discoveryQueries=[...observed]
             }
           }
-          if(list.length===0) continue
+          if(list.length===0) break
         }catch(error){
           searchFailures++
           passFailures++
@@ -51,13 +51,15 @@ export async function collectDiscoveryPasses({queries=[],passes=[],fetchPage}={}
       }
     }
 
-    const previous=groups[group]||{stable:false,passesExecuted:0,newJobIds:0}
+    const previous=groups[group]||{stable:false,passesExecuted:0,newJobIds:0,cleanPasses:0}
+    const cleanPasses=(newJobIds===0&&passFailures===0)?Number(previous.cleanPasses||0)+1:0
     const current={
       stable:false,
       passesExecuted:previous.passesExecuted+1,
       newJobIds:previous.newJobIds+newJobIds,
+      cleanPasses,
     }
-    if(current.passesExecuted>1 && newJobIds===0 && passFailures===0){
+    if(current.passesExecuted>1 && cleanPasses>=2){
       current.stable=true
       stableGroups.add(group)
     }
