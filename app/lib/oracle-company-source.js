@@ -1,8 +1,8 @@
 import { normalizeJob } from './normalized-job.js'
 import { companyConnection } from './company-watch.js'
+import { sourceWithinFreshness, stripSourceHtml } from './source-freshness.js'
 
 function clean(value){return String(value??'').replace(/\s+/g,' ').trim()}
-function stripHtml(html=''){return clean(String(html??'').replace(/<!--[sS]*?-->/g,' ').replace(/<script\b[sS]*?<\/script>/gi,' ').replace(/<style\b[sS]*?<\/style>/gi,' ').replace(/<br\s*\/?\s*>/gi,'\n').replace(/<\/p\s*>|<\/li\s*>|<\/h[1-6]\s*>/gi,'\n').replace(/<[^>]+>/g,' ').replace(/&nbsp;/gi,' ').replace(/&amp;/gi,'&').replace(/&quot;/gi,'"').replace(/&#39;|&apos;/gi,"'").replace(/&lt;/gi,'<').replace(/&gt;/gi,'>'))}
 function withinFreshness(value,days){if(!value)return true;const d=new Date(value);if(!Number.isFinite(d.getTime()))return true;return Date.now()-d.getTime()<=Number(days)*86400000+86400000}
 async function getJson(fetcher,url){const r=await fetcher(url,{headers:{accept:'application/json'}});if(!r?.ok)throw new Error(`Oracle careers HTTP ${r?.status||'error'}`);return r.json()}
 function requisitionRows(data={}){
@@ -25,7 +25,7 @@ function reqId(record={}){
 }
 function title(record={}){return clean(record.Title||record.JobTitle||record.RequisitionTitle||'')}
 function description(record={}){
-  return stripHtml(record.JobDescription||record.ExternalDescriptionStr||record.ExternalDescription||record.Description||record.JobDescriptionExternal||'')
+  return stripSourceHtml(record.JobDescription||record.ExternalDescriptionStr||record.ExternalDescription||record.Description||record.JobDescriptionExternal||'')
 }
 function detailUrl(cfg,id){return `${cfg.host}/hcmUI/CandidateExperience/en/sites/${cfg.site}/job/${encodeURIComponent(id)}`}
 
@@ -33,7 +33,7 @@ export async function searchOracleCompanies({companies=[],freshnessDays=7,unionS
   const selected=(Array.isArray(companies)?companies:[]).filter(name=>companyConnection(name).connector==='oracle')
   const directions=(Array.isArray(unionSearchPlan?.directions)?unionSearchPlan.directions:[]).map(d=>clean(d?.query||d?.role)).filter(Boolean)
   const queries=[...new Set(directions.length?directions:['project manager','delivery manager','implementation manager','integration manager','digital transformation'])]
-  const jobs=[];const errors=[];let discovered=0,fullJdVerified=0,detailRequests=0
+  const jobs=[];const errors=[];let rawDiscovered=0,discovered=0,fullJdVerified=0,detailRequests=0
 
   for(const company of selected){
     const cfg=companyConnection(company)
@@ -54,7 +54,7 @@ export async function searchOracleCompanies({companies=[],freshnessDays=7,unionS
       }catch(error){errors.push(`${company}: ${error.message}`)}
     }
 
-    discovered+=found.size
+    rawDiscovered+=found.size
 
     for(const [id,summary] of found){
       try{
@@ -66,11 +66,12 @@ export async function searchOracleCompanies({companies=[],freshnessDays=7,unionS
         const data=await getJson(fetcher,url.toString())
         const detail=detailRecord(data)||summary
         const posted=publishedAt(detail)||publishedAt(summary)
-        if(!withinFreshness(posted,freshnessDays)) continue
+        if(!sourceWithinFreshness(posted,freshnessDays)) continue
         const fullJd=description(detail)
         if(fullJd.length<500) continue
         const location=locationText(detail)||locationText(summary)
         if(cfg.country&&location&&!location.toLowerCase().includes(String(cfg.country).toLowerCase())&&!location.toLowerCase().includes('dk')&&!location.toLowerCase().includes('copenhagen')&&!location.toLowerCase().includes('aarhus')) continue
+        discovered++
         fullJdVerified++
         const openUrl=detailUrl(cfg,id)
         jobs.push(normalizeJob({
@@ -96,5 +97,5 @@ export async function searchOracleCompanies({companies=[],freshnessDays=7,unionS
     }
   }
 
-  return {source:'company_site',status:errors.length?'partial':'success',jobs,stats:{discovered,fullJdVerified,detailRequests,returned:jobs.length},error:errors.slice(0,3).join(' · ')}
+  return {source:'company_site',status:errors.length?'partial':'success',jobs,stats:{rawDiscovered,discovered,fullJdVerified,detailRequests,returned:jobs.length},error:errors.slice(0,3).join(' · ')}
 }
