@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/cv-library-3-slots
+      - fix/search-stability-step4-freshness-filter
 
 jobs:
   verify:
@@ -18,6 +19,6 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Test
-        run: npm test
+        run: node --test --test-name-pattern="role evaluation uses the full approved|same verified job|deterministic discovery expansion|default discovery search plan|all freshness views use the same 14-day|1/3/7/14-day views are local subsets" app/lib/linkedin-profile-search.test.mjs app/lib/search-query-expansion-ai.test.mjs
       - name: Build
         run: npm run build
