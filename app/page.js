@@ -352,22 +352,28 @@ export default function Home(){
       return {source:'jobnet',data}
     })())
 
-    if(activeCompanySites.length) tasks.push((async()=>{
+    if(activeCompanySites.length){
       if(!hasProfilePlan) throw new Error('Company Watch requires a saved Search Profile.')
-      const res=await fetch('/api/company-profile-search',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          freshnessDays,
-          companies:activeCompanySites,
-          unionSearchPlan:profile.unionSearchPlan,
-          exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[],
-        }),
-      })
-      const data=await res.json()
-      if(!res.ok) throw new Error(data.error||'Company site search failed')
-      return {source:'company_site',data}
-    })())
+      const companyChunks=[]
+      for(let i=0;i<activeCompanySites.length;i+=4) companyChunks.push(activeCompanySites.slice(i,i+4))
+      companyChunks.forEach(companies=>tasks.push((async()=>{
+        const res=await fetch('/api/company-profile-search',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            freshnessDays,
+            companies,
+            unionSearchPlan:profile.unionSearchPlan,
+            exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[],
+          }),
+        })
+        const raw=await res.text()
+        let data
+        try{data=raw?JSON.parse(raw):{}}catch{throw new Error(res.ok?'Company site search returned invalid response':`Company site search failed (HTTP ${res.status})`)}
+        if(!res.ok) throw new Error(data.error||`Company site search failed (HTTP ${res.status})`)
+        return {source:'company_site',data}
+      })()))
+    }
 
     if(activeConsultantPortals.length) tasks.push((async()=>{
       if(!hasProfilePlan) throw new Error('Consultant Portals require a saved Search Profile.')
