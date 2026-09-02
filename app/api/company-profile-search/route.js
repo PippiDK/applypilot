@@ -5,6 +5,7 @@ import { searchSuccessFactorsCompanies } from '../../lib/successfactors-company-
 import { searchWorkdayCompanies } from '../../lib/workday-company-source.js'
 import { searchOracleCompanies } from '../../lib/oracle-company-source.js'
 import { searchWorkableCompanies } from '../../lib/workable-company-source.js'
+import { searchLegacySuccessFactorsCompanies } from '../../lib/legacy-successfactors-company-source.js'
 import { evaluateProfileJob } from '../../lib/job-profile-evaluator.js'
 
 export const runtime='nodejs'
@@ -22,14 +23,15 @@ export async function POST(request){
     const foundBy=Array.isArray(body?.unionSearchPlan?.directions)?body.unionSearchPlan.directions:[]
     if(!companies.length) return NextResponse.json({jobs:[],audit:[],stats:{discovered:0,fullJdVerified:0,evaluated:0,returned:0},coverage:{source:'Company sites',freshnessDays,status:'NO RELEVANT RESULTS'},fetchedAt:new Date().toISOString()})
 
-    const [teamtailor,successfactors,workday,oracle,workable]=await Promise.all([
+    const [teamtailor,successfactors,workday,oracle,workable,legacySuccessfactors]=await Promise.all([
       searchTeamtailorCompanies({companies,freshnessDays,fetcher:globalThis.fetch}),
       searchSuccessFactorsCompanies({companies,freshnessDays,unionSearchPlan:body?.unionSearchPlan||{},fetcher:globalThis.fetch}),
       searchWorkdayCompanies({companies,freshnessDays,unionSearchPlan:body?.unionSearchPlan||{},fetcher:globalThis.fetch}),
       searchOracleCompanies({companies,freshnessDays,unionSearchPlan:body?.unionSearchPlan||{},fetcher:globalThis.fetch}),
       searchWorkableCompanies({companies,freshnessDays,fetcher:globalThis.fetch}),
+      searchLegacySuccessFactorsCompanies({companies,freshnessDays,unionSearchPlan:body?.unionSearchPlan||{},fetcher:globalThis.fetch}),
     ])
-    const sources=[teamtailor,successfactors,workday,oracle,workable]
+    const sources=[teamtailor,successfactors,workday,oracle,workable,legacySuccessfactors]
     const sourceJobs=sources.flatMap(source=>Array.isArray(source.jobs)?source.jobs:[])
     const sourceStats={
       discovered:sources.reduce((sum,source)=>sum+Number(source.stats?.discovered||0),0),
