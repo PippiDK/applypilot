@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - feature/cv-library-3-slots
-      - fix/search-stability-step3-stable-query-plan
 
 jobs:
   verify:
@@ -19,6 +18,6 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Test
-        run: node --test --test-name-pattern="deterministic discovery expansion|default discovery search plan|role evaluation uses the full approved|same verified job" app/lib/search-query-expansion-ai.test.mjs app/lib/linkedin-profile-search.test.mjs
+        run: npm test
       - name: Build
         run: npm run build
