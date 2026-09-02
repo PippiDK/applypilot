@@ -20,6 +20,7 @@ export const COMPANY_CONNECTORS={
   'PFA':{status:'connected',connector:'successfactors_legacy',baseUrl:'https://career2.successfactors.eu',company:'pfa',country:'Denmark'},
   'COWI':{status:'connected',connector:'custom_html',baseUrl:'https://www.cowi.com',listingPath:'/your-career/open-vacancies/?country=Denmark',detailPattern:'/your-career/open-vacancies/vacancy/?id='},
   'Ørsted':{status:'connected',connector:'custom_html',baseUrl:'https://orsted.com',listingPath:'/en/careers/vacancies-list',detailPattern:'/en/careers/vacancies-list/'},
+  'Copenhagen Merchants':{status:'connected',connector:'teamtailor',baseUrl:'https://joinus.copmer.com'},
 }
 
 export const TARGET_COMPANIES=[
