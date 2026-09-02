@@ -75,8 +75,8 @@ test('default discovery search plan is deterministic and does not depend on AI o
       ['Senior IT Project Manager','Senior IT Project Lead','expanded'],
       ['Senior IT Project Manager','IT Project Lead','expanded'],
       ['Transformation Project Manager','Transformation Project Manager','exact'],
-      ['Transformation Project Manager','Transformation Manager','expanded'],
-      ['Transformation Project Manager','Transformation Project Lead','expanded']
+      ['Transformation Project Manager','Transformation Project Lead','expanded'],
+      ['Transformation Project Manager','Transformation Manager','expanded']
     ]
   )
 })
