@@ -9,7 +9,7 @@ const plan={directions:[
   {key:'programme delivery manager',role:'Programme Delivery Manager',tier:'adjacent',origin:'manual',cvSlots:[]}
 ]}
 
-test('issues exactly one start=0 Denmark search request per approved direction and never requests job detail',async()=>{
+test('runs repeated Denmark discovery passes per approved direction until the result converges and never requests job detail',async()=>{
   const urls=[]
   const fetcher=async url=>{
     urls.push(url)
@@ -18,8 +18,8 @@ test('issues exactly one start=0 Denmark search request per approved direction a
     return role==='Integration Project Manager'?card('1111111111','Integration Programme Manager'):card('2222222222','Programme Delivery Manager')
   }
   const result=await searchLinkedInShadow({freshnessDays:7,unionSearchPlan:plan,fetcher})
-  assert.equal(urls.length,2)
-  assert.deepEqual(urls.map(url=>new URL(url).searchParams.get('keywords')),['Integration Project Manager','Programme Delivery Manager'])
+  assert.equal(urls.length,4)
+  assert.deepEqual(urls.map(url=>new URL(url).searchParams.get('keywords')),['Integration Project Manager','Programme Delivery Manager','Integration Project Manager','Programme Delivery Manager'])
   for(const url of urls){
     const parsed=new URL(url)
     assert.equal(parsed.pathname,'/jobs-guest/jobs/api/seeMoreJobPostings/search')
@@ -29,7 +29,9 @@ test('issues exactly one start=0 Denmark search request per approved direction a
     assert.equal(parsed.searchParams.get('start'),'0')
     assert.equal(url.includes('/jobPosting/'),false)
   }
-  assert.equal(result.stats.searchRequests,2)
+  assert.equal(result.stats.searchRequests,4)
+  assert.equal(result.stats.discoveryPasses,2)
+  assert.equal(result.stats.discoveryStable,true)
 })
 
 test('deduplicates jobs and aggregates every finding direction with provenance',async()=>{
@@ -53,7 +55,7 @@ test('preserves successful directions when another direction fails',async()=>{
     return card('1111111111')
   }})
   assert.equal(result.candidates.length,1)
-  assert.equal(result.stats.searchRequests,2)
+  assert.ok(result.stats.searchRequests>=2)
   assert.equal(result.stats.searchFailures,1)
   assert.equal(result.coverage.status,'ACCESS LIMITED')
   assert.match(result.coverage.detail,/blocked/)
@@ -68,7 +70,7 @@ test('empty plan returns a valid empty result without network calls',async()=>{
   const result=await searchLinkedInShadow({freshnessDays:14,unionSearchPlan:{directions:[]},fetcher:async()=>{calls++;return ''}})
   assert.equal(calls,0)
   assert.deepEqual(result.candidates,[])
-  assert.deepEqual(result.stats,{directions:0,primaryDirections:0,adjacentDirections:0,searchRequests:0,searchFailures:0,searchRows:0,discovered:0})
+  assert.deepEqual(result.stats,{directions:0,primaryDirections:0,adjacentDirections:0,searchRequests:0,searchFailures:0,searchRows:0,discovered:0,discoveryPasses:0,discoveryStable:false})
   assert.deepEqual(result.coverage,{status:'NO DIRECTIONS',detail:null})
 })
 
@@ -93,4 +95,25 @@ test('continues to the next LinkedIn discovery page so wider windows do not lose
   assert.equal(result.candidates.some(candidate=>candidate.jobId==='4454799999'),true)
   assert.equal(result.stats.searchRequests,2)
   assert.equal(result.stats.discovered,26)
+})
+
+
+test('one search run unions reshuffled LinkedIn result sets until two consecutive passes add no new IDs',async()=>{
+  const singlePlan={directions:[{key:'project manager',role:'Project Manager',tier:'primary',origin:'cv',cvSlots:[1]}]}
+  let pass=0
+  const result=await searchLinkedInShadow({
+    freshnessDays:14,
+    unionSearchPlan:singlePlan,
+    fetcher:async url=>{
+      const start=Number(new URL(url).searchParams.get('start')||0)
+      if(start!==0) return ''
+      pass++
+      if(pass===1) return card('4454800001','Project Manager A')+card('4454800002','Project Manager B')
+      if(pass===2) return card('4454800002','Project Manager B')+card('4454800003','Project Manager C')
+      return card('4454800001','Project Manager A')+card('4454800002','Project Manager B')+card('4454800003','Project Manager C')
+    }
+  })
+  assert.deepEqual(new Set(result.candidates.map(x=>x.jobId)),new Set(['4454800001','4454800002','4454800003']))
+  assert.equal(result.stats.discoveryPasses,3)
+  assert.equal(result.stats.discoveryStable,true)
 })
