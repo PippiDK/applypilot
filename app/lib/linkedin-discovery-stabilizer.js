@@ -33,13 +33,8 @@ export async function collectDiscoveryPasses({queries=[],passes=[],fetchPage}={}
             const id=String(row?.jobId||'')
             if(!id) continue
             if(!byId.has(id)){
-              byId.set(id,{...row,__discoveryQueries:[String(query)]})
+              byId.set(id,row)
               newJobIds++
-            }else{
-              const existing=byId.get(id)
-              const observed=new Set(Array.isArray(existing.__discoveryQueries)?existing.__discoveryQueries:[])
-              observed.add(String(query))
-              existing.__discoveryQueries=[...observed]
             }
           }
           if(list.length===0) break
@@ -51,15 +46,13 @@ export async function collectDiscoveryPasses({queries=[],passes=[],fetchPage}={}
       }
     }
 
-    const previous=groups[group]||{stable:false,passesExecuted:0,newJobIds:0,cleanPasses:0}
-    const cleanPasses=(newJobIds===0&&passFailures===0)?Number(previous.cleanPasses||0)+1:0
+    const previous=groups[group]||{stable:false,passesExecuted:0,newJobIds:0}
     const current={
       stable:false,
       passesExecuted:previous.passesExecuted+1,
       newJobIds:previous.newJobIds+newJobIds,
-      cleanPasses,
     }
-    if(current.passesExecuted>1 && cleanPasses>=2){
+    if(current.passesExecuted>1 && newJobIds===0 && passFailures===0){
       current.stable=true
       stableGroups.add(group)
     }
