@@ -68,8 +68,10 @@ function profileEvaluation(job,profileDirections=[]){
     const relevant=similarity.substantiveCommon>0 && (similarity.score>=0.45||support>=0.65)
     if(!relevant) continue
     const tier=direction?.tier==='primary'?'primary':'adjacent'
-    const base=tier==='primary'?6.5:5.9
-    const score=Math.min(9.6,round1(base+similarity.score*2.2+support*.9))
+    // Keep recall broad, but spread scores so weak/adjacent matches do not all look "High".
+    // A primary role still gets a modest prior, while title/JD evidence must earn the rest.
+    const base=tier==='primary'?5.5:5.0
+    const score=Math.min(9.6,round1(base+similarity.score*2.8+support*1.3))
     const candidate={direction,tier,similarity:similarity.score,support,score}
     if(!best||candidate.score>best.score) best=candidate
   }
@@ -78,7 +80,7 @@ function profileEvaluation(job,profileDirections=[]){
     return {pass:false,reason:'Vacancy does not confirm an approved Search Profile role direction',evaluation:null}
   }
 
-  const verdict=best.score>=9?'Strong profile match':best.score>=7.5?'Profile match':'Possible profile match'
+  const verdict=best.score>=9?'Strong profile match':best.score>=8?'Profile match':'Possible profile match'
   const action=best.score>=7.5?'Consider':'Hold'
   return {
     pass:true,

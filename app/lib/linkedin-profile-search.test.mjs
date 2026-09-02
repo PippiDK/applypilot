@@ -320,3 +320,52 @@ test('fresh discovery always runs while cached verified JDs avoid repeat detail 
   assert.equal(result.stats.cachedJdUsed,2)
   assert.deepEqual(result.jobs.map(item=>item.job.company),['Today Co'])
 })
+
+
+test('scoring calibration keeps broad recall but reserves 9+ for strong direct role evidence',async()=>{
+  const searchPlan=plan('Senior IT Project Manager')
+  const exactFetcher=scenarioFetcher({
+    searchHtml:card('2222222201','Senior IT Project Manager','Exact Co'),
+    details:{'2222222201':detailHtml({
+      title:'Senior IT Project Manager',
+      company:'Exact Co',
+      description:'Lead enterprise IT projects end-to-end. Own scope, timeline, milestones, risks, dependencies, governance, implementation, cutover and go-live. '.repeat(5)
+    })}
+  })
+  const exact=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:searchPlan,fetcher:exactFetcher,now:new Date('2026-08-27T12:00:00Z')})
+  assert.equal(exact.jobs.length,1)
+  assert.ok(exact.jobs[0].evaluation.score>=9)
+
+  const weakFetcher=scenarioFetcher({
+    searchHtml:card('2222222202','Project Manager','Broad Co'),
+    details:{'2222222202':detailHtml({
+      title:'Project Manager',
+      company:'Broad Co',
+      description:'Coordinate projects, stakeholders, timelines and delivery activities across the organisation. Support implementation planning and project reporting. '.repeat(5)
+    })}
+  })
+  const weak=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:searchPlan,fetcher:weakFetcher,now:new Date('2026-08-27T12:00:00Z')})
+  assert.equal(weak.jobs.length,1)
+  assert.ok(weak.jobs[0].evaluation.score<8)
+  assert.ok(weak.jobs[0].evaluation.score>=7)
+})
+
+test('adjacent exact role stays visible but does not automatically outrank a strong primary match',async()=>{
+  const unionSearchPlan={version:'union-search-plan-v1',directions:[
+    {key:'senior-it-project-manager',role:'Senior IT Project Manager',tier:'primary',origin:'cv',cvSlots:[1]},
+    {key:'implementation-manager',role:'Implementation Manager',tier:'adjacent',origin:'cv',cvSlots:[1]},
+  ]}
+  const fetcher=scenarioFetcher({
+    searchHtml:card('2222222203','Implementation Manager','Adjacent Co'),
+    details:{'2222222203':detailHtml({
+      title:'Implementation Manager',
+      company:'Adjacent Co',
+      description:'Own implementation delivery, scope, timeline, risks, dependencies, stakeholders, cutover and go-live for enterprise software customers. '.repeat(5)
+    })}
+  })
+  const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan,fetcher,now:new Date('2026-08-27T12:00:00Z')})
+  assert.equal(result.jobs.length,1)
+  assert.ok(result.jobs[0].evaluation.score>=8)
+  assert.ok(result.jobs[0].evaluation.score<=9.1)
+  assert.equal(result.jobs[0].evaluation.breakdown.tier,'adjacent')
+})
