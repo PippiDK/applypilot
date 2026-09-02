@@ -39,7 +39,8 @@ export async function searchSuccessFactorsCompanies({companies=[],freshnessDays=
     for(const q of queries){
       for(let page=0;page<maxPages;page++){
         try{
-          const url=new URL(cfg.baseUrl+cfg.listingPath)
+          const searchPath=cfg.searchPath||cfg.listingPath||'/search/'
+          const url=new URL(cfg.baseUrl+searchPath)
           url.searchParams.set('q',q)
           if(page>0) url.searchParams.set('startrow',String(page*25))
           const html=await fetchText(fetcher,url.toString())
