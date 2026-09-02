@@ -22,7 +22,7 @@ import {JOB_STATUS_OPTIONS,readJobStatuses,writeJobStatus} from './lib/job-statu
 import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
 import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
 import {companyConnection,connectedCompanyNames,defaultCompanyWatch,readCompanyWatch,writeCompanyWatch,TARGET_COMPANIES} from './lib/company-watch.js'
-import {CONSULTANT_PORTALS,defaultConsultantPortals,readConsultantPortals,writeConsultantPortals} from './lib/consultant-portals.js'
+import {CONSULTANT_PORTALS,connectedConsultantPortalIds,defaultConsultantPortals,readConsultantPortals,writeConsultantPortals} from './lib/consultant-portals.js'
 import SearchAudit from './components/search-audit.js'
 import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
@@ -43,7 +43,7 @@ function roleList(value){return Array.isArray(value)?value.map(item=>String(item
 function legacyRoles(value=''){return String(value??'').split(',').map(item=>item.trim()).filter(Boolean)}
 function combinedRoles(primary=[],adjacent=[]){return [...roleList(primary),...roleList(adjacent)].join(', ')}
 function workModelText(values=[]){return values.map(value=>value==='onsite'?'On-site':value==='hybrid'?'Hybrid':'Remote').join(' · ')}
-function jobSourceLabel(job={}){const source=String(job?.source||job?.sourceRecords?.[0]?.source||'').toLowerCase();if(source==='company_site')return `Company site · ${job?.company||'Official'}`;if(source==='jobindex')return 'Jobindex';if(source==='jobnet')return 'Jobnet';if(source==='linkedin')return 'LinkedIn';const url=String(job?.originalUrl||'');if(url.includes('jobnet.dk'))return 'Jobnet';if(url.includes('linkedin.com'))return 'LinkedIn';return 'Source'}
+function jobSourceLabel(job={}){const source=String(job?.source||job?.sourceRecords?.[0]?.source||'').toLowerCase();if(source==='consultant_portal')return `Consultant portal · ${job?.consultantPortal?.name||job?.company||'Consultant'}`;if(source==='company_site')return `Company site · ${job?.company||'Official'}`;if(source==='jobindex')return 'Jobindex';if(source==='jobnet')return 'Jobnet';if(source==='linkedin')return 'LinkedIn';const url=String(job?.originalUrl||'');if(url.includes('jobnet.dk'))return 'Jobnet';if(url.includes('linkedin.com'))return 'LinkedIn';return 'Source'}
 function sourceDedupeKey(job={}){const company=String(job.company||'').toLowerCase().replace(/\b(a\/s|as)\b/g,'as').replace(/[.,]/g,'').trim();const title=String(job.title||'').toLowerCase().replace(/\s+/g,' ').trim();const location=String(job.location||'').toLowerCase().replace(/\s+/g,' ').trim();return company&&title?company+'|'+title+'|'+location:''}
 function mergeSourceItems(groups=[]){const out=[];const byKey=new Map();for(const item of groups.flat()){const key=sourceDedupeKey(item?.job);if(key&&byKey.has(key)){const index=byKey.get(key);const current=out[index];const currentOfficial=String(current?.job?.source||'')==='company_site';const itemOfficial=String(item?.job?.source||'')==='company_site';if(itemOfficial&&!currentOfficial){out[index]=item;continue}if(currentOfficial&&!itemOfficial)continue;const richer=String(item?.job?.description||item?.job?.fullJd||'').length>String(current?.job?.description||current?.job?.fullJd||'').length?item:current;out[index]=richer;continue}if(key)byKey.set(key,out.length);out.push(item)}return out}
 
@@ -273,7 +273,8 @@ export default function Home(){
     return
   }
   const activeCompanySites=companyWatch.enabled?companyWatch.selected.filter(name=>connectedCompanyNames().includes(name)):[]
-  if(!selectedSources.length&&!activeCompanySites.length){
+  const activeConsultantPortals=consultantPortals.enabled?consultantPortals.selected.filter(id=>connectedConsultantPortalIds().includes(id)):[]
+  if(!selectedSources.length&&!activeCompanySites.length&&!activeConsultantPortals.length){
     setState({loading:false,error:'Select at least one search source.',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
   }
@@ -368,6 +369,23 @@ export default function Home(){
       return {source:'company_site',data}
     })())
 
+    if(activeConsultantPortals.length) tasks.push((async()=>{
+      if(!hasProfilePlan) throw new Error('Consultant Portals require a saved Search Profile.')
+      const res=await fetch('/api/consultant-profile-search',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          freshnessDays,
+          portalIds:activeConsultantPortals,
+          unionSearchPlan:profile.unionSearchPlan,
+          exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[],
+        }),
+      })
+      const data=await res.json()
+      if(!res.ok) throw new Error(data.error||'Consultant portal search failed')
+      return {source:'consultant_portal',data}
+    })())
+
     const settled=await Promise.allSettled(tasks)
     const successful=settled.filter(item=>item.status==='fulfilled').map(item=>item.value)
     const failed=settled.filter(item=>item.status==='rejected')
@@ -386,7 +404,7 @@ export default function Home(){
     setState({
       loading:false,
       error:'',
-      coverage:{source:[...selectedSources,...(activeCompanySites.length?['company-sites']:[])].join('+'),freshnessDays,status:limited?'ACCESS LIMITED':mergedJobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:failed[0]?.reason?.message||null},
+      coverage:{source:[...selectedSources,...(activeCompanySites.length?['company-sites']:[]),...(activeConsultantPortals.length?['consultant-portals']:[])].join('+'),freshnessDays,status:limited?'ACCESS LIMITED':mergedJobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:failed[0]?.reason?.message||null},
       stats,
       fetchedAt:new Date().toISOString(),
       audit,
@@ -653,7 +671,7 @@ export default function Home(){
         <div className="companyWatchActions"><span>{consultantPortals.selected.length} portals selected</span><button className="secondary companyManage" onClick={()=>setConsultantPortalsOpen(open=>!open)}>{consultantPortalsOpen?'Close':'Manage'}</button></div>
       </div>
       {consultantPortalsOpen&&<div className="companyWatchList consultantPortalList">
-        {CONSULTANT_PORTALS.map(portal=><label key={portal.id}><input type="checkbox" checked={consultantPortals.selected.includes(portal.id)} onChange={()=>toggleConsultantPortal(portal.id)}/><span>{portal.name}</span><small>Connection pending</small></label>)}
+        {CONSULTANT_PORTALS.map(portal=><label key={portal.id}><input type="checkbox" checked={consultantPortals.selected.includes(portal.id)} onChange={()=>toggleConsultantPortal(portal.id)}/><span>{portal.name}</span><small className={portal.status==='connected'?'ready':''}>{portal.status==='connected'?('Connected · '+portal.connector):'Connection pending'}</small></label>)}
       </div>}
     </section>
 
