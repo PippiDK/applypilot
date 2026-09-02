@@ -41,7 +41,7 @@ function roleList(value){return Array.isArray(value)?value.map(item=>String(item
 function legacyRoles(value=''){return String(value??'').split(',').map(item=>item.trim()).filter(Boolean)}
 function combinedRoles(primary=[],adjacent=[]){return [...roleList(primary),...roleList(adjacent)].join(', ')}
 function workModelText(values=[]){return values.map(value=>value==='onsite'?'On-site':value==='hybrid'?'Hybrid':'Remote').join(' · ')}
-function jobSourceLabel(job={}){const source=String(job?.source||job?.sourceRecords?.[0]?.source||'').toLowerCase();if(source==='jobindex')return 'Jobindex';if(source==='linkedin')return 'LinkedIn';return String(job?.originalUrl||'').includes('linkedin.com')?'LinkedIn':'Source'}
+function jobSourceLabel(job={}){const source=String(job?.source||job?.sourceRecords?.[0]?.source||'').toLowerCase();if(source==='jobindex')return 'Jobindex';if(source==='jobnet')return 'Jobnet';if(source==='linkedin')return 'LinkedIn';const url=String(job?.originalUrl||'');if(url.includes('jobnet.dk'))return 'Jobnet';if(url.includes('linkedin.com'))return 'LinkedIn';return 'Source'}
 function sourceDedupeKey(job={}){const company=String(job.company||'').toLowerCase().replace(/\b(a\/s|as)\b/g,'as').replace(/[.,]/g,'').trim();const title=String(job.title||'').toLowerCase().replace(/\s+/g,' ').trim();const location=String(job.location||'').toLowerCase().replace(/\s+/g,' ').trim();return company&&title?company+'|'+title+'|'+location:''}
 function mergeSourceItems(groups=[]){const out=[];const byKey=new Map();for(const item of groups.flat()){const key=sourceDedupeKey(item?.job);if(key&&byKey.has(key)){const index=byKey.get(key);const current=out[index];const richer=String(item?.job?.description||item?.job?.fullJd||'').length>String(current?.job?.description||current?.job?.fullJd||'').length?item:current;out[index]=richer;continue}if(key)byKey.set(key,out.length);out.push(item)}return out}
 
@@ -304,6 +304,22 @@ export default function Home(){
       return {source:'jobindex',data}
     })())
 
+    if(selectedSources.includes('jobnet')) tasks.push((async()=>{
+      if(!hasProfilePlan) throw new Error('Jobnet requires a saved Search Profile.')
+      const res=await fetch('/api/jobnet-profile-search',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          freshnessDays,
+          unionSearchPlan:profile.unionSearchPlan,
+          exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[],
+        }),
+      })
+      const data=await res.json()
+      if(!res.ok) throw new Error(data.error||'Jobnet search failed')
+      return {source:'jobnet',data}
+    })())
+
     const settled=await Promise.allSettled(tasks)
     const successful=settled.filter(item=>item.status==='fulfilled').map(item=>item.value)
     const failed=settled.filter(item=>item.status==='rejected')
@@ -558,7 +574,7 @@ export default function Home(){
   }
 
   return <main>
-    <header><div><div className="brand">ApplyPilot</div><div className="tag">Search less. Apply better.</div></div><div className="headerActions"><div className={`sourceBadge profileStatus ${resumeLoaded?'statusReady':'statusEmpty'}`}>{resumeLoaded?'Profile ready':'Profile empty'}</div><div className="sourceBadge">LINKEDIN + JOBINDEX · TEST</div></div></header>
+    <header><div><div className="brand">ApplyPilot</div><div className="tag">Search less. Apply better.</div></div><div className="headerActions"><div className={`sourceBadge profileStatus ${resumeLoaded?'statusReady':'statusEmpty'}`}>{resumeLoaded?'Profile ready':'Profile empty'}</div><div className="sourceBadge">LINKEDIN + JOBINDEX + JOBNET · TEST</div></div></header>
 
     <section className="hero">
       <div><p className="eyebrow">MULTI-SOURCE · END-TO-END</p><h1>Find the right roles for your Search Profile in Denmark.</h1><p>Search Profile → selected sources → full job description → worthwhile matches only.</p></div>
@@ -569,7 +585,7 @@ export default function Home(){
 
     <section className="controls">
       <div><small>POSTED WITHIN</small><div className="choices">{WINDOWS.map(days=><button key={days} className={freshnessDays===days?'choice selected':'choice'} onClick={()=>setFreshnessDays(days)}>{days} day{days===1?'':'s'}</button>)}</div></div>
-      <div><small>SEARCH SOURCES</small><div className="choices"><label className="choice"><input type="checkbox" checked={selectedSources.includes('linkedin')} onChange={()=>toggleSource('linkedin')}/> LinkedIn</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobindex')} onChange={()=>toggleSource('jobindex')}/> Jobindex</label></div></div>
+      <div><small>SEARCH SOURCES</small><div className="choices"><label className="choice"><input type="checkbox" checked={selectedSources.includes('linkedin')} onChange={()=>toggleSource('linkedin')}/> LinkedIn</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobindex')} onChange={()=>toggleSource('jobindex')}/> Jobindex</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobnet')} onChange={()=>toggleSource('jobnet')}/> Jobnet</label></div></div>
       <button className="primary" onClick={search} disabled={state.loading}>{state.loading?'Searching…':'Search'}</button>
     </section>
 
@@ -660,7 +676,7 @@ export default function Home(){
       <ShadowSearchAudit shadowState={shadowState}/>
     </section>}
 
-    <footer>TEST · LinkedIn + Jobindex multi-source search</footer>
+    <footer>TEST · LinkedIn + Jobindex + Jobnet multi-source search</footer>
 
     {profileOpen&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget&&!profileSaveState.loading)closeProfile()}}><div className="modal profileModal">
       <div className="modalHead"><div><p className="eyebrow">BUILD YOUR SEARCH AGENT</p><h2>Search profile</h2></div><button className="close" onClick={closeProfile} disabled={profileSaveState.loading}>×</button></div>
