@@ -18,6 +18,8 @@ test('multi-pass discovery unions reshuffled LinkedIn pages until a clean pass a
     ['7d-pass-2|25',['C','D','F']],
     ['7d-pass-3|0',['F','A','B']],
     ['7d-pass-3|25',['C','D','E']],
+    ['7d-pass-4|0',['A','B','E']],
+    ['7d-pass-4|25',['C','D','F']],
   ])
   const calls=[]
   const result=await collectDiscoveryPasses({
@@ -31,11 +33,12 @@ test('multi-pass discovery unions reshuffled LinkedIn pages until a clean pass a
 
   assert.deepEqual(new Set(result.rows.map(x=>x.jobId)),new Set(['A','B','C','D','E','F']))
   assert.equal(result.groups['7d'].stable,true)
-  assert.equal(result.groups['7d'].passesExecuted,3)
+  assert.equal(result.groups['7d'].passesExecuted,4)
   assert.equal(result.passStats[0].newJobIds,4)
   assert.equal(result.passStats[1].newJobIds,2)
   assert.equal(result.passStats[2].newJobIds,0)
-  assert.equal(calls.some(x=>x.startsWith('7d-pass-4')),false)
+  assert.equal(result.passStats[3].newJobIds,0)
+  assert.equal(calls.some(x=>x.startsWith('7d-pass-4')),true)
 })
 
 test('a failed discovery request cannot falsely mark a pass stable',async()=>{

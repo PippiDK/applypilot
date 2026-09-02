@@ -114,6 +114,6 @@ test('one search run unions reshuffled LinkedIn result sets until two consecutiv
     }
   })
   assert.deepEqual(new Set(result.candidates.map(x=>x.jobId)),new Set(['4454800001','4454800002','4454800003']))
-  assert.equal(result.stats.discoveryPasses,3)
+  assert.equal(result.stats.discoveryPasses,4)
   assert.equal(result.stats.discoveryStable,true)
 })
