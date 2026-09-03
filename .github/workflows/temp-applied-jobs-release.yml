@@ -1,4 +1,4 @@
-name: Temporary Applied Jobs diagnostic
+name: Temporary Applied Jobs release verification
 
 on:
   push:
@@ -9,7 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  diagnose-tests:
+  patch-test-build:
+    if: ${{ !contains(github.event.head_commit.message, '[applied-jobs-patched]') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout release branch
@@ -22,18 +23,79 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Integrate Applied Jobs into current main page
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('app/page.js')
+          text = path.read_text()
+
+          def replace_once(old, new, label):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected exactly one match, found {count}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              "import {JOB_STATUS_OPTIONS,readJobStatuses,writeJobStatus} from './lib/job-statuses.js'\nimport {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'",
+              "import {JOB_STATUS_OPTIONS,readJobStatuses,writeJobStatus} from './lib/job-statuses.js'\nimport {readAppliedJobs,archiveAppliedJob,syncAppliedArchive} from './lib/applied-jobs.js'\nimport AppliedJobsArchive from './components/applied-jobs-archive.js'\nimport {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'",
+              'imports',
+          )
+
+          replace_once(
+              "  const [jobStatuses,setJobStatuses]=useState({})\n  const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})",
+              "  const [jobStatuses,setJobStatuses]=useState({})\n  const [appliedJobs,setAppliedJobs]=useState([])\n  const [appliedArchiveOpen,setAppliedArchiveOpen]=useState(false)\n  const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})",
+              'state',
+          )
+
+          replace_once(
+              "  useEffect(()=>{\n    setJobStatuses(readJobStatuses(localStorage))\n  },[])",
+              "  useEffect(()=>{\n    setJobStatuses(readJobStatuses(localStorage))\n    setAppliedJobs(readAppliedJobs(localStorage))\n  },[])",
+              'reload persistence',
+          )
+
+          replace_once(
+              "  function changeJobStatus(jobId,status){\n    setJobStatuses(current=>writeJobStatus({storage:localStorage,statuses:current,jobId,status}))\n  }",
+              "  function changeJobStatus(jobId,status){\n    const item=jobs.find(candidate=>candidate?.job?.sourceJobId===jobId)\n    setJobStatuses(current=>writeJobStatus({storage:localStorage,statuses:current,jobId,status}))\n    if(status==='applied'&&item){\n      setAppliedJobs(current=>archiveAppliedJob({storage:localStorage,archive:current,job:item.job,evaluation:item.evaluation}))\n    }\n  }",
+              'status archive',
+          )
+
+          replace_once(
+              "    setJobs(mergedJobs)\n",
+              "    setJobs(mergedJobs)\n    setAppliedJobs(current=>syncAppliedArchive({storage:localStorage,archive:current,items:mergedJobs,statuses:jobStatuses}))\n",
+              'search backfill',
+          )
+
+          replace_once(
+              "    </section>}\n\n    <footer>TEST · LinkedIn + Jobindex + Jobnet multi-source search</footer>",
+              "    </section>}\n\n    <AppliedJobsArchive jobs={appliedJobs} open={appliedArchiveOpen} onOpen={()=>setAppliedArchiveOpen(true)} onClose={()=>setAppliedArchiveOpen(false)}/>\n\n    <footer>TEST · LinkedIn + Jobindex + Jobnet multi-source search</footer>",
+              'archive render',
+          )
+
+          path.write_text(text)
+
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Capture full test output
+      - name: Run Applied Jobs tests
+        run: node --test app/lib/applied-jobs.test.mjs
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Verify integration patch
         run: |
-          set +e
-          npm test > .applied-test-output.txt 2>&1
-          code=$?
-          echo "TEST_EXIT=$code" >> .applied-test-output.txt
+          test "$(git diff --name-only)" = "app/page.js"
+          git diff --check
+          grep -q "readAppliedJobs" app/page.js
+          grep -q "AppliedJobsArchive" app/page.js
+
+      - name: Commit integrated page
+        run: |
           git config user.name "PippiDK"
           git config user.email "133820767+PippiDK@users.noreply.github.com"
-          git add .applied-test-output.txt
-          git commit -m "chore: capture Applied Jobs test diagnostics [skip ci]"
+          git add app/page.js
+          git commit -m "feat: integrate Applied Jobs history [applied-jobs-patched]"
           git push origin HEAD:release/applied-jobs-main
-          exit $code
