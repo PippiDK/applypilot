@@ -2,10 +2,10 @@ const COPENHAGEN_TIME_ZONE='Europe/Copenhagen'
 const DAY_MS=86400000
 
 export const FRESHNESS_OPTIONS=[
-  {id:'today',label:'Today',requestDays:1},
-  {id:'yesterday',label:'Yesterday',requestDays:3},
-  {id:'5d',label:'5 days',requestDays:7},
-  {id:'10d',label:'10 days',requestDays:14},
+  {id:'today',label:'1 Day',requestDays:1},
+  {id:'yesterday',label:'Previous Day',requestDays:3},
+  {id:'5d',label:'5 Days',requestDays:7},
+  {id:'10d',label:'10 Days',requestDays:14},
 ]
 
 const optionFor=selection=>FRESHNESS_OPTIONS.find(option=>option.id===selection)||FRESHNESS_OPTIONS[2]
@@ -39,10 +39,10 @@ export function freshnessSelectionFromDays(days){
 }
 
 export function freshnessResultLabel(selection){
-  if(selection==='today') return 'Today'
-  if(selection==='yesterday') return 'Yesterday'
-  if(selection==='10d') return 'Newest 10 days'
-  return 'Newest 5 days'
+  if(selection==='today') return '1 Day'
+  if(selection==='yesterday') return 'Previous Day'
+  if(selection==='10d') return 'Newest 10 Days'
+  return 'Newest 5 Days'
 }
 
 export function filterItemsByFreshnessSelection(items=[],selection='5d',now=new Date()){
