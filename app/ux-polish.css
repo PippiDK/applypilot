@@ -12,3 +12,14 @@
 .job{transition:background .16s,border-color .16s}.job:hover{background:#1a2027;border-color:#333d48}.job.active:hover{border-color:#58cfa2;background:#18231f}.jobStatusSelect{opacity:.72;font-size:8px;border-color:#2d353f}.jobStatusSelect:hover,.jobStatusSelect:focus{opacity:1}.job>span:last-child{width:26px;height:26px;display:flex;align-items:center;justify-content:center;justify-self:end;border:1px solid #313b46;border-radius:999px;color:#91a0af;font-size:14px;transition:border-color .16s,color .16s,transform .16s}.job:hover>span:last-child,.job.active>span:last-child{border-color:#4e7968;color:#8de7c2;transform:translateX(2px)}
 
 @media(max-width:780px){.hero{margin-top:24px;padding:22px}.docs{grid-template-columns:1fr}.cvWorkflowChooser .reviewActions{border-top:0}.job>span:last-child{width:24px;height:24px}}
+
+/* Applied jobs archive — permanent local application history; history lives on the left */
+.appliedArchiveTab{position:fixed;left:0;right:auto;top:42%;z-index:40;display:flex;flex-direction:column;align-items:center;gap:6px;background:#132019;border:1px solid #285e4a;border-left:0;border-right:1px solid #285e4a;color:#7ee2b8;border-radius:0 12px 12px 0;padding:12px 9px;box-shadow:0 10px 35px rgba(0,0,0,.35)}
+.appliedArchiveTab span{font-size:9px;font-weight:900;letter-spacing:.12em;writing-mode:vertical-rl;transform:rotate(180deg)}.appliedArchiveTab b{font-size:14px}
+.appliedArchiveBackdrop{position:fixed;z-index:70;inset:0;background:rgba(2,4,6,.56);backdrop-filter:blur(4px);display:flex;justify-content:flex-start}
+.appliedArchiveDrawer{width:min(520px,94vw);height:100%;overflow:auto;background:#0f1318;border-right:1px solid #303946;padding:26px;box-shadow:30px 0 90px rgba(0,0,0,.55)}
+.appliedArchiveHead{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;padding-bottom:18px;border-bottom:1px solid #242c35}.appliedArchiveHead h2{font-size:30px;margin:3px 0 4px}.appliedArchiveHead span{color:#84909c;font-size:12px}
+.appliedArchiveList{padding:10px 0}.appliedArchiveItem{background:#151a20;border:1px solid #29313a;border-radius:15px;padding:16px;margin:10px 0}
+.appliedArchiveItemTop{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.appliedArchiveItemTop b{display:block;font-size:14px;line-height:1.4}.appliedArchiveItemTop span{display:block;color:#8d98a4;font-size:11px;margin-top:5px;line-height:1.35}.appliedArchiveItemTop strong{color:#7ee2b8;font-size:16px}
+.appliedArchiveItem small{display:block;color:#6f7c88;margin:11px 0;font-size:10px}.appliedArchiveLink{min-width:0;padding:9px 12px;font-size:11px}
+@media(max-width:780px){.appliedArchiveTab{top:auto;bottom:18px;left:12px;right:auto;border-left:1px solid #285e4a;border-right:1px solid #285e4a;border-radius:999px;flex-direction:row;padding:10px 14px}.appliedArchiveTab span{writing-mode:initial;transform:none}.appliedArchiveDrawer{width:100%;padding:20px}}
