@@ -26,7 +26,9 @@ export default function SplashGate({children}){
           <path className={styles.letterA} d="M128 254 L206 58 H244 L324 254 H278 L257 202 H190 L170 254 Z M205 164 H243 L224 112 Z" fill="url(#applyPilotMint)"/>
           <path className={styles.flightGlow} d={SPLASH_MOTION.path}/>
           <path className={styles.flightPath} d={SPLASH_MOTION.path}/>
-          <circle className={styles.flightDot} r="7" cx="88" cy="238"/>
+          <circle className={styles.flightDot} r="7">
+            <animateMotion dur="1.7s" begin="0.22s" fill="freeze" path={SPLASH_MOTION.path}/>
+          </circle>
           <path className={styles.flightTip} d="M346 113 L371 124 L349 141 Z"/>
         </svg>
       </div>
