@@ -33,6 +33,11 @@ export function freshnessRequestDays(selection){
   return optionFor(selection).requestDays
 }
 
+export function freshnessSelectionFromDays(days){
+  const requested=Number(days)
+  return FRESHNESS_OPTIONS.find(option=>option.requestDays===requested)?.id||'5d'
+}
+
 export function freshnessResultLabel(selection){
   if(selection==='today') return 'Today'
   if(selection==='yesterday') return 'Yesterday'
