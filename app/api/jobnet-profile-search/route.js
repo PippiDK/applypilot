@@ -4,6 +4,7 @@ import { buildDiscoverySearchPlan } from '../../lib/search-query-expansion-ai.js
 import { searchJobnetSource } from '../../lib/jobnet-source-adapter.js'
 import { evaluateProfileJob } from '../../lib/job-profile-evaluator.js'
 import { jobnetRoleContextGuard } from '../../lib/jobnet-role-context-guard.js'
+import { freshnessSelectionFromDays,filterItemsByFreshnessSelection } from '../../lib/freshness-selection.js'
 
 export const runtime='nodejs'
 export const dynamic='force-dynamic'
@@ -61,17 +62,20 @@ export async function POST(request){
     }
 
     jobs.sort((a,b)=>b.evaluation.score-a.evaluation.score||(new Date(b.job.publishedAt||0)-new Date(a.job.publishedAt||0)))
+    const now=new Date()
+    const freshnessSelection=freshnessSelectionFromDays(freshnessDays)
+    const filteredJobs=filterItemsByFreshnessSelection(jobs,freshnessSelection,now)
     const discovered=Number(source?.stats?.discovered)||0
     const fullJdVerified=Number(source?.stats?.fullJdVerified)||0
     const inaccessible=Number(source?.stats?.searchFailures||0)+Number(source?.stats?.detailFailures||0)+unverified
-    const status=inaccessible?'ACCESS LIMITED':jobs.length?'SEARCHED':'NO RELEVANT RESULTS'
+    const status=inaccessible?'ACCESS LIMITED':filteredJobs.length?'SEARCHED':'NO RELEVANT RESULTS'
 
     return NextResponse.json({
-      jobs,
+      jobs:filteredJobs,
       audit,
-      stats:{...source?.stats,discovered,fullJdVerified,evaluated,returned:jobs.length},
-      coverage:{source:'Jobnet',freshnessDays,status,detail:source?.error||null},
-      fetchedAt:new Date().toISOString(),
+      stats:{...source?.stats,discovered,fullJdVerified,evaluated,returned:filteredJobs.length},
+      coverage:{source:'Jobnet',freshnessDays,freshnessSelection,status,detail:source?.error||null},
+      fetchedAt:now.toISOString(),
     })
   }catch(error){
     console.error('jobnet-profile-search error',error)
