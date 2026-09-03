@@ -13,12 +13,12 @@ const ids=items=>items.map(entry=>entry.job.sourceJobId)
 
 const NOW=new Date('2026-09-03T10:00:00.000Z') // 12:00 in Copenhagen
 
-test('exposes intensive-search cadence Today Yesterday 5 days 10 days',()=>{
+test('exposes professional intensive-search cadence labels',()=>{
   assert.deepEqual(FRESHNESS_OPTIONS.map(({id,label})=>({id,label})),[
-    {id:'today',label:'Today'},
-    {id:'yesterday',label:'Yesterday'},
-    {id:'5d',label:'5 days'},
-    {id:'10d',label:'10 days'},
+    {id:'today',label:'1 Day'},
+    {id:'yesterday',label:'Previous Day'},
+    {id:'5d',label:'5 Days'},
+    {id:'10d',label:'10 Days'},
   ])
   assert.equal(freshnessRequestDays('today'),1)
   assert.equal(freshnessRequestDays('yesterday'),3)
@@ -62,9 +62,9 @@ test('5 and 10 day modes cap visible results to their actual rolling horizon',()
   assert.deepEqual(ids(filterItemsByFreshnessSelection(jobs,'10d',NOW)),['4d23h','5d01h','9d23h'])
 })
 
-test('result labels are human-readable instead of numeric-day boilerplate',()=>{
-  assert.equal(freshnessResultLabel('today'),'Today')
-  assert.equal(freshnessResultLabel('yesterday'),'Yesterday')
-  assert.equal(freshnessResultLabel('5d'),'Newest 5 days')
-  assert.equal(freshnessResultLabel('10d'),'Newest 10 days')
+test('result labels use the same professional wording',()=>{
+  assert.equal(freshnessResultLabel('today'),'1 Day')
+  assert.equal(freshnessResultLabel('yesterday'),'Previous Day')
+  assert.equal(freshnessResultLabel('5d'),'Newest 5 Days')
+  assert.equal(freshnessResultLabel('10d'),'Newest 10 Days')
 })
