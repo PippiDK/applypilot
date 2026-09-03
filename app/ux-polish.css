@@ -15,4 +15,6 @@
 
 /* Applied jobs archive — position only: past/history lives on the left */
 .appliedArchiveTab{left:0;right:auto;border-left:0;border-right:1px solid #285e4a;border-radius:0 12px 12px 0}
+.appliedArchiveBackdrop{justify-content:flex-start}
+.appliedArchiveDrawer{border-left:0;border-right:1px solid #303946;box-shadow:30px 0 90px rgba(0,0,0,.55)}
 @media(max-width:780px){.appliedArchiveTab{left:12px;right:auto;border-left:1px solid #285e4a;border-radius:999px}}
