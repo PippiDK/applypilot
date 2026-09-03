@@ -12,3 +12,7 @@
 .job{transition:background .16s,border-color .16s}.job:hover{background:#1a2027;border-color:#333d48}.job.active:hover{border-color:#58cfa2;background:#18231f}.jobStatusSelect{opacity:.72;font-size:8px;border-color:#2d353f}.jobStatusSelect:hover,.jobStatusSelect:focus{opacity:1}.job>span:last-child{width:26px;height:26px;display:flex;align-items:center;justify-content:center;justify-self:end;border:1px solid #313b46;border-radius:999px;color:#91a0af;font-size:14px;transition:border-color .16s,color .16s,transform .16s}.job:hover>span:last-child,.job.active>span:last-child{border-color:#4e7968;color:#8de7c2;transform:translateX(2px)}
 
 @media(max-width:780px){.hero{margin-top:24px;padding:22px}.docs{grid-template-columns:1fr}.cvWorkflowChooser .reviewActions{border-top:0}.job>span:last-child{width:24px;height:24px}}
+
+/* Applied jobs archive — position only: past/history lives on the left */
+.appliedArchiveTab{left:0;right:auto;border-left:0;border-right:1px solid #285e4a;border-radius:0 12px 12px 0}
+@media(max-width:780px){.appliedArchiveTab{left:12px;right:auto;border-left:1px solid #285e4a;border-radius:999px}}
