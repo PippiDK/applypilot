@@ -1,10 +1,15 @@
 // TEST splash intro motion approved for ApplyPilot entry screen.
 export const SPLASH_MOTION={
-  path:'M 88 238 C 128 170 176 92 226 78 C 278 62 318 118 292 164 C 268 206 240 226 224 246 C 258 220 302 182 352 126',
+  path:'M 96 244 C 158 204 222 161 290 132 C 314 122 334 113 352 108',
   pathDelayMs:220,
-  wordmarkDelayMs:980,
+  pathDurationMs:2050,
+  wordmarkDelayMs:1120,
+  wordmarkDurationMs:1000,
   wordmarkStartScale:0.28,
   wordmarkEndScale:1,
-  entryLabel:'Вход',
+  wordmarkApplyWeight:430,
+  wordmarkPilotWeight:780,
+  wordmarkLetterSpacingEm:-0.035,
+  entryLabel:'START',
   entryColor:'#f4c542'
 }
