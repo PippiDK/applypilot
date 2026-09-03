@@ -4,6 +4,7 @@ import {
   FRESHNESS_OPTIONS,
   freshnessRequestDays,
   freshnessResultLabel,
+  freshnessSelectionFromDays,
   filterItemsByFreshnessSelection,
 } from './freshness-selection.js'
 
@@ -23,6 +24,13 @@ test('exposes intensive-search cadence Today Yesterday 5 days 10 days',()=>{
   assert.equal(freshnessRequestDays('yesterday'),3)
   assert.equal(freshnessRequestDays('5d'),7)
   assert.equal(freshnessRequestDays('10d'),14)
+})
+
+test('maps the existing 1 3 7 14 controls to the new semantics',()=>{
+  assert.equal(freshnessSelectionFromDays(1),'today')
+  assert.equal(freshnessSelectionFromDays(3),'yesterday')
+  assert.equal(freshnessSelectionFromDays(7),'5d')
+  assert.equal(freshnessSelectionFromDays(14),'10d')
 })
 
 test('Today keeps only the current Copenhagen calendar day',()=>{
