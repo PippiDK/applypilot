@@ -38,7 +38,7 @@ export default function SplashGate({children}){
             </filter>
           </defs>
 
-          <rect className={styles.logoFrame} x="48" y="20" width="344" height="290" rx="52"/>
+          <rect className={styles.logoFrame} x="63" y="8" width="314" height="314" rx="58"/>
           <path className={styles.letterA} d={A_SHAPE} fill="url(#applyPilotMint)"/>
           <path className={styles.cutPath} d={A_CUT}/>
 
