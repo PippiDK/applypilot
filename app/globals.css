@@ -38,3 +38,15 @@
 
 /* M4.11 — selected-CV review */
 .reviewBaseline{margin:8px 0 0;color:#7ee2b8;font-size:12px;font-weight:750}.reviewScopeLine{margin:16px 0;color:#7f8c99;font-size:11px;letter-spacing:.03em}.adaptationLoading,.adaptationRunStatus,.reviewEmpty{margin:18px 0;padding:14px 16px;border-radius:12px;display:flex;flex-direction:column;gap:5px}.adaptationLoading{background:#151a20;border:1px solid #343d48}.adaptationLoading span,.reviewEmpty span{color:#9aa5b1;font-size:12px}.adaptationRunStatus{background:#132019;border:1px solid #285e4a}.adaptationRunStatus b{color:#7ee2b8}.adaptationRunStatus span{color:#aab5ae;font-size:12px}.reviewEmpty{background:#151a20;border:1px solid #2a323c}.reviewEmpty b{color:#dce2e8}
+
+
+/* Applied jobs archive — permanent local application history */
+.appliedArchiveTab{position:fixed;right:0;top:42%;z-index:40;display:flex;flex-direction:column;align-items:center;gap:6px;background:#132019;border:1px solid #285e4a;border-right:0;color:#7ee2b8;border-radius:12px 0 0 12px;padding:12px 9px;box-shadow:0 10px 35px rgba(0,0,0,.35)}
+.appliedArchiveTab span{font-size:9px;font-weight:900;letter-spacing:.12em;writing-mode:vertical-rl;transform:rotate(180deg)}.appliedArchiveTab b{font-size:14px}
+.appliedArchiveBackdrop{position:fixed;z-index:70;inset:0;background:rgba(2,4,6,.56);backdrop-filter:blur(4px);display:flex;justify-content:flex-end}
+.appliedArchiveDrawer{width:min(520px,94vw);height:100%;overflow:auto;background:#0f1318;border-left:1px solid #303946;padding:26px;box-shadow:-30px 0 90px rgba(0,0,0,.55)}
+.appliedArchiveHead{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;padding-bottom:18px;border-bottom:1px solid #242c35}.appliedArchiveHead h2{font-size:30px;margin:3px 0 4px}.appliedArchiveHead span{color:#84909c;font-size:12px}
+.appliedArchiveList{padding:10px 0}.appliedArchiveItem{background:#151a20;border:1px solid #29313a;border-radius:15px;padding:16px;margin:10px 0}
+.appliedArchiveItemTop{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.appliedArchiveItemTop b{display:block;font-size:14px;line-height:1.4}.appliedArchiveItemTop span{display:block;color:#8d98a4;font-size:11px;margin-top:5px;line-height:1.35}.appliedArchiveItemTop strong{color:#7ee2b8;font-size:16px}
+.appliedArchiveItem small{display:block;color:#6f7c88;margin:11px 0;font-size:10px}.appliedArchiveLink{min-width:0;padding:9px 12px;font-size:11px}
+@media(max-width:780px){.appliedArchiveTab{top:auto;bottom:18px;right:12px;border-right:1px solid #285e4a;border-radius:999px;flex-direction:row;padding:10px 14px}.appliedArchiveTab span{writing-mode:initial;transform:none}.appliedArchiveDrawer{width:100%;padding:20px}}
