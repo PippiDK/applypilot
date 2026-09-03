@@ -23,3 +23,16 @@
 .appliedArchiveItemTop{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.appliedArchiveItemTop b{display:block;font-size:14px;line-height:1.4}.appliedArchiveItemTop span{display:block;color:#8d98a4;font-size:11px;margin-top:5px;line-height:1.35}.appliedArchiveItemTop strong{color:#7ee2b8;font-size:16px}
 .appliedArchiveItem small{display:block;color:#6f7c88;margin:11px 0;font-size:10px}.appliedArchiveLink{min-width:0;padding:9px 12px;font-size:11px}
 @media(max-width:780px){.appliedArchiveTab{top:auto;bottom:18px;left:12px;right:auto;border-left:1px solid #285e4a;border-right:1px solid #285e4a;border-radius:999px;flex-direction:row;padding:10px 14px}.appliedArchiveTab span{writing-mode:initial;transform:none}.appliedArchiveDrawer{width:100%;padding:20px}}
+
+/* TEST — intensive freshness cadence. Existing 1/3/7/14 values stay as retrieval envelopes. */
+.controls>div:first-child .choices>.choice{font-size:0}
+.controls>div:first-child .choices>.choice::after{font-size:14px}
+.controls>div:first-child .choices>.choice:nth-child(1)::after{content:"Today"}
+.controls>div:first-child .choices>.choice:nth-child(2)::after{content:"Yesterday"}
+.controls>div:first-child .choices>.choice:nth-child(3)::after{content:"5 days"}
+.controls>div:first-child .choices>.choice:nth-child(4)::after{content:"10 days"}
+.controls~.grid .listHead>small{font-size:0}
+.controls:has(>div:first-child .choice:nth-child(1).selected)~.grid .listHead>small::after{content:"Today";font-size:12px}
+.controls:has(>div:first-child .choice:nth-child(2).selected)~.grid .listHead>small::after{content:"Yesterday";font-size:12px}
+.controls:has(>div:first-child .choice:nth-child(3).selected)~.grid .listHead>small::after{content:"Newest 5 days";font-size:12px}
+.controls:has(>div:first-child .choice:nth-child(4).selected)~.grid .listHead>small::after{content:"Newest 10 days";font-size:12px}
