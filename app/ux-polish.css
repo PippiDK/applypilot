@@ -27,12 +27,12 @@
 /* TEST — intensive freshness cadence. Existing 1/3/7/14 values stay as retrieval envelopes. */
 .controls>div:first-child .choices>.choice{font-size:0}
 .controls>div:first-child .choices>.choice::after{font-size:14px}
-.controls>div:first-child .choices>.choice:nth-child(1)::after{content:"Today"}
-.controls>div:first-child .choices>.choice:nth-child(2)::after{content:"Yesterday"}
-.controls>div:first-child .choices>.choice:nth-child(3)::after{content:"5 days"}
-.controls>div:first-child .choices>.choice:nth-child(4)::after{content:"10 days"}
+.controls>div:first-child .choices>.choice:nth-child(1)::after{content:"1 Day"}
+.controls>div:first-child .choices>.choice:nth-child(2)::after{content:"Previous Day"}
+.controls>div:first-child .choices>.choice:nth-child(3)::after{content:"5 Days"}
+.controls>div:first-child .choices>.choice:nth-child(4)::after{content:"10 Days"}
 .controls~.grid .listHead>small{font-size:0}
-.controls:has(>div:first-child .choice:nth-child(1).selected)~.grid .listHead>small::after{content:"Today";font-size:12px}
-.controls:has(>div:first-child .choice:nth-child(2).selected)~.grid .listHead>small::after{content:"Yesterday";font-size:12px}
-.controls:has(>div:first-child .choice:nth-child(3).selected)~.grid .listHead>small::after{content:"Newest 5 days";font-size:12px}
-.controls:has(>div:first-child .choice:nth-child(4).selected)~.grid .listHead>small::after{content:"Newest 10 days";font-size:12px}
+.controls:has(>div:first-child .choice:nth-child(1).selected)~.grid .listHead>small::after{content:"1 Day";font-size:12px}
+.controls:has(>div:first-child .choice:nth-child(2).selected)~.grid .listHead>small::after{content:"Previous Day";font-size:12px}
+.controls:has(>div:first-child .choice:nth-child(3).selected)~.grid .listHead>small::after{content:"Newest 5 Days";font-size:12px}
+.controls:has(>div:first-child .choice:nth-child(4).selected)~.grid .listHead>small::after{content:"Newest 10 Days";font-size:12px}
