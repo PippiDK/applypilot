@@ -3,6 +3,7 @@ import { requireUser } from '../../lib/auth/require-user.js'
 import { buildDiscoverySearchPlan } from '../../lib/search-query-expansion-ai.js'
 import { searchJobindexSource } from '../../lib/jobindex-source-adapter.js'
 import { evaluateProfileJob } from '../../lib/job-profile-evaluator.js'
+import { freshnessSelectionFromDays,filterItemsByFreshnessSelection } from '../../lib/freshness-selection.js'
 
 export const runtime='nodejs'
 export const dynamic='force-dynamic'
@@ -58,17 +59,20 @@ export async function POST(request){
     }
 
     jobs.sort((a,b)=>b.evaluation.score-a.evaluation.score||(new Date(b.job.publishedAt||0)-new Date(a.job.publishedAt||0)))
+    const now=new Date()
+    const freshnessSelection=freshnessSelectionFromDays(freshnessDays)
+    const filteredJobs=filterItemsByFreshnessSelection(jobs,freshnessSelection,now)
     const discovered=Number(source?.stats?.discovered)||0
     const fullJdVerified=Number(source?.stats?.fullJdVerified)||0
     const inaccessible=Number(source?.stats?.searchFailures||0)+Number(source?.stats?.detailFailures||0)+Number(source?.stats?.externalDetailFailures||0)+unverified
-    const status=inaccessible?'ACCESS LIMITED':jobs.length?'SEARCHED':'NO RELEVANT RESULTS'
+    const status=inaccessible?'ACCESS LIMITED':filteredJobs.length?'SEARCHED':'NO RELEVANT RESULTS'
 
     return NextResponse.json({
-      jobs,
+      jobs:filteredJobs,
       audit,
-      stats:{...source?.stats,discovered,fullJdVerified,evaluated,returned:jobs.length},
-      coverage:{source:'Jobindex',freshnessDays,status,detail:source?.error||null},
-      fetchedAt:new Date().toISOString(),
+      stats:{...source?.stats,discovered,fullJdVerified,evaluated,returned:filteredJobs.length},
+      coverage:{source:'Jobindex',freshnessDays,freshnessSelection,status,detail:source?.error||null},
+      fetchedAt:now.toISOString(),
     })
   }catch(error){
     console.error('jobindex-profile-search error',error)
