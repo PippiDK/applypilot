@@ -19,6 +19,8 @@ import {evaluateJobConditions} from './lib/job-conditions.js'
 import {fitLabel} from './lib/fit-label.js'
 import {compareShadowToLegacy} from './lib/shadow-search-compare.js'
 import {JOB_STATUS_OPTIONS,readJobStatuses,writeJobStatus} from './lib/job-statuses.js'
+import {readAppliedJobs,archiveAppliedJob,syncAppliedArchive} from './lib/applied-jobs.js'
+import AppliedJobsArchive from './components/applied-jobs-archive.js'
 import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
 import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
 import SearchAudit from './components/search-audit.js'
@@ -56,6 +58,8 @@ export default function Home(){
   const someFiltersSelected=selectedAreas.length>0||selectedWorkModels.length>0
   const [selected,setSelected]=useState(null)
   const [jobStatuses,setJobStatuses]=useState({})
+  const [appliedJobs,setAppliedJobs]=useState([])
+  const [appliedArchiveOpen,setAppliedArchiveOpen]=useState(false)
   const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
   const [shadowState,setShadowState]=useState({status:'idle',error:'',stats:null,coverage:null,comparison:null})
   const [cvData,setCvData]=useState(null)
@@ -109,6 +113,7 @@ export default function Home(){
 
   useEffect(()=>{
     setJobStatuses(readJobStatuses(localStorage))
+    setAppliedJobs(readAppliedJobs(localStorage))
   },[])
 
   const profileReady=Boolean(profile.savedAt)
@@ -217,7 +222,11 @@ export default function Home(){
   }
 
   function changeJobStatus(jobId,status){
+    const item=jobs.find(candidate=>candidate?.job?.sourceJobId===jobId)
     setJobStatuses(current=>writeJobStatus({storage:localStorage,statuses:current,jobId,status}))
+    if(status==='applied'&&item){
+      setAppliedJobs(current=>archiveAppliedJob({storage:localStorage,archive:current,job:item.job,evaluation:item.evaluation}))
+    }
   }
 
   function toggleJobFilter(setter,id){
@@ -327,6 +336,7 @@ export default function Home(){
 
     const mergedJobs=mergeSourceItems(successful.map(result=>Array.isArray(result.data.jobs)?result.data.jobs:[]))
     setJobs(mergedJobs)
+    setAppliedJobs(current=>syncAppliedArchive({storage:localStorage,archive:current,items:mergedJobs,statuses:jobStatuses}))
 
     const stats={
       masterPoolSize:successful.reduce((sum,result)=>sum+Number(result.data.stats?.masterPoolSize??result.data.stats?.discovered??0),0),
@@ -675,6 +685,8 @@ export default function Home(){
       <SearchAudit audit={state.audit}/>
       <ShadowSearchAudit shadowState={shadowState}/>
     </section>}
+
+    <AppliedJobsArchive jobs={appliedJobs} open={appliedArchiveOpen} onOpen={()=>setAppliedArchiveOpen(true)} onClose={()=>setAppliedArchiveOpen(false)}/>
 
     <footer>TEST · LinkedIn + Jobindex + Jobnet multi-source search</footer>
 
