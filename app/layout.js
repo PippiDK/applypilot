@@ -4,6 +4,7 @@ import './loader.css'
 import './v15-polish.css'
 import './ux-polish.css'
 import SignOutButton from './components/sign-out-button.js'
+import SplashGate from './components/splash-gate.js'
 
 export const metadata={title:'ApplyPilot',description:'Job search autopilot for senior IT professionals'}
 
@@ -14,5 +15,5 @@ export default function RootLayout({children}){
     ? 'LIVE 17 · 6a5f02c'
     : `V16 · PREVIEW · ${shortSha}`
 
-  return <html lang="en"><body>{children}<div className="versionBadge">{versionLabel}</div><SignOutButton/></body></html>
+  return <html lang="en"><body><SplashGate>{children}<div className="versionBadge">{versionLabel}</div><SignOutButton/></SplashGate></body></html>
 }
