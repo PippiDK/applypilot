@@ -10,16 +10,15 @@ test('uses the approved Flight Path A asset as a visible HTML image layer',()=>{
   assert.equal(SPLASH_MOTION.logoRender,'html-img')
 })
 
-test('entire intro choreography is slowed exactly 2x',()=>{
-  assert.equal(SPLASH_MOTION.logoZoomDelayMs,400)
-  assert.equal(SPLASH_MOTION.logoZoomDurationMs,3800)
-  assert.equal(SPLASH_MOTION.planeDelayMs,4100)
-  assert.equal(SPLASH_MOTION.planeDurationMs,5100)
-  assert.equal(SPLASH_MOTION.wordmarkDelayMs,5100)
+test('tightens the handoff from logo to text layers without changing animation speeds',()=>{
+  const logoEnd=SPLASH_MOTION.logoZoomDelayMs+SPLASH_MOTION.logoZoomDurationMs
+  assert.equal(logoEnd,4200)
+  assert.equal(SPLASH_MOTION.wordmarkDelayMs,4500)
+  assert.equal(SPLASH_MOTION.wordmarkDelayMs-logoEnd,300)
   assert.equal(SPLASH_MOTION.wordmarkDurationMs,1800)
-  assert.equal(SPLASH_MOTION.taglineDelayMs,6500)
-  assert.equal(SPLASH_MOTION.entryDelayMs,7100)
-  assert.equal(SPLASH_MOTION.introStableMs,9400)
+  assert.equal(SPLASH_MOTION.taglineDelayMs,5900)
+  assert.equal(SPLASH_MOTION.entryDelayMs,6500)
+  assert.equal(SPLASH_MOTION.introStableMs,8800)
 })
 
 test('removes the airplane overlay while preserving logo and copy',()=>{
