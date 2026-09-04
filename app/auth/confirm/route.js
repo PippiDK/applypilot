@@ -22,5 +22,7 @@ export async function GET(request){
   const {error}=await supabase.auth.verifyOtp({token_hash,type})
   if(error) return loginRedirect(url.origin,'invalid_or_expired_link')
 
-  return NextResponse.redirect(new URL(next,url.origin),{status:303})
+  const welcome=new URL('/welcome',url.origin)
+  welcome.searchParams.set('next',next)
+  return NextResponse.redirect(welcome,{status:303})
 }
