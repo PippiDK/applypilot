@@ -3,6 +3,7 @@ export const SPLASH_MOTION={
   concept:'approved-logo-orbit',
   logoAsset:'/flight-path-a-approved.webp',
   logoGlow:true,
+  logoRender:'html-img',
   logoZoomDelayMs:200,
   logoZoomDurationMs:1900,
   logoStartScale:0.12,
