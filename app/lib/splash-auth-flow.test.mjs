@@ -10,6 +10,11 @@ test('public auth flow is not wrapped by the splash gate',()=>{
   assert.equal(layout.includes('<SplashGate>'),false)
 })
 
+test('PKCE magic-link callback exchanges the auth code before welcome',()=>{
+  assert.equal(confirmRoute.includes("url.searchParams.get('code')"),true)
+  assert.equal(confirmRoute.includes('exchangeCodeForSession(code)'),true)
+})
+
 test('successful magic-link confirmation redirects to a dedicated welcome route',()=>{
   assert.equal(confirmRoute.includes("new URL('/welcome',url.origin)"),true)
   assert.equal(confirmRoute.includes("welcome.searchParams.set('next',next)"),true)
