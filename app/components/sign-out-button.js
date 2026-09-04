@@ -1,6 +1,7 @@
 'use client'
 
 import {usePathname} from 'next/navigation'
+import NightFlightSettings from './night-flight-settings.js'
 
 const controlStyle={
   border:'1px solid rgba(255,255,255,.14)',
@@ -22,6 +23,7 @@ export default function SignOutButton(){
 
   return <div style={{position:'fixed',top:12,right:14,zIndex:1000,display:'flex',gap:8,alignItems:'center'}}>
     {pathname!=='/help'&&<a href="/help" target="_blank" rel="noopener noreferrer" style={controlStyle}>HELP</a>}
+    {pathname!=='/help'&&<NightFlightSettings/>}
     <form action="/auth/signout" method="post" style={{margin:0}}>
       <button type="submit" style={controlStyle}>Sign out</button>
     </form>
