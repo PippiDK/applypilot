@@ -1,7 +1,7 @@
 // TEST-only splash intro motion for the approved ApplyPilot Flight Path A logo.
 export const SPLASH_MOTION={
   concept:'approved-logo-orbit',
-  logoAsset:'/flight-path-a-approved.webp',
+  logoAsset:'/flight-path-a-visible-v2.webp',
   logoGlow:true,
   logoRender:'html-img',
   logoZoomDelayMs:400,

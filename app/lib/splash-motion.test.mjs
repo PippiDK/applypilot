@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {SPLASH_MOTION} from './splash-motion.js'
 
 test('uses the approved Flight Path A asset as a visible HTML image layer',()=>{
-  assert.equal(SPLASH_MOTION.logoAsset,'/flight-path-a-approved.webp')
+  assert.equal(SPLASH_MOTION.logoAsset,'/flight-path-a-visible-v2.webp')
   assert.equal(SPLASH_MOTION.logoRender,'html-img')
 })
 
