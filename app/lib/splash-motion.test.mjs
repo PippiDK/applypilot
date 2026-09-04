@@ -2,25 +2,33 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {SPLASH_MOTION} from './splash-motion.js'
 
-test('flight path matches the approved Flight Path A rising route',()=>{
-  assert.equal(SPLASH_MOTION.path,'M 96 244 C 158 204 222 161 290 132 C 314 122 334 113 352 108')
+test('motion follows right-top to A apex to lower-left to final arc',()=>{
+  assert.equal(SPLASH_MOTION.motionPath,'M 454 146 L 278 90 L 124 386 C 205 329 299 258 446 208')
+  assert.equal(SPLASH_MOTION.motionTip,'M 431 190 L 466 203 L 440 228 Z')
 })
 
-test('splash motion is slightly slower and text still zooms in',()=>{
-  assert.equal(SPLASH_MOTION.pathDurationMs,2050)
-  assert.equal(SPLASH_MOTION.wordmarkDurationMs,1000)
-  assert.ok(SPLASH_MOTION.wordmarkDelayMs>SPLASH_MOTION.pathDelayMs)
+test('motion layer is separate from the final logo and has no animated dots',()=>{
+  assert.equal(SPLASH_MOTION.finalLogoRevealMs,2570)
+  assert.equal(SPLASH_MOTION.motionFadeMs,520)
+  assert.equal(SPLASH_MOTION.showTraveller,false)
+  assert.equal(SPLASH_MOTION.showStartPoint,false)
+})
+
+test('wordmark waits for final-logo reveal and zooms in slowly',()=>{
+  assert.equal(SPLASH_MOTION.pathDurationMs,2400)
+  assert.equal(SPLASH_MOTION.wordmarkDurationMs,1050)
+  assert.ok(SPLASH_MOTION.wordmarkDelayMs>SPLASH_MOTION.finalLogoRevealMs)
   assert.ok(SPLASH_MOTION.wordmarkStartScale<0.5)
   assert.equal(SPLASH_MOTION.wordmarkEndScale,1)
 })
 
-test('wordmark is stronger and slightly wider',()=>{
+test('wordmark remains stronger and wider',()=>{
   assert.equal(SPLASH_MOTION.wordmarkApplyWeight,430)
   assert.equal(SPLASH_MOTION.wordmarkPilotWeight,780)
   assert.equal(SPLASH_MOTION.wordmarkLetterSpacingEm,-0.035)
 })
 
-test('entry label is the approved yellow START label',()=>{
+test('entry remains the approved yellow START label',()=>{
   assert.equal(SPLASH_MOTION.entryLabel,'START')
   assert.equal(SPLASH_MOTION.entryColor,'#f4c542')
 })
