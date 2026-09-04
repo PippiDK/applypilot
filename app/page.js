@@ -25,6 +25,7 @@ import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/link
 import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
 import {companyConnection,connectedCompanyNames,defaultCompanyWatch,readCompanyWatch,writeCompanyWatch,TARGET_COMPANIES} from './lib/company-watch.js'
 import {CONSULTANT_PORTALS,connectedConsultantPortalIds,defaultConsultantPortals,readConsultantPortals,writeConsultantPortals} from './lib/consultant-portals.js'
+import {syncNightFlightProfile} from './lib/night-flight-profile-sync-client.js'
 import SearchAudit from './components/search-audit.js'
 import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
@@ -116,6 +117,7 @@ export default function Home(){
       }
       setProfile(hydrated)
       setDraft(hydrated)
+      if(hydrated.savedAt) void syncNightFlightProfile({searchProfile:hydrated,cv:primaryCv})
     }catch{}
   },[])
 
@@ -195,7 +197,10 @@ export default function Home(){
         setReviewOpen(false)
         setProfile(current=>{
           const next=resumeToProfile(current,primaryCv)
-          if(current.savedAt) localStorage.setItem('applypilot-profile',JSON.stringify(next))
+          if(current.savedAt){
+            localStorage.setItem('applypilot-profile',JSON.stringify(next))
+            void syncNightFlightProfile({searchProfile:next,cv:primaryCv})
+          }
           return next
         })
         setDraft(current=>resumeToProfile(current,primaryCv))
@@ -223,7 +228,10 @@ export default function Home(){
     setReviewOpen(false)
     setProfile(current=>{
       const next={...current,cvName:'',factBank:[],skills:[],cvParsedAt:''}
-      if(current.savedAt) localStorage.setItem('applypilot-profile',JSON.stringify(next))
+      if(current.savedAt){
+        localStorage.setItem('applypilot-profile',JSON.stringify(next))
+        void syncNightFlightProfile({searchProfile:next,cv:null})
+      }
       return next
     })
     setDraft(current=>({...current,cvName:'',factBank:[],skills:[],cvParsedAt:''}))
@@ -522,6 +530,7 @@ export default function Home(){
       const exclusions=String(draft.exclusions??'').replace(/\s+/g,' ').trim()
       const saved={...resumeToProfile(draft,cvData),primaryRoles,adjacentRoles,roles:combinedRoles(primaryRoles,adjacentRoles),rolesSourceVersion:cvData?.sourceVersion||draft.rolesSourceVersion||'',cvRoleProfiles:Array.isArray(draft.cvRoleProfiles)?draft.cvRoleProfiles:[],roleSources:Array.isArray(draft.roleSources)?draft.roleSources:[],rolesLibraryFingerprint:draft.rolesLibraryFingerprint||rolesLibraryFingerprint,rolesBuilderVersion:SEARCH_PROFILE_BUILDER_VERSION,unionSearchPlan:draftUnionSearchPlan,unionSearchPlanVersion:UNION_SEARCH_PLAN_VERSION,unionSearchPlanFingerprint:draftUnionSearchPlan.fingerprint,locations,workModels,geography,exclusions,exclusionRules:compiledExclusions.rules,exclusionsFingerprint:compiledExclusions.fingerprint,exclusionsParserVersion:compiledExclusions.parserVersion,exclusionsParsedAt:exclusions?new Date().toISOString():'',savedAt:new Date().toISOString()}
       localStorage.setItem('applypilot-profile',JSON.stringify(saved))
+      await syncNightFlightProfile({searchProfile:saved,cv:cvData})
       setProfile(saved)
       setDraft(saved)
       setProfileSaveState({loading:false,error:''})
