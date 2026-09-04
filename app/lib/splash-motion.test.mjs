@@ -2,33 +2,38 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {SPLASH_MOTION} from './splash-motion.js'
 
-test('motion follows right-top to A apex to lower-left to final arc',()=>{
-  assert.equal(SPLASH_MOTION.motionPath,'M 454 146 L 278 90 L 124 386 C 205 329 299 258 446 208')
-  assert.equal(SPLASH_MOTION.motionTip,'M 431 190 L 466 203 L 440 228 Z')
+test('Precision Launch uses a short scan then builds the mark',()=>{
+  assert.equal(SPLASH_MOTION.scanDelayMs,120)
+  assert.equal(SPLASH_MOTION.scanDurationMs,650)
+  assert.equal(SPLASH_MOTION.markDelayMs,360)
+  assert.equal(SPLASH_MOTION.markDurationMs,850)
 })
 
-test('motion layer is separate from the final logo and has no animated dots',()=>{
-  assert.equal(SPLASH_MOTION.finalLogoRevealMs,2570)
-  assert.equal(SPLASH_MOTION.motionFadeMs,520)
+test('navigation arc is short, delayed, and has no moving dots',()=>{
+  assert.equal(SPLASH_MOTION.arcDelayMs,900)
+  assert.equal(SPLASH_MOTION.arcDurationMs,1050)
   assert.equal(SPLASH_MOTION.showTraveller,false)
   assert.equal(SPLASH_MOTION.showStartPoint,false)
+  assert.equal('motionPath' in SPLASH_MOTION,false)
 })
 
-test('wordmark waits for final-logo reveal and zooms in slowly',()=>{
-  assert.equal(SPLASH_MOTION.pathDurationMs,2400)
-  assert.equal(SPLASH_MOTION.wordmarkDurationMs,1050)
-  assert.ok(SPLASH_MOTION.wordmarkDelayMs>SPLASH_MOTION.finalLogoRevealMs)
-  assert.ok(SPLASH_MOTION.wordmarkStartScale<0.5)
+test('wordmark arrives after the mark with restrained zoom',()=>{
+  assert.equal(SPLASH_MOTION.wordmarkDelayMs,1780)
+  assert.equal(SPLASH_MOTION.wordmarkDurationMs,820)
+  assert.equal(SPLASH_MOTION.wordmarkStartScale,0.72)
   assert.equal(SPLASH_MOTION.wordmarkEndScale,1)
+  assert.ok(SPLASH_MOTION.wordmarkDelayMs>SPLASH_MOTION.arcDelayMs)
 })
 
-test('wordmark remains stronger and wider',()=>{
-  assert.equal(SPLASH_MOTION.wordmarkApplyWeight,430)
-  assert.equal(SPLASH_MOTION.wordmarkPilotWeight,780)
-  assert.equal(SPLASH_MOTION.wordmarkLetterSpacingEm,-0.035)
+test('intro becomes stable before four seconds',()=>{
+  assert.equal(SPLASH_MOTION.taglineDelayMs,2360)
+  assert.equal(SPLASH_MOTION.entryDelayMs,2860)
+  assert.equal(SPLASH_MOTION.introStableMs,3420)
+  assert.ok(SPLASH_MOTION.introStableMs<4000)
 })
 
-test('entry remains the approved yellow START label',()=>{
+test('entry keeps the approved gold START treatment',()=>{
   assert.equal(SPLASH_MOTION.entryLabel,'START')
   assert.equal(SPLASH_MOTION.entryColor,'#f4c542')
+  assert.equal(SPLASH_MOTION.entryShine,true)
 })

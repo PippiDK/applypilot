@@ -4,59 +4,62 @@ import {useState} from 'react'
 import {SPLASH_MOTION} from '../lib/splash-motion.js'
 import styles from './splash-gate.module.css'
 
-const FINAL_A='M242 90 Q238 90 235 100 L122 386 H178 L210 303 H345 L378 386 H432 L317 100 Q314 90 308 90 Z M278 158 L235 267 H317 Z'
-const FINAL_CUT='M123 386 C 210 326 300 267 408 227'
-const FINAL_CURVE='M171 404 C 235 337 308 276 407 228'
-const FINAL_TIP='M397 207 L447 207 L414 240 Z'
+const MARK_A='M160 318 L221 121 Q225 108 238 108 H254 Q267 108 271 121 L332 318 H289 L274 270 H207 L192 318 Z M219 229 H262 L241 158 Z'
+const MARK_CUT='M147 307 C 211 279 274 237 356 194'
+const MARK_ARC='M151 313 C 205 289 266 247 356 194'
+const MARK_TIP='M345 178 L376 188 L353 211 Z'
+const SCAN='M82 304 L397 136'
 
 export default function SplashGate({children}){
   const [entered,setEntered]=useState(false)
   if(entered) return children
 
   const motionStyle={
-    '--path-delay':`${SPLASH_MOTION.pathDelayMs}ms`,
-    '--path-duration':`${SPLASH_MOTION.pathDurationMs}ms`,
-    '--logo-reveal-delay':`${SPLASH_MOTION.finalLogoRevealMs}ms`,
-    '--logo-reveal-duration':`${SPLASH_MOTION.finalLogoDurationMs}ms`,
-    '--motion-fade-duration':`${SPLASH_MOTION.motionFadeMs}ms`,
+    '--scan-delay':`${SPLASH_MOTION.scanDelayMs}ms`,
+    '--scan-duration':`${SPLASH_MOTION.scanDurationMs}ms`,
+    '--mark-delay':`${SPLASH_MOTION.markDelayMs}ms`,
+    '--mark-duration':`${SPLASH_MOTION.markDurationMs}ms`,
+    '--arc-delay':`${SPLASH_MOTION.arcDelayMs}ms`,
+    '--arc-duration':`${SPLASH_MOTION.arcDurationMs}ms`,
     '--wordmark-delay':`${SPLASH_MOTION.wordmarkDelayMs}ms`,
     '--wordmark-duration':`${SPLASH_MOTION.wordmarkDurationMs}ms`,
     '--wordmark-start-scale':SPLASH_MOTION.wordmarkStartScale,
     '--wordmark-spacing':`${SPLASH_MOTION.wordmarkLetterSpacingEm}em`,
     '--apply-weight':SPLASH_MOTION.wordmarkApplyWeight,
     '--pilot-weight':SPLASH_MOTION.wordmarkPilotWeight,
+    '--tagline-delay':`${SPLASH_MOTION.taglineDelayMs}ms`,
+    '--entry-delay':`${SPLASH_MOTION.entryDelayMs}ms`,
   }
 
   return <div className={styles.splash} style={motionStyle}>
     <div className={styles.center}>
-      <div className={styles.logoStage} aria-label="ApplyPilot animated Flight Path A logo">
-        <svg className={styles.logo} viewBox="0 0 544 473" role="img" aria-hidden="true">
+      <div className={styles.logoStage} aria-label="ApplyPilot Precision Launch logo animation">
+        <svg className={styles.logo} viewBox="0 0 480 420" role="img" aria-hidden="true">
           <defs>
-            <linearGradient id="applyPilotMint" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#91f3c5"/>
-              <stop offset="48%" stopColor="#5be4a7"/>
-              <stop offset="100%" stopColor="#27bf83"/>
+            <linearGradient id="precisionMint" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#a8f8d4"/>
+              <stop offset="48%" stopColor="#63e9ae"/>
+              <stop offset="100%" stopColor="#2fc488"/>
             </linearGradient>
-            <filter id="applyPilotGlow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="5" result="blur"/>
+            <linearGradient id="scanMint" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#65edb2" stopOpacity="0"/>
+              <stop offset="50%" stopColor="#b9ffe1" stopOpacity=".95"/>
+              <stop offset="100%" stopColor="#65edb2" stopOpacity="0"/>
+            </linearGradient>
+            <filter id="precisionGlow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="4" result="blur"/>
               <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
             </filter>
           </defs>
 
-          <g className={styles.motionLayer}>
-            <path className={styles.motionGlow} d={SPLASH_MOTION.motionPath}/>
-            <path className={styles.motionPath} d={SPLASH_MOTION.motionPath}/>
-            <path className={styles.motionTip} d={SPLASH_MOTION.motionTip}/>
-          </g>
+          <path className={styles.scanBeam} d={SCAN}/>
 
-          <g className={styles.finalLogo}>
-            <rect className={styles.logoFrame} x="59" y="18" width="445" height="444" rx="82"/>
-            <path className={styles.finalA} d={FINAL_A} fill="url(#applyPilotMint)" fillRule="evenodd"/>
-            <path className={styles.finalCut} d={FINAL_CUT}/>
-            <path className={styles.finalCurve} d={FINAL_CURVE}/>
-            <circle className={styles.finalStart} cx="171" cy="404" r="15"/>
-            <path className={styles.finalTip} d={FINAL_TIP}/>
-          </g>
+          <rect className={styles.logoFrame} x="80" y="42" width="320" height="320" rx="68"/>
+          <path className={styles.letterA} d={MARK_A} fill="url(#precisionMint)" fillRule="evenodd"/>
+          <path className={styles.logoCut} d={MARK_CUT}/>
+          <path className={styles.arcGlow} d={MARK_ARC}/>
+          <path className={styles.arc} d={MARK_ARC}/>
+          <path className={styles.arcTip} d={MARK_TIP}/>
         </svg>
       </div>
 
