@@ -2,34 +2,36 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {SPLASH_MOTION} from './splash-motion.js'
 
-test('Precision Launch uses a short scan then builds the mark',()=>{
-  assert.equal(SPLASH_MOTION.scanDelayMs,120)
-  assert.equal(SPLASH_MOTION.scanDurationMs,650)
-  assert.equal(SPLASH_MOTION.markDelayMs,360)
-  assert.equal(SPLASH_MOTION.markDurationMs,850)
+test('Approach Fly-by brings the logo from far away',()=>{
+  assert.equal(SPLASH_MOTION.concept,'approach-flyby')
+  assert.equal(SPLASH_MOTION.logoZoomDelayMs,200)
+  assert.equal(SPLASH_MOTION.logoZoomDurationMs,1900)
+  assert.equal(SPLASH_MOTION.logoStartScale,0.12)
+  assert.equal(SPLASH_MOTION.logoEndScale,1)
 })
 
-test('navigation arc is short, delayed, and has no moving dots',()=>{
-  assert.equal(SPLASH_MOTION.arcDelayMs,900)
-  assert.equal(SPLASH_MOTION.arcDurationMs,1050)
-  assert.equal(SPLASH_MOTION.showTraveller,false)
-  assert.equal(SPLASH_MOTION.showStartPoint,false)
-  assert.equal('motionPath' in SPLASH_MOTION,false)
+test('paper plane makes one wide orbit with back and front depth phases',()=>{
+  assert.equal(SPLASH_MOTION.planeBackPath,'M 424 92 C 330 20 140 18 70 126 C 8 222 68 340 184 360')
+  assert.equal(SPLASH_MOTION.planeFrontPath,'M 184 360 C 302 366 410 292 442 186 C 459 129 468 75 454 34')
+  assert.equal(SPLASH_MOTION.planeDelayMs,420)
+  assert.equal(SPLASH_MOTION.planeBackDurationMs,1450)
+  assert.equal(SPLASH_MOTION.planeFrontDelayMs,1710)
+  assert.equal(SPLASH_MOTION.planeFrontDurationMs,1250)
+  assert.equal(SPLASH_MOTION.planeStyle,'origami-outline')
 })
 
-test('wordmark arrives after the mark with restrained zoom',()=>{
-  assert.equal(SPLASH_MOTION.wordmarkDelayMs,1780)
-  assert.equal(SPLASH_MOTION.wordmarkDurationMs,820)
-  assert.equal(SPLASH_MOTION.wordmarkStartScale,0.72)
-  assert.equal(SPLASH_MOTION.wordmarkEndScale,1)
-  assert.ok(SPLASH_MOTION.wordmarkDelayMs>SPLASH_MOTION.arcDelayMs)
+test('old scan and navigation arc choreography is removed',()=>{
+  assert.equal('scanDelayMs' in SPLASH_MOTION,false)
+  assert.equal('arcDelayMs' in SPLASH_MOTION,false)
 })
 
-test('intro becomes stable before four seconds',()=>{
-  assert.equal(SPLASH_MOTION.taglineDelayMs,2360)
-  assert.equal(SPLASH_MOTION.entryDelayMs,2860)
-  assert.equal(SPLASH_MOTION.introStableMs,3420)
-  assert.ok(SPLASH_MOTION.introStableMs<4000)
+test('brand copy waits until the logo is close and settled',()=>{
+  assert.equal(SPLASH_MOTION.wordmarkDelayMs,2550)
+  assert.equal(SPLASH_MOTION.wordmarkDurationMs,900)
+  assert.equal(SPLASH_MOTION.wordmarkStartScale,0.76)
+  assert.equal(SPLASH_MOTION.taglineDelayMs,3250)
+  assert.equal(SPLASH_MOTION.entryDelayMs,3550)
+  assert.equal(SPLASH_MOTION.introStableMs,4200)
 })
 
 test('entry keeps the approved gold START treatment',()=>{
