@@ -101,6 +101,8 @@ export default function NightFlightSettings(){
     }
   }
 
+  const saveBlocked=state.loading||state.saving||!draft.sources.length
+
   return <>
     <button type="button" style={controlStyle} onClick={openSettings}>SETTINGS ⚙️</button>
     {open&&<div role="presentation" style={{position:'fixed',inset:0,zIndex:1200,background:'rgba(0,0,0,.68)',display:'grid',placeItems:'center',padding:20}} onMouseDown={event=>{if(event.target===event.currentTarget) cancelSettings()}}>
@@ -129,7 +131,7 @@ export default function NightFlightSettings(){
         {state.error&&<p role="alert" style={{margin:'16px 0 0',color:'#ffb4b4',fontSize:12,fontWeight:700}}>{state.error}</p>}
         <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:24}}>
           <button type="button" onClick={cancelSettings} style={secondaryButton}>Cancel</button>
-          <button type="button" onClick={saveSettings} disabled={state.loading||state.saving||!draft.sources.length} style={{...primaryButton,opacity:(state.loading||state.saving||!draft.sources.length)?.55:1,cursor:(state.loading||state.saving||!draft.sources.length)?'not-allowed':'pointer'}}>{state.saving?'Saving…':'Save'}</button>
+          <button type="button" onClick={saveSettings} disabled={saveBlocked} style={{...primaryButton,opacity:saveBlocked?0.55:1,cursor:saveBlocked?'not-allowed':'pointer'}}>{state.saving?'Saving…':'Save'}</button>
         </div>
       </section>
     </div>}
