@@ -13,7 +13,7 @@ export const SPLASH_MOTION={
   planeDelayMs:4100,
   planeDurationMs:5100,
   planeStyle:'origami-solid',
-  wordmarkDelayMs:4500,
+  wordmarkDelayMs:4800,
   wordmarkDurationMs:1800,
   wordmarkStartScale:0.76,
   wordmarkEndScale:1,
