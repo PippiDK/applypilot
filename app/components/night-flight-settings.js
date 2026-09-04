@@ -77,6 +77,10 @@ export default function NightFlightSettings(){
   }
 
   async function saveSettings(){
+    if(!loaded){
+      setState(current=>({...current,error:'Night Flight settings must load before they can be saved.'}))
+      return
+    }
     if(!draft.sources.length){
       setState(current=>({...current,error:'Select at least one source.'}))
       return
@@ -101,7 +105,7 @@ export default function NightFlightSettings(){
     }
   }
 
-  const saveBlocked=state.loading||state.saving||!draft.sources.length
+  const saveBlocked=!loaded||state.loading||state.saving||!draft.sources.length
 
   return <>
     <button type="button" style={controlStyle} onClick={openSettings}>SETTINGS ⚙️</button>
