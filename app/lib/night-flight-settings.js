@@ -1,17 +1,7 @@
-export const NIGHT_FLIGHT_SOURCES=['linkedin','jobindex','jobnet']
+import {SEARCH_AREAS} from './job-list-filters.js'
 
-export const NIGHT_FLIGHT_AREAS=[
-  'copenhagen_north',
-  'greater_copenhagen',
-  'north_zealand',
-  'rest_zealand',
-  'aarhus_east_jutland',
-  'central_jutland',
-  'south_jutland',
-  'north_jutland',
-  'funen',
-  'bornholm'
-]
+export const NIGHT_FLIGHT_SOURCES=['linkedin','jobindex','jobnet']
+export const NIGHT_FLIGHT_AREAS=SEARCH_AREAS.map(({id})=>id)
 
 export const DEFAULT_NIGHT_FLIGHT_SETTINGS={
   enabled:false,
