@@ -3,6 +3,7 @@ import './expertise-loader.css'
 import './loader.css'
 import './v15-polish.css'
 import './ux-polish.css'
+import './company-watch.css'
 import SignOutButton from './components/sign-out-button.js'
 import SplashGate from './components/splash-gate.js'
 
