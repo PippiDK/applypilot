@@ -6,6 +6,7 @@ test('uses the approved logo asset rather than reconstructing the mark',()=>{
   assert.equal(SPLASH_MOTION.concept,'approved-logo-orbit')
   assert.equal(SPLASH_MOTION.logoAsset,'/flight-path-a-approved.webp')
   assert.equal(SPLASH_MOTION.logoGlow,true)
+  assert.equal(SPLASH_MOTION.logoRender,'html-img')
 })
 
 test('paper plane launches from the approved arrow tip and makes one orbit',()=>{
