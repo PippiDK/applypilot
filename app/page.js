@@ -23,6 +23,8 @@ import {readAppliedJobs,archiveAppliedJob,syncAppliedArchive} from './lib/applie
 import AppliedJobsArchive from './components/applied-jobs-archive.js'
 import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
 import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
+import {companyConnection,connectedCompanyNames,defaultCompanyWatch,readCompanyWatch,writeCompanyWatch,TARGET_COMPANIES} from './lib/company-watch.js'
+import {CONSULTANT_PORTALS,connectedConsultantPortalIds,defaultConsultantPortals,readConsultantPortals,writeConsultantPortals} from './lib/consultant-portals.js'
 import SearchAudit from './components/search-audit.js'
 import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
@@ -43,14 +45,18 @@ function roleList(value){return Array.isArray(value)?value.map(item=>String(item
 function legacyRoles(value=''){return String(value??'').split(',').map(item=>item.trim()).filter(Boolean)}
 function combinedRoles(primary=[],adjacent=[]){return [...roleList(primary),...roleList(adjacent)].join(', ')}
 function workModelText(values=[]){return values.map(value=>value==='onsite'?'On-site':value==='hybrid'?'Hybrid':'Remote').join(' · ')}
-function jobSourceLabel(job={}){const source=String(job?.source||job?.sourceRecords?.[0]?.source||'').toLowerCase();if(source==='jobindex')return 'Jobindex';if(source==='jobnet')return 'Jobnet';if(source==='linkedin')return 'LinkedIn';const url=String(job?.originalUrl||'');if(url.includes('jobnet.dk'))return 'Jobnet';if(url.includes('linkedin.com'))return 'LinkedIn';return 'Source'}
+function jobSourceLabel(job={}){const source=String(job?.source||job?.sourceRecords?.[0]?.source||'').toLowerCase();if(source==='consultant_portal')return `Consultant portal · ${job?.consultantPortal?.name||job?.company||'Consultant'}`;if(source==='company_site')return `Company site · ${job?.company||'Official'}`;if(source==='jobindex')return 'Jobindex';if(source==='jobnet')return 'Jobnet';if(source==='linkedin')return 'LinkedIn';const url=String(job?.originalUrl||'');if(url.includes('jobnet.dk'))return 'Jobnet';if(url.includes('linkedin.com'))return 'LinkedIn';return 'Source'}
 function sourceDedupeKey(job={}){const company=String(job.company||'').toLowerCase().replace(/\b(a\/s|as)\b/g,'as').replace(/[.,]/g,'').trim();const title=String(job.title||'').toLowerCase().replace(/\s+/g,' ').trim();const location=String(job.location||'').toLowerCase().replace(/\s+/g,' ').trim();return company&&title?company+'|'+title+'|'+location:''}
-function mergeSourceItems(groups=[]){const out=[];const byKey=new Map();for(const item of groups.flat()){const key=sourceDedupeKey(item?.job);if(key&&byKey.has(key)){const index=byKey.get(key);const current=out[index];const richer=String(item?.job?.description||item?.job?.fullJd||'').length>String(current?.job?.description||current?.job?.fullJd||'').length?item:current;out[index]=richer;continue}if(key)byKey.set(key,out.length);out.push(item)}return out}
+function mergeSourceItems(groups=[]){const out=[];const byKey=new Map();for(const item of groups.flat()){const key=sourceDedupeKey(item?.job);if(key&&byKey.has(key)){const index=byKey.get(key);const current=out[index];const currentOfficial=String(current?.job?.source||'')==='company_site';const itemOfficial=String(item?.job?.source||'')==='company_site';if(itemOfficial&&!currentOfficial){out[index]=item;continue}if(currentOfficial&&!itemOfficial)continue;const richer=String(item?.job?.description||item?.job?.fullJd||'').length>String(current?.job?.description||current?.job?.fullJd||'').length?item:current;out[index]=richer;continue}if(key)byKey.set(key,out.length);out.push(item)}return out}
 
 export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(7)
   const [jobs,setJobs]=useState([])
   const [selectedSources,setSelectedSources]=useState(()=>[...DEFAULT_SEARCH_SOURCES])
+  const [companyWatch,setCompanyWatch]=useState(()=>defaultCompanyWatch())
+  const [companyWatchOpen,setCompanyWatchOpen]=useState(false)
+  const [consultantPortals,setConsultantPortals]=useState(()=>defaultConsultantPortals())
+  const [consultantPortalsOpen,setConsultantPortalsOpen]=useState(false)
   const [selectedAreas,setSelectedAreas]=useState(()=>SEARCH_AREAS.map(({id})=>id))
   const [selectedWorkModels,setSelectedWorkModels]=useState(()=>WORK_MODELS.map(({id})=>id))
   const [selectedStatuses,setSelectedStatuses]=useState(()=>[...DEFAULT_JOB_STATUS_FILTERS])
@@ -99,6 +105,8 @@ export default function Home(){
       const hydrated={...resumeToProfile(savedProfile,primaryCv),...preferences,geography:legacyGeographyFromPreferences(preferences.locations,preferences.workModels)}
 
       setSelectedSources(readSearchSources(localStorage))
+      setCompanyWatch(readCompanyWatch(localStorage))
+      setConsultantPortals(readConsultantPortals(localStorage))
       setCvLibrary(library)
       if(readyCvCount(library)>0) localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(library))
       if(primaryCv){
@@ -246,12 +254,36 @@ export default function Home(){
     })
   }
 
+  function toggleCompanyWatchEnabled(){
+    setCompanyWatch(current=>writeCompanyWatch(localStorage,{...current,enabled:!current.enabled}))
+  }
+
+  function toggleCompany(name){
+    setCompanyWatch(current=>{
+      const selected=current.selected.includes(name)?current.selected.filter(value=>value!==name):[...current.selected,name]
+      return writeCompanyWatch(localStorage,{...current,selected})
+    })
+  }
+
+  function toggleConsultantPortalsEnabled(){
+    setConsultantPortals(current=>writeConsultantPortals(localStorage,{...current,enabled:!current.enabled}))
+  }
+
+  function toggleConsultantPortal(id){
+    setConsultantPortals(current=>{
+      const selected=current.selected.includes(id)?current.selected.filter(value=>value!==id):[...current.selected,id]
+      return writeConsultantPortals(localStorage,{...current,selected})
+    })
+  }
+
   async function search(){
   if(!resumeLoaded){
     setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
   }
-  if(!selectedSources.length){
+  const activeCompanySites=companyWatch.enabled?companyWatch.selected.filter(name=>connectedCompanyNames().includes(name)):[]
+  const activeConsultantPortals=consultantPortals.enabled?consultantPortals.selected.filter(id=>connectedConsultantPortalIds().includes(id)):[]
+  if(!selectedSources.length&&!activeCompanySites.length&&!activeConsultantPortals.length){
     setState({loading:false,error:'Select at least one search source.',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
   }
@@ -329,6 +361,46 @@ export default function Home(){
       return {source:'jobnet',data}
     })())
 
+    if(activeCompanySites.length){
+      if(!hasProfilePlan) throw new Error('Company Watch requires a saved Search Profile.')
+      const companyChunks=[]
+      for(let i=0;i<activeCompanySites.length;i+=4) companyChunks.push(activeCompanySites.slice(i,i+4))
+      companyChunks.forEach(companies=>tasks.push((async()=>{
+        const res=await fetch('/api/company-profile-search',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            freshnessDays,
+            companies,
+            unionSearchPlan:profile.unionSearchPlan,
+            exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[],
+          }),
+        })
+        const raw=await res.text()
+        let data
+        try{data=raw?JSON.parse(raw):{}}catch{throw new Error(res.ok?'Company site search returned invalid response':`Company site search failed (HTTP ${res.status})`)}
+        if(!res.ok) throw new Error(data.error||`Company site search failed (HTTP ${res.status})`)
+        return {source:'company_site',data}
+      })()))
+    }
+
+    if(activeConsultantPortals.length) tasks.push((async()=>{
+      if(!hasProfilePlan) throw new Error('Consultant Portals require a saved Search Profile.')
+      const res=await fetch('/api/consultant-profile-search',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          freshnessDays,
+          portalIds:activeConsultantPortals,
+          unionSearchPlan:profile.unionSearchPlan,
+          exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[],
+        }),
+      })
+      const data=await res.json()
+      if(!res.ok) throw new Error(data.error||'Consultant portal search failed')
+      return {source:'consultant_portal',data}
+    })())
+
     const settled=await Promise.allSettled(tasks)
     const successful=settled.filter(item=>item.status==='fulfilled').map(item=>item.value)
     const failed=settled.filter(item=>item.status==='rejected')
@@ -348,7 +420,7 @@ export default function Home(){
     setState({
       loading:false,
       error:'',
-      coverage:{source:selectedSources.join('+'),freshnessDays,status:limited?'ACCESS LIMITED':mergedJobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:failed[0]?.reason?.message||null},
+      coverage:{source:[...selectedSources,...(activeCompanySites.length?['company-sites']:[]),...(activeConsultantPortals.length?['consultant-portals']:[])].join('+'),freshnessDays,status:limited?'ACCESS LIMITED':mergedJobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:failed[0]?.reason?.message||null},
       stats,
       fetchedAt:new Date().toISOString(),
       audit,
@@ -584,7 +656,7 @@ export default function Home(){
   }
 
   return <main>
-    <header><div><div className="brand">ApplyPilot</div><div className="tag">Search less. Apply better.</div></div><div className="headerActions"><div className={`sourceBadge profileStatus ${resumeLoaded?'statusReady':'statusEmpty'}`}>{resumeLoaded?'Profile ready':'Profile empty'}</div><div className="sourceBadge">LINKEDIN + JOBINDEX + JOBNET · TEST</div></div></header>
+    <header><div><div className="brand">ApplyPilot</div><div className="tag">Search less. Apply better.</div></div><div className="headerActions"><div className={`sourceBadge profileStatus ${resumeLoaded?'statusReady':'statusEmpty'}`}>{resumeLoaded?'Profile ready':'Profile empty'}</div><div className="sourceBadge">MULTI-SOURCE + COMPANY WATCH · TEST</div></div></header>
 
     <section className="hero">
       <div><p className="eyebrow">MULTI-SOURCE · END-TO-END</p><h1>Find the right roles for your Search Profile in Denmark.</h1><p>Search Profile → selected sources → full job description → worthwhile matches only.</p></div>
@@ -597,6 +669,26 @@ export default function Home(){
       <div><small>POSTED WITHIN</small><div className="choices">{WINDOWS.map(days=><button key={days} className={freshnessDays===days?'choice selected':'choice'} onClick={()=>setFreshnessDays(days)}>{days} day{days===1?'':'s'}</button>)}</div></div>
       <div><small>SEARCH SOURCES</small><div className="choices"><label className="choice"><input type="checkbox" checked={selectedSources.includes('linkedin')} onChange={()=>toggleSource('linkedin')}/> LinkedIn</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobindex')} onChange={()=>toggleSource('jobindex')}/> Jobindex</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobnet')} onChange={()=>toggleSource('jobnet')}/> Jobnet</label></div></div>
       <button className="primary" onClick={search} disabled={state.loading}>{state.loading?'Searching…':'Search'}</button>
+    </section>
+
+    <section className="companyWatch">
+      <div className="companyWatchMain">
+        <label className="companyWatchToggle"><input type="checkbox" checked={companyWatch.enabled} onChange={toggleCompanyWatchEnabled}/><span><small>DIRECT COMPANY WATCH</small><b>Company career sites</b></span></label>
+        <div className="companyWatchActions"><span>{companyWatch.selected.length} companies selected</span><button className="secondary companyManage" onClick={()=>setCompanyWatchOpen(open=>!open)}>{companyWatchOpen?'Close':'Manage'}</button></div>
+      </div>
+      {companyWatchOpen&&<div className="companyWatchList">
+        {TARGET_COMPANIES.map(name=>{const connection=companyConnection(name);return <label key={name}><input type="checkbox" checked={companyWatch.selected.includes(name)} onChange={()=>toggleCompany(name)}/><span>{name}</span><small className={connection.status==='connected'?'ready':''}>{connection.status==='connected'?('Connected · '+connection.connector):'Connection pending'}</small></label>})}
+      </div>}
+    </section>
+
+    <section className="companyWatch consultantPortals">
+      <div className="companyWatchMain">
+        <label className="companyWatchToggle"><input type="checkbox" checked={consultantPortals.enabled} onChange={toggleConsultantPortalsEnabled}/><span><small>CONSULTANT PORTALS</small><b>Freelance & consulting assignments</b></span></label>
+        <div className="companyWatchActions"><span>{consultantPortals.selected.length} portals selected</span><button className="secondary companyManage" onClick={()=>setConsultantPortalsOpen(open=>!open)}>{consultantPortalsOpen?'Close':'Manage'}</button></div>
+      </div>
+      {consultantPortalsOpen&&<div className="companyWatchList consultantPortalList">
+        {CONSULTANT_PORTALS.map(portal=><label key={portal.id}><input type="checkbox" checked={consultantPortals.selected.includes(portal.id)} onChange={()=>toggleConsultantPortal(portal.id)}/><span>{portal.name}</span><small className={portal.status==='connected'?'ready':''}>{portal.status==='connected'?('Connected · '+portal.connector):'Connection pending'}</small></label>)}
+      </div>}
     </section>
 
     {state.error&&<div className="errorBox"><b>{state.error==='Please Upload Your CV'?'Please Upload Your CV':'Search failed'}</b>{state.error!=='Please Upload Your CV'&&<span>{state.error}</span>}</div>}
