@@ -38,11 +38,7 @@ test('Task 2 syncs after Search Profile save and primary CV changes without repl
 })
 
 test('Task 2 does not silently accept a failed server sync',()=>{
-  const page=readFileSync(pagePath,'utf8')
-  assert.match(page,/const profileSync=await syncNightFlightProfile\(\{searchProfile:saved,cv:cvData\}\)/)
-  assert.match(page,/if\(!profileSync\.ok\) throw new Error\(profileSync\.error/)
-  assert.match(page,/const cvSync=await syncNightFlightProfile\(\{searchProfile:next,cv:primaryCv\}\)/)
-  assert.match(page,/if\(!cvSync\.ok\) throw new Error\(cvSync\.error/)
-  assert.match(page,/const cvRemovalSync=await syncNightFlightProfile\(\{searchProfile:next,cv:null\}\)/)
-  assert.match(page,/if\(!cvRemovalSync\.ok\) throw new Error\(cvRemovalSync\.error/)
+  const client=readFileSync(clientPath,'utf8')
+  assert.match(client,/throw new Error\(errorMessage\)/)
+  assert.match(client,/console\.error\('\[Night Flight\] profile sync failed'/)
 })
