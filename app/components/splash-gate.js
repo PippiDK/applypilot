@@ -54,6 +54,10 @@ export default function SplashGate({children}){
   return <div className={styles.splash} style={motionStyle}>
     <div className={styles.center}>
       <div className={styles.logoStage} aria-label="ApplyPilot approved Flight Path A with paper-plane orbit">
+        <div className={styles.logoApproach}>
+          <img className={styles.approvedLogo} src={SPLASH_MOTION.logoAsset} alt="" aria-hidden="true"/>
+        </div>
+
         <svg className={styles.logo} viewBox="0 0 700 600" role="img" aria-hidden="true">
           <defs>
             <filter id="planeGlow" x="-70%" y="-70%" width="240%" height="240%">
@@ -64,19 +68,6 @@ export default function SplashGate({children}){
 
           <path className={styles.orbitTrailGlow} pathLength="1" d={SPLASH_MOTION.planeOrbitPath}/>
           <path className={styles.orbitTrail} pathLength="1" d={SPLASH_MOTION.planeOrbitPath}/>
-
-          <g className={styles.logoApproach}>
-            <image
-              className={styles.approvedLogo}
-              href={SPLASH_MOTION.logoAsset}
-              x="50"
-              y="10"
-              width="560"
-              height="560"
-              preserveAspectRatio="xMidYMid meet"
-            />
-          </g>
-
           <PaperPlane/>
         </svg>
       </div>
