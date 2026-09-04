@@ -6,9 +6,13 @@ export async function syncNightFlightProfile({searchProfile,cv}={}){
       body:JSON.stringify({searchProfile:searchProfile||{},cv:cv||null}),
     })
     const data=await response.json().catch(()=>({}))
-    if(!response.ok) return {ok:false,error:data.error||'Night Flight profile sync failed.'}
-    return {ok:true,...data}
+    if(response.ok) return {ok:true,...data}
+    const errorMessage=data.error||'Night Flight profile sync failed.'
+    console.error('[Night Flight] profile sync failed',errorMessage)
+    throw new Error(errorMessage)
   }catch(error){
-    return {ok:false,error:error?.message||'Night Flight profile sync failed.'}
+    const errorMessage=error?.message||'Night Flight profile sync failed.'
+    console.error('[Night Flight] profile sync failed',errorMessage)
+    throw new Error(errorMessage)
   }
 }
