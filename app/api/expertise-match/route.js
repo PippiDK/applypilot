@@ -25,8 +25,9 @@ export async function POST(request){
   try{
     const body=await request.json()
     const rawJob=body?.job&&typeof body.job==='object'?body.job:{}
+    const identity=body?.jobIdentity&&typeof body.jobIdentity==='object'?body.jobIdentity:{}
     const job={
-      ...rawJob,
+      ...identity,
       title:text(rawJob.title),
       company:text(rawJob.company),
       location:text(rawJob.location),
