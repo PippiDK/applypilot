@@ -59,7 +59,7 @@ test('Task 2D browser client surfaces backend sync failure', async () => {
   )
 })
 
-test('Task 2D route and Search Profile save wiring are present, with server sync before local success commit', () => {
+test('Task 2D route and Search Profile save wiring are present, with guarded server sync before local commit', () => {
   assert.equal(existsSync(routePath), true, 'Task 2D authenticated sync route must exist')
   const routeSource = existsSync(routePath) ? readFileSync(routePath, 'utf8') : ''
   assert.match(routeSource, /requireUser/)
@@ -71,7 +71,7 @@ test('Task 2D route and Search Profile save wiring are present, with server sync
   assert.match(pageSource, /requestNightFlightProfileSync/)
   const saveStart = pageSource.indexOf('async function saveProfile()')
   const localCommit = pageSource.indexOf("localStorage.setItem('applypilot-profile'", saveStart)
-  const serverSync = pageSource.indexOf('await requestNightFlightProfileSync', saveStart)
-  assert.ok(saveStart >= 0 && serverSync > saveStart, 'Search Profile save must await Night Flight server sync')
-  assert.ok(localCommit > serverSync, 'Server sync must complete before local profile is marked saved')
+  const guardedSync = pageSource.indexOf('await attemptNightFlightProfileSync', saveStart)
+  assert.ok(saveStart >= 0 && guardedSync > saveStart, 'Search Profile save must await the Task 2E Night Flight sync guard')
+  assert.ok(localCommit > guardedSync, 'Guarded server sync attempt must finish before local profile commit')
 })
