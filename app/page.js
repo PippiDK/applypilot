@@ -5,6 +5,7 @@ import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normaliz
 import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'
 import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'
 import {requestNightFlightProfileSync} from './lib/night-flight-profile-client.js'
+import {attemptNightFlightProfileSync} from './lib/night-flight-profile-failure.js'
 import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'
 import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'
 import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'
@@ -78,6 +79,7 @@ export default function Home(){
   const [profileStep,setProfileStep]=useState(1)
   const [profileRoleState,setProfileRoleState]=useState(EMPTY_ROLE_STATE)
   const [profileSaveState,setProfileSaveState]=useState({loading:false,error:''})
+  const [nightFlightSyncWarning,setNightFlightSyncWarning]=useState('')
   const [reviewOpen,setReviewOpen]=useState(false)
   const [adaptationSelections,setAdaptationSelections]=useState({})
   const [adaptationBaselines,setAdaptationBaselines]=useState({})
@@ -522,7 +524,8 @@ export default function Home(){
       const compiledExclusions=await resolveSearchProfileExclusions({storage:localStorage,exclusionsText:draft.exclusions,savedProfile:profile,parse:requestSearchProfileExclusions})
       const exclusions=String(draft.exclusions??'').replace(/\s+/g,' ').trim()
       const saved={...resumeToProfile(draft,cvData),primaryRoles,adjacentRoles,roles:combinedRoles(primaryRoles,adjacentRoles),rolesSourceVersion:cvData?.sourceVersion||draft.rolesSourceVersion||'',cvRoleProfiles:Array.isArray(draft.cvRoleProfiles)?draft.cvRoleProfiles:[],roleSources:Array.isArray(draft.roleSources)?draft.roleSources:[],rolesLibraryFingerprint:draft.rolesLibraryFingerprint||rolesLibraryFingerprint,rolesBuilderVersion:SEARCH_PROFILE_BUILDER_VERSION,unionSearchPlan:draftUnionSearchPlan,unionSearchPlanVersion:UNION_SEARCH_PLAN_VERSION,unionSearchPlanFingerprint:draftUnionSearchPlan.fingerprint,locations,workModels,geography,exclusions,exclusionRules:compiledExclusions.rules,exclusionsFingerprint:compiledExclusions.fingerprint,exclusionsParserVersion:compiledExclusions.parserVersion,exclusionsParsedAt:exclusions?new Date().toISOString():'',savedAt:new Date().toISOString()}
-      await requestNightFlightProfileSync({searchProfile:saved,cv:cvData?{text:cvData.cvText,sourceVersion:cvData.sourceVersion}:null})
+      const syncResult=await attemptNightFlightProfileSync({sync:requestNightFlightProfileSync,searchProfile:saved,cv:cvData?{text:cvData.cvText,sourceVersion:cvData.sourceVersion}:null})
+      setNightFlightSyncWarning(syncResult.stale?syncResult.error:'')
       localStorage.setItem('applypilot-profile',JSON.stringify(saved))
       setProfile(saved)
       setDraft(saved)
@@ -666,6 +669,8 @@ export default function Home(){
     </section>
 
     <div className="profileStrip"><span className="profileSearchSummary">{profileSearchPlanSummary}</span><button className="profileEditButton" onClick={startProfile}>{profileReady?'Edit profile':'Search profile'}</button><button className="cvButton" onClick={startProfile}>{cvReadyCount?`✓ CVs ${cvReadyCount}/${MAX_CVS}`:'Upload CVs'}</button></div>
+
+    {nightFlightSyncWarning&&<div className="warningBox"><b>Night Flight backend is not synced</b><span>{nightFlightSyncWarning}</span></div>}
 
     <section className="controls">
       <div><small>POSTED WITHIN</small><div className="choices">{WINDOWS.map(days=><button key={days} className={freshnessDays===days?'choice selected':'choice'} onClick={()=>setFreshnessDays(days)}>{days} day{days===1?'':'s'}</button>)}</div></div>
