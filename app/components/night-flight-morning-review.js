@@ -55,6 +55,8 @@ export default function NightFlightMorningReview(){
   const [error,setError]=useState('')
   const [open,setOpen]=useState(false)
   const [selectedKey,setSelectedKey]=useState('')
+  const [recoveringKey,setRecoveringKey]=useState('')
+  const [recoveryError,setRecoveryError]=useState('')
 
   useEffect(()=>{
     setHost(document.querySelector('.profileStrip'))
@@ -128,6 +130,32 @@ export default function NightFlightMorningReview(){
   const visibleProgress=progress||progressFromReview(review)
   const selected=review?.jobs?.find(item=>item.key===selectedKey)||review?.jobs?.[0]||null
   const analysis=selected?.analysis||null
+
+  async function recoverNightFlightMatch(){
+    if(!review?.run?.id||selected?.status!=='FAILED'||!selected?.key||recoveringKey) return
+    const selectedJobKey=selected.key
+    setRecoveringKey(selectedJobKey)
+    setRecoveryError('')
+    try{
+      const response=await fetch('/api/night-flight-review',{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({runId:review.run.id,jobKey:selected.key}),
+        cache:'no-store',
+      })
+      const payload=await response.json().catch(()=>({}))
+      if(!response.ok) throw new Error(payload?.error||'Night Flight Match recovery failed.')
+      const next=payload?.review||null
+      setReview(next)
+      setProgress(progressFromReview(next))
+      setSelectedKey(selected.key)
+    }catch(recoveryFailure){
+      setRecoveryError(recoveryFailure?.message||'Night Flight Match recovery failed.')
+    }finally{
+      setRecoveringKey('')
+    }
+  }
+
   const card=createPortal(
     <div className={styles.card} aria-label="Night Flight Morning Review">
       <div>
@@ -152,7 +180,7 @@ export default function NightFlightMorningReview(){
         </div>
         <div className={styles.body}>
           <aside className={styles.list} aria-label="Night Flight jobs">
-            {(review.jobs||[]).map(item=><button type="button" key={item.key} className={`${styles.job} ${selected?.key===item.key?styles.selected:''}`} onClick={()=>setSelectedKey(item.key)}>
+            {(review.jobs||[]).map(item=><button type="button" key={item.key} className={`${styles.job} ${selected?.key===item.key?styles.selected:''}`} onClick={()=>{setSelectedKey(item.key);setRecoveryError('')}}>
               <span className={styles.jobTitle}>{item.job?.title||'Untitled role'}</span>
               <span className={styles.jobMeta}>{item.job?.company||'Company unavailable'} · {item.job?.location||item.source||'Location unavailable'}</span>
               <span className={item.status==='READY'?styles.ready:styles.failed}>{item.status==='READY'?'READY':'FAILED'}</span>
@@ -163,7 +191,8 @@ export default function NightFlightMorningReview(){
             {!selected&&<p className={styles.muted}>No review jobs for this run.</p>}
             {selected?.status==='FAILED'&&<>
               <div className={styles.failure}>{selected.lastError||'Automatic Profile Match failed.'}</div>
-              <button type="button" className={styles.retry} disabled>Run Match</button>
+              {recoveryError&&<div className={styles.failure}>{recoveryError}</div>}
+              <button type="button" className={styles.retry} onClick={recoverNightFlightMatch} disabled={recoveringKey===selected.key}>{recoveringKey===selected.key?'Running…':'Run Match'}</button>
             </>}
             {selected?.status==='READY'&&analysis&&<>
               <div className={styles.score}><b>{Number.isFinite(Number(analysis.expertiseMatch))?Math.round(Number(analysis.expertiseMatch)):'—'}%</b><span>Expertise Match</span></div>
