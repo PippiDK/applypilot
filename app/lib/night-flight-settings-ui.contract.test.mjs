@@ -3,13 +3,14 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
 const componentPath=new URL('../components/night-flight-settings.js',import.meta.url)
-const pagePath=new URL('../page.js',import.meta.url)
+const layoutPath=new URL('../layout.js',import.meta.url)
 const component=fs.existsSync(componentPath)?fs.readFileSync(componentPath,'utf8'):''
-const page=fs.readFileSync(pagePath,'utf8')
+const layout=fs.readFileSync(layoutPath,'utf8')
 
 test('header exposes compact Night Flight Settings entry without changing Manual Search controls',()=>{
-  assert.match(page,/import NightFlightSettings from '\.\/components\/night-flight-settings\.js'/)
-  assert.match(page,/<NightFlightSettings\s*\/>/)
+  assert.match(layout,/import NightFlightSettings from '\.\/components\/night-flight-settings\.js'/)
+  assert.match(layout,/<NightFlightSettings\s*\/>/)
+  assert.match(component,/document\.querySelector\('\.headerActions'\)/)
   assert.match(component,/⚙️\s*Settings/)
   assert.doesNotMatch(component,/selectedSources|writeSearchSources|freshnessDays|setFreshnessDays/)
 })

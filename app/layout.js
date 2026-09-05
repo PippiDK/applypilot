@@ -7,6 +7,7 @@ import './company-watch.css'
 import SignOutButton from './components/sign-out-button.js'
 import SplashGate from './components/splash-gate.js'
 import NeutralizeLegacyTestLabels from './components/neutralize-legacy-test-labels.js'
+import NightFlightSettings from './components/night-flight-settings.js'
 
 export const metadata={title:'ApplyPilot',description:'Job search autopilot for senior IT professionals'}
 
@@ -17,5 +18,5 @@ export default function RootLayout({children}){
     ? 'LIVE 17 · 6a5f02c'
     : `V16 · PREVIEW · ${shortSha}`
 
-  return <html lang="en"><body><SplashGate>{children}<NeutralizeLegacyTestLabels/><div className="versionBadge">{versionLabel}</div><SignOutButton/></SplashGate></body></html>
+  return <html lang="en"><body><SplashGate>{children}<NightFlightSettings/><NeutralizeLegacyTestLabels/><div className="versionBadge">{versionLabel}</div><SignOutButton/></SplashGate></body></html>
 }
