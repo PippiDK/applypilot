@@ -1,6 +1,9 @@
 import {NextResponse} from 'next/server'
 import {analyzeExpertiseMatch} from '../../lib/expertise-service.js'
+import {resolveManualExpertiseMatch} from '../../lib/expertise-match-server-cache.js'
+import {loadLatestNightFlightProfileState} from '../../lib/night-flight-profile-store.js'
 import {requireUser} from '../../lib/auth/require-user.js'
+import {createServerSupabaseClient} from '../../lib/supabase/server.js'
 
 export const dynamic='force-dynamic'
 const text=value=>String(value??'').trim()
@@ -21,15 +24,28 @@ export async function POST(request){
 
   try{
     const body=await request.json()
+    const rawJob=body?.job&&typeof body.job==='object'?body.job:{}
     const job={
-      title:text(body?.job?.title),
-      company:text(body?.job?.company),
-      location:text(body?.job?.location),
-      description:text(body?.job?.description)
+      ...rawJob,
+      title:text(rawJob.title),
+      company:text(rawJob.company),
+      location:text(rawJob.location),
+      description:text(rawJob.description)
     }
     const cvText=text(body?.cvText)
-    const analysis=await analyzeExpertiseMatch({job,cvText})
-    return NextResponse.json({analysis})
+    const cvSourceVersion=text(body?.cvSourceVersion)
+    const supabase=await createServerSupabaseClient()
+    const profileState=await loadLatestNightFlightProfileState({supabase,userId:auth.user.id})
+    const result=await resolveManualExpertiseMatch({
+      supabase,
+      userId:auth.user.id,
+      job,
+      cvText,
+      cvSourceVersion,
+      profileState,
+      analyze:input=>analyzeExpertiseMatch(input),
+    })
+    return NextResponse.json({analysis:result.analysis})
   }catch(error){
     const safe=safeExpertiseError(error)
     console.error('expertise-match error',{code:String(error?.code||'AI_UNKNOWN')})
