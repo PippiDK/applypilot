@@ -40,6 +40,25 @@ export async function persistNightFlightAreaScope({supabase,userId,batch}={}){
   if(!userId) throw new Error('Authenticated user is required')
   if(!supabase||typeof supabase.from!=='function') throw new Error('Supabase client is required')
   const frozenBatch=requireBatch(batch)
+
+  const {data:existingRun,error:existingRunError}=await supabase
+    .from('night_flight_runs')
+    .select('id,status,jobs_discovered,jobs_queued,jobs_skipped')
+    .eq('user_id',userId)
+    .eq('target_date',frozenBatch.targetDate)
+    .maybeSingle()
+
+  if(existingRunError) throw new Error(`Night Flight run lookup failed: ${existingRunError.message||'unknown Supabase error'}`)
+  if(existingRun?.id){
+    return {
+      runId:existingRun.id,
+      jobsDiscovered:Number(existingRun.jobs_discovered||0),
+      jobsQueued:Number(existingRun.jobs_queued||0),
+      jobsSkipped:Number(existingRun.jobs_skipped||0),
+      status:existingRun.status||'RUNNING',
+    }
+  }
+
   const planned=planNightFlightAreaScope(frozenBatch)
   const jobsQueued=planned.filter(row=>row.status==='QUEUED').length
   const jobsSkipped=planned.length-jobsQueued
@@ -87,5 +106,6 @@ export async function persistNightFlightAreaScope({supabase,userId,batch}={}){
     jobsDiscovered:planned.length,
     jobsQueued,
     jobsSkipped,
+    status:runPayload.status,
   }
 }
