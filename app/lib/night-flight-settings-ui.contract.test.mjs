@@ -4,8 +4,10 @@ import fs from 'node:fs'
 
 const componentPath=new URL('../components/night-flight-settings.js',import.meta.url)
 const layoutPath=new URL('../layout.js',import.meta.url)
+const settingsPath=new URL('./night-flight-settings.js',import.meta.url)
 const component=fs.existsSync(componentPath)?fs.readFileSync(componentPath,'utf8'):''
 const layout=fs.readFileSync(layoutPath,'utf8')
+const settingsSource=fs.readFileSync(settingsPath,'utf8')
 
 test('header exposes compact Night Flight Settings entry without changing Manual Search controls',()=>{
   assert.match(layout,/import NightFlightSettings from '\.\/components\/night-flight-settings\.js'/)
@@ -19,9 +21,10 @@ test('Night Flight Settings uses the approved controls and existing SEARCH_AREAS
   assert.match(component,/Night Flight Settings/)
   assert.match(component,/Prepares matches from the last completed day overnight\./)
   assert.match(component,/Run Night Flight automatically/)
-  assert.match(component,/LinkedIn/)
-  assert.match(component,/Jobindex/)
-  assert.match(component,/Jobnet/)
+  assert.match(component,/NIGHT_FLIGHT_SOURCES/)
+  assert.match(settingsSource,/label:'LinkedIn'/)
+  assert.match(settingsSource,/label:'Jobindex'/)
+  assert.match(settingsSource,/label:'Jobnet'/)
   assert.match(component,/SEARCH_AREAS/)
   assert.match(component,/No areas selected = all areas/)
 })
