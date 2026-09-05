@@ -120,7 +120,7 @@ test('Source CV upload entry points keep the current four-step Search Profile fl
   assert.doesNotMatch(source,/setCvOpen/)
   assert.doesNotMatch(source,/cvOpen&&/)
   assert.match(source,/className="cvButton" onClick=\{startProfile\}/)
-  assert.match(source,/Upload CV<\/button>/)
+  assert.match(cvLibraryStep,/?'Replace':'Upload CV'/)
   assert.match(cvLibraryStep,/Upload your CVs/)
   assert.doesNotMatch(source,/Upload your master CV/i)
   assert.doesNotMatch(source,/onClick=\{\(\)=>setCvOpen\(true\)\}[^>]*>Upload \/ analyse CV/)
