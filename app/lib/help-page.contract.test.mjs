@@ -19,5 +19,5 @@ test('Help page covers the complete MVP user flow and current screenshot',async(
   for(const text of ['Quick start','Search Profile','CV Library','Search & Filters','Vacancy review','Expertise Match','Best CV','CV Adaptation','Truth Guard','Download','LIVE vs TEST','Troubleshooting']){
     assert.ok(source.includes(text),`missing Help section: ${text}`)
   }
-  assert.match(source,/\/help\/applypilot-live-results\.jpg/)
+  assert.match(source,/\/help\/applypilot-live-results\.webp/)
 })
