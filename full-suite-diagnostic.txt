@@ -5,13 +5,13 @@ exit_code=1
 # Subtest: profile-driven search returns legacy-compatible result shape and full-JD statistics
 ok 292 - profile-driven search returns legacy-compatible result shape and full-JD statistics
   ---
-  duration_ms: 21.367446
+  duration_ms: 19.177249
   type: 'test'
   ...
 # Subtest: 7-day profile discovery uses repeated deep LinkedIn pages instead of shadow start=0 only
 not ok 293 - 7-day profile discovery uses repeated deep LinkedIn pages instead of shadow start=0 only
   ---
-  duration_ms: 6.755378
+  duration_ms: 21.548733
   type: 'test'
   location: '/home/runner/work/applypilot/applypilot/app/lib/linkedin-profile-search.test.mjs:82:1'
   failureType: 'testCodeFailure'
@@ -33,19 +33,19 @@ not ok 293 - 7-day profile discovery uses repeated deep LinkedIn pages instead o
 # Subtest: role evaluation uses the full approved Search Profile, not only the discovery path
 ok 294 - role evaluation uses the full approved Search Profile, not only the discovery path
   ---
-  duration_ms: 1.087614
+  duration_ms: 2.072284
   type: 'test'
   ...
 # Subtest: same verified job and Search Profile keep the same role decision and score across different discovery paths
 ok 295 - same verified job and Search Profile keep the same role decision and score across different discovery paths
   ---
-  duration_ms: 1.94659
+  duration_ms: 3.255643
   type: 'test'
   ...
 # Subtest: each freshness view performs fresh LinkedIn discovery for its selected window
 ok 296 - each freshness view performs fresh LinkedIn discovery for its selected window
   ---
-  duration_ms: 3.256764
+  duration_ms: 4.510058
   type: 'test'
   ...
 # Subtest: 1/3/7/14-day views are local subsets over the same discovered jobs
@@ -56,13 +56,13 @@ ok 297 - 1/3/7/14-day views are local subsets over the same discovered jobs
 # Subtest: exact Technical Project Manager in a non-enterprise engineering context is demoted but kept
 ok 304 - exact Technical Project Manager in a non-enterprise engineering context is demoted but kept
   ---
-  duration_ms: 1.509313
+  duration_ms: 2.360968
   type: 'test'
   ...
 # Subtest: exact Technical Project Manager with strong enterprise IT context remains High
 not ok 305 - exact Technical Project Manager with strong enterprise IT context remains High
   ---
-  duration_ms: 1.597476
+  duration_ms: 1.89676
   type: 'test'
   location: '/home/runner/work/applypilot/applypilot/app/lib/linkedin-profile-search.test.mjs:391:1'
   failureType: 'testCodeFailure'
@@ -84,294 +84,36 @@ not ok 305 - exact Technical Project Manager with strong enterprise IT context r
 # Subtest: specialist adjacent Implementation Manager remains visible but payroll context lowers top-score inflation
 ok 306 - specialist adjacent Implementation Manager remains visible but payroll context lowers top-score inflation
   ---
-  duration_ms: 1.425613
+  duration_ms: 2.775061
   type: 'test'
   ...
 # Subtest: generic hands-on engineer titles are rejected before JD fetch
 ok 307 - generic hands-on engineer titles are rejected before JD fetch
   ---
-  duration_ms: 3.431472
+  duration_ms: 5.526915
   type: 'test'
   ...
 # Subtest: director and stream-owner career tracks are rejected before JD fetch
 ok 308 - director and stream-owner career tracks are rejected before JD fetch
   ---
-  duration_ms: 0.387081
+  duration_ms: 0.556827
   type: 'test'
   ...
 # Subtest: people-manager hybrid title is rejected even though it contains Project Manager
 ok 309 - people-manager hybrid title is rejected even though it contains Project Manager
   ---
---- lines 2042-2149 ---
-  ...
-# Subtest: audit helper allow-list cannot copy CV or JD source payloads
-ok 335 - audit helper allow-list cannot copy CV or JD source payloads
-  ---
-  duration_ms: 1.472101
-  type: 'test'
-  ...
-# Subtest: creates a privacy-safe discovery audit record
-not ok 336 - creates a privacy-safe discovery audit record
-  ---
-  duration_ms: 2.2239
-  type: 'test'
-  location: '/home/runner/work/applypilot/applypilot/app/lib/linkedin-search-audit.test.mjs:5:1'
-  failureType: 'testCodeFailure'
-  error: |-
-    Expected values to be strictly deep-equal:
-    + actual - expected
-    
-      {
-        company: 'Example',
-        decision: 'PENDING',
-    +   discoveryProvenance: [],
-        jobId: '123',
-        reason: null,
-        score: null,
-        stage: 'DISCOVERED',
-        title: 'Senior Project Manager'
-    
-  code: 'ERR_ASSERTION'
-  name: 'AssertionError'
-  expected:
-    jobId: '123'
-    title: 'Senior Project Manager'
-    company: 'Example'
-    stage: 'DISCOVERED'
-    decision: 'PENDING'
-    reason: ~
-    score: ~
-  actual:
-    jobId: '123'
-    title: 'Senior Project Manager'
-    company: 'Example'
-    stage: 'DISCOVERED'
-    decision: 'PENDING'
-    reason: ~
-    score: ~
-    discoveryProvenance:
-  operator: 'deepStrictEqual'
-  stack: |-
-    TestContext.<anonymous> (file:///home/runner/work/applypilot/applypilot/app/lib/linkedin-search-audit.test.mjs:7:10)
-    Test.runInAsyncScope (node:async_hooks:214:14)
-    Test.run (node:internal/test_runner/test:1047:25)
-    Test.start (node:internal/test_runner/test:944:17)
-    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
-  ...
-# Subtest: updates one audit record without leaking arbitrary source fields
-not ok 337 - updates one audit record without leaking arbitrary source fields
-  ---
-  duration_ms: 0.65726
-  type: 'test'
-  location: '/home/runner/work/applypilot/applypilot/app/lib/linkedin-search-audit.test.mjs:13:1'
-  failureType: 'testCodeFailure'
-  error: |-
-    Expected values to be strictly deep-equal:
-    + actual - expected
-    
-      [
-        {
-          company: 'Co',
-          decision: 'REJECT',
-    +     discoveryProvenance: [],
-          jobId: '123',
-          reason: 'Poor fit',
-          score: 5.8,
-          stage: 'BELOW_60',
-          title: 'PM'
-    
-  code: 'ERR_ASSERTION'
-  name: 'AssertionError'
-  expected:
-    0:
-      jobId: '123'
-      title: 'PM'
-      company: 'Co'
-      stage: 'BELOW_60'
-      decision: 'REJECT'
-      reason: 'Poor fit'
-      score: 5.8
-  actual:
-    0:
-      jobId: '123'
-      title: 'PM'
-      company: 'Co'
-      stage: 'BELOW_60'
-      decision: 'REJECT'
-      reason: 'Poor fit'
-      score: 5.8
-      discoveryProvenance:
-  operator: 'deepStrictEqual'
-  stack: |-
-    TestContext.<anonymous> (file:///home/runner/work/applypilot/applypilot/app/lib/linkedin-search-audit.test.mjs:16:10)
-    Test.runInAsyncScope (node:async_hooks:214:14)
-    Test.run (node:internal/test_runner/test:1047:25)
-    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
-    Test.postRun (node:internal/test_runner/test:1173:19)
-    Test.run (node:internal/test_runner/test:1101:12)
-    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
-  ...
---- lines 2635-2782 ---
-  ...
-# Subtest: requestPreviousRoleOverview fails safely if the previous-role stage is rejected
-ok 419 - requestPreviousRoleOverview fails safely if the previous-role stage is rejected
-  ---
-  duration_ms: 1.242458
-  type: 'test'
-  ...
-# Subtest: writePreviousRoleOverview uses only evidence from the detected previous employment section
-not ok 420 - writePreviousRoleOverview uses only evidence from the detected previous employment section
-  ---
-  duration_ms: 5.228302
-  type: 'test'
-  location: '/home/runner/work/applypilot/applypilot/app/lib/previous-role-overview.test.mjs:54:1'
-  failureType: 'testCodeFailure'
-  error: |-
-    Expected values to be strictly equal:
-    + actual - expected
-    
-    + 'undefined'
-    - 'function'
-    
-  code: 'ERR_ASSERTION'
-  name: 'AssertionError'
-  expected: 'function'
-  actual: 'undefined'
-  operator: 'strictEqual'
-  stack: |-
-    TestContext.<anonymous> (file:///home/runner/work/applypilot/applypilot/app/lib/previous-role-overview.test.mjs:56:10)
-    async Test.run (node:internal/test_runner/test:1054:7)
-    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
-  ...
-# Subtest: writePreviousRoleOverview rejects evidence IDs from the latest employment role
-not ok 421 - writePreviousRoleOverview rejects evidence IDs from the latest employment role
-  ---
-  duration_ms: 0.508009
-  type: 'test'
-  location: '/home/runner/work/applypilot/applypilot/app/lib/previous-role-overview.test.mjs:86:1'
-  failureType: 'testCodeFailure'
-  error: |-
-    Expected values to be strictly equal:
-    + actual - expected
-    
-    + 'undefined'
-    - 'function'
-    
-  code: 'ERR_ASSERTION'
-  name: 'AssertionError'
-  expected: 'function'
-  actual: 'undefined'
-  operator: 'strictEqual'
-  stack: |-
-    TestContext.<anonymous> (file:///home/runner/work/applypilot/applypilot/app/lib/previous-role-overview.test.mjs:88:10)
-    async Test.run (node:internal/test_runner/test:1054:7)
-    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
-  ...
-# Subtest: writePreviousRoleOverview rejects numbers absent from previous-role evidence
-not ok 422 - writePreviousRoleOverview rejects numbers absent from previous-role evidence
-  ---
-  duration_ms: 0.400086
-  type: 'test'
-  location: '/home/runner/work/applypilot/applypilot/app/lib/previous-role-overview.test.mjs:98:1'
-  failureType: 'testCodeFailure'
-  error: |-
-    Expected values to be strictly equal:
-    + actual - expected
-    
-    + 'undefined'
-    - 'function'
-    
-  code: 'ERR_ASSERTION'
-  name: 'AssertionError'
-  expected: 'function'
-  actual: 'undefined'
-  operator: 'strictEqual'
-  stack: |-
-    TestContext.<anonymous> (file:///home/runner/work/applypilot/applypilot/app/lib/previous-role-overview.test.mjs:100:10)
-    async Test.run (node:internal/test_runner/test:1054:7)
-    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
-  ...
-# Subtest: writePreviousRoleOverview enforces the existing previous-role overview length window
-not ok 423 - writePreviousRoleOverview enforces the existing previous-role overview length window
-  ---
-  duration_ms: 1.31829
-  type: 'test'
-  location: '/home/runner/work/applypilot/applypilot/app/lib/previous-role-overview.test.mjs:110:1'
-  failureType: 'testCodeFailure'
-  error: |-
-    Expected values to be strictly equal:
-    + actual - expected
-    
-    + 'undefined'
-    - 'function'
-    
-  code: 'ERR_ASSERTION'
-  name: 'AssertionError'
-  expected: 'function'
-  actual: 'undefined'
-  operator: 'strictEqual'
-  stack: |-
-    TestContext.<anonymous> (file:///home/runner/work/applypilot/applypilot/app/lib/previous-role-overview.test.mjs:112:10)
-    async Test.run (node:internal/test_runner/test:1054:7)
-    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
-  ...
-# Subtest: writePreviousRoleOverview returns unavailable when the selected CV has no previous role
-not ok 424 - writePreviousRoleOverview returns unavailable when the selected CV has no previous role
-  ---
-  duration_ms: 0.417502
-  type: 'test'
-  location: '/home/runner/work/applypilot/applypilot/app/lib/previous-role-overview.test.mjs:119:1'
-  failureType: 'testCodeFailure'
-  error: |-
-    Expected values to be strictly equal:
-    + actual - expected
-    
-    + 'undefined'
-    - 'function'
-    
-  code: 'ERR_ASSERTION'
-  name: 'AssertionError'
-  expected: 'function'
-  actual: 'undefined'
-  operator: 'strictEqual'
-  stack: |-
-    TestContext.<anonymous> (file:///home/runner/work/applypilot/applypilot/app/lib/previous-role-overview.test.mjs:121:10)
-    async Test.run (node:internal/test_runner/test:1054:7)
-    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
-  ...
-# Subtest: LIVE Search uses the profile-driven endpoint when a saved Union Search Plan exists
-ok 425 - LIVE Search uses the profile-driven endpoint when a saved Union Search Plan exists
-  ---
-  duration_ms: 1.008731
-  type: 'test'
-  ...
-# Subtest: LIVE Search keeps the frozen legacy endpoint as fallback
-ok 426 - LIVE Search keeps the frozen legacy endpoint as fallback
-  ---
-  duration_ms: 0.159407
-  type: 'test'
-  ...
-# Subtest: profile-driven LIVE endpoint exists separately from the frozen legacy endpoint
-ok 427 - profile-driven LIVE endpoint exists separately from the frozen legacy endpoint
-  ---
-  duration_ms: 0.180364
-  type: 'test'
-  ...
-# Subtest: 1 day means the current Denmark calendar day from 00:00, not yesterday
-ok 428 - 1 day means the current Denmark calendar day from 00:00, not yesterday
-  ---
---- lines 2821-2864 ---
+--- lines 2642-2685 ---
   ...
 # Subtest: review helpers accept current live LinkedIn result shape
 ok 435 - review helpers accept current live LinkedIn result shape
   ---
-  duration_ms: 0.956479
+  duration_ms: 1.010859
   type: 'test'
   ...
 # Subtest: merged UI restores Search Profile persistence without wiring it into LinkedIn search
 not ok 436 - merged UI restores Search Profile persistence without wiring it into LinkedIn search
   ---
-  duration_ms: 1.433129
+  duration_ms: 1.405102
   type: 'test'
   location: '/home/runner/work/applypilot/applypilot/app/lib/profile-review.test.mjs:77:1'
   failureType: 'testCodeFailure'
@@ -405,7 +147,7 @@ not ok 436 - merged UI restores Search Profile persistence without wiring it int
       "import AppliedJobsArchive from './components/applied-jobs-archive.js'\n" +
       "import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'\n" +
       "import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'\n" +
---- lines 2869-2970 ---
+--- lines 2690-2791 ---
       "import CvLibraryStep from './components/cv-library-step.js'\n" +
       "import SearchProfileRolesStep from './components/search-profile-roles-step.js'\n" +
       "import SearchPlanPreview from './components/search-plan-preview.js'\n" +
@@ -508,7 +250,7 @@ not ok 436 - merged UI restores Search Profile persistence without wiring it int
     import AppliedJobsArchive from './components/applied-jobs-archive.js'
     import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
     import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
---- lines 2975-3064 ---
+--- lines 2796-2885 ---
     import CvLibraryStep from './components/cv-library-step.js'
     import SearchProfileRolesStep from './components/search-profile-roles-step.js'
     import SearchPlanPreview from './components/search-plan-preview.js'
@@ -599,7 +341,7 @@ not ok 436 - merged UI restores Search Profile persistence without wiring it int
           }
           setProfile(hydrated)
           setDraft(hydrated)
---- lines 3104-3188 ---
+--- lines 2925-3009 ---
       const allReviewDecisionsMade=Boolean(currentAdaptationResult)&&reviewedCount===reviewChanges.length
       const selectedSourceDocx=activeAdaptationBaseline?sourceDocxFiles[activeAdaptationBaseline.sourceVersion]||null:null
       const profileCompletion=useMemo(()=>{
@@ -685,7 +427,7 @@ not ok 436 - merged UI restores Search Profile persistence without wiring it int
       function toggleJobFilter(setter,id){
         setter(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id])
       }
---- lines 3219-3266 ---
+--- lines 3040-3087 ---
         setConsultantPortals(current=>{
           const selected=current.selected.includes(id)?current.selected.filter(value=>value!==id):[...current.selected,id]
           return writeConsultantPortals(localStorage,{...current,selected})
@@ -734,7 +476,7 @@ not ok 436 - merged UI restores Search Profile persistence without wiring it int
           }
           const data=await res.json()
           if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
---- lines 3360-3553 ---
+--- lines 3181-3374 ---
           masterPoolSize:successful.reduce((sum,result)=>sum+Number(result.data.stats?.masterPoolSize??result.data.stats?.discovered??0),0),
           fullJdVerified:successful.reduce((sum,result)=>sum+Number(result.data.stats?.fullJdVerified??0),0),
           returned:mergedJobs.length,
@@ -929,7 +671,7 @@ not ok 436 - merged UI restores Search Profile persistence without wiring it int
       }
     
       function setDecision(blockId,value){
---- lines 3558-3631 ---
+--- lines 3379-3452 ---
     
       function acceptAll(){
         if(!activeAdaptationBaseline) return
@@ -1004,7 +746,7 @@ not ok 436 - merged UI restores Search Profile persistence without wiring it int
           {companyWatchOpen&&<div className="companyWatchList">
             {TARGET_COMPANIES.map(name=>{const connection=companyConnection(name);return <label key={name}><input type="checkbox" checked={companyWatch.selected.includes(name)} onChange={()=>toggleCompany(name)}/><span>{name}</span><small className={connection.status==='connected'?'ready':''}>{connection.status==='connected'?('Connected · '+connection.connector):'Connection pending'}</small></label>})}
           </div>}
---- lines 3768-3811 ---
+--- lines 3589-3632 ---
     Test.runInAsyncScope (node:async_hooks:214:14)
     Test.run (node:internal/test_runner/test:1047:25)
     Test.processPendingSubtests (node:internal/test_runner/test:744:18)
@@ -1015,7 +757,7 @@ not ok 436 - merged UI restores Search Profile persistence without wiring it int
 # Subtest: merged UI keeps Application Pack and exposes the direct M4 review flow
 not ok 437 - merged UI keeps Application Pack and exposes the direct M4 review flow
   ---
-  duration_ms: 1.407666
+  duration_ms: 1.557741
   type: 'test'
   location: '/home/runner/work/applypilot/applypilot/app/lib/profile-review.test.mjs:86:1'
   failureType: 'testCodeFailure'
@@ -1049,7 +791,7 @@ not ok 437 - merged UI keeps Application Pack and exposes the direct M4 review f
       "import AppliedJobsArchive from './components/applied-jobs-archive.js'\n" +
       "import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'\n" +
       "import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'\n" +
---- lines 3816-3917 ---
+--- lines 3637-3738 ---
       "import CvLibraryStep from './components/cv-library-step.js'\n" +
       "import SearchProfileRolesStep from './components/search-profile-roles-step.js'\n" +
       "import SearchPlanPreview from './components/search-plan-preview.js'\n" +
@@ -1152,7 +894,7 @@ not ok 437 - merged UI keeps Application Pack and exposes the direct M4 review f
     import AppliedJobsArchive from './components/applied-jobs-archive.js'
     import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
     import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
---- lines 3922-4011 ---
+--- lines 3743-3832 ---
     import CvLibraryStep from './components/cv-library-step.js'
     import SearchProfileRolesStep from './components/search-profile-roles-step.js'
     import SearchPlanPreview from './components/search-plan-preview.js'
@@ -1243,7 +985,7 @@ not ok 437 - merged UI keeps Application Pack and exposes the direct M4 review f
           }
           setProfile(hydrated)
           setDraft(hydrated)
---- lines 4051-4135 ---
+--- lines 3872-3956 ---
       const allReviewDecisionsMade=Boolean(currentAdaptationResult)&&reviewedCount===reviewChanges.length
       const selectedSourceDocx=activeAdaptationBaseline?sourceDocxFiles[activeAdaptationBaseline.sourceVersion]||null:null
       const profileCompletion=useMemo(()=>{
@@ -1329,7 +1071,7 @@ not ok 437 - merged UI keeps Application Pack and exposes the direct M4 review f
       function toggleJobFilter(setter,id){
         setter(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id])
       }
---- lines 4166-4213 ---
+--- lines 3987-4034 ---
         setConsultantPortals(current=>{
           const selected=current.selected.includes(id)?current.selected.filter(value=>value!==id):[...current.selected,id]
           return writeConsultantPortals(localStorage,{...current,selected})
@@ -1378,7 +1120,7 @@ not ok 437 - merged UI keeps Application Pack and exposes the direct M4 review f
           }
           const data=await res.json()
           if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
---- lines 4307-4500 ---
+--- lines 4128-4321 ---
           masterPoolSize:successful.reduce((sum,result)=>sum+Number(result.data.stats?.masterPoolSize??result.data.stats?.discovered??0),0),
           fullJdVerified:successful.reduce((sum,result)=>sum+Number(result.data.stats?.fullJdVerified??0),0),
           returned:mergedJobs.length,
@@ -1573,7 +1315,7 @@ not ok 437 - merged UI keeps Application Pack and exposes the direct M4 review f
       }
     
       function setDecision(blockId,value){
---- lines 4505-4578 ---
+--- lines 4326-4399 ---
     
       function acceptAll(){
         if(!activeAdaptationBaseline) return
@@ -1648,18 +1390,18 @@ not ok 437 - merged UI keeps Application Pack and exposes the direct M4 review f
           {companyWatchOpen&&<div className="companyWatchList">
             {TARGET_COMPANIES.map(name=>{const connection=companyConnection(name);return <label key={name}><input type="checkbox" checked={companyWatch.selected.includes(name)} onChange={()=>toggleCompany(name)}/><span>{name}</span><small className={connection.status==='connected'?'ready':''}>{connection.status==='connected'?('Connected · '+connection.connector):'Connection pending'}</small></label>})}
           </div>}
---- lines 4727-4770 ---
+--- lines 4548-4591 ---
   ...
 # Subtest: M4 CV review shows a neutral empty state when AI returns no changed block
 ok 439 - M4 CV review shows a neutral empty state when AI returns no changed block
   ---
-  duration_ms: 1.202991
+  duration_ms: 1.213794
   type: 'test'
   ...
 # Subtest: Source CV upload entry points keep the current five-step Search Profile flow
 not ok 440 - Source CV upload entry points keep the current five-step Search Profile flow
   ---
-  duration_ms: 1.105276
+  duration_ms: 1.401456
   type: 'test'
   location: '/home/runner/work/applypilot/applypilot/app/lib/profile-review.test.mjs:116:1'
   failureType: 'testCodeFailure'
@@ -1693,7 +1435,7 @@ not ok 440 - Source CV upload entry points keep the current five-step Search Pro
       "import AppliedJobsArchive from './components/applied-jobs-archive.js'\n" +
       "import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'\n" +
       "import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'\n" +
---- lines 4775-4876 ---
+--- lines 4596-4697 ---
       "import CvLibraryStep from './components/cv-library-step.js'\n" +
       "import SearchProfileRolesStep from './components/search-profile-roles-step.js'\n" +
       "import SearchPlanPreview from './components/search-plan-preview.js'\n" +
@@ -1796,7 +1538,7 @@ not ok 440 - Source CV upload entry points keep the current five-step Search Pro
     import AppliedJobsArchive from './components/applied-jobs-archive.js'
     import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
     import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
---- lines 4881-4970 ---
+--- lines 4702-4791 ---
     import CvLibraryStep from './components/cv-library-step.js'
     import SearchProfileRolesStep from './components/search-profile-roles-step.js'
     import SearchPlanPreview from './components/search-plan-preview.js'
@@ -1887,7 +1629,7 @@ not ok 440 - Source CV upload entry points keep the current five-step Search Pro
           }
           setProfile(hydrated)
           setDraft(hydrated)
---- lines 5010-5094 ---
+--- lines 4831-4915 ---
       const allReviewDecisionsMade=Boolean(currentAdaptationResult)&&reviewedCount===reviewChanges.length
       const selectedSourceDocx=activeAdaptationBaseline?sourceDocxFiles[activeAdaptationBaseline.sourceVersion]||null:null
       const profileCompletion=useMemo(()=>{
@@ -1973,7 +1715,7 @@ not ok 440 - Source CV upload entry points keep the current five-step Search Pro
       function toggleJobFilter(setter,id){
         setter(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id])
       }
---- lines 5125-5172 ---
+--- lines 4946-4993 ---
         setConsultantPortals(current=>{
           const selected=current.selected.includes(id)?current.selected.filter(value=>value!==id):[...current.selected,id]
           return writeConsultantPortals(localStorage,{...current,selected})
@@ -2022,7 +1764,7 @@ not ok 440 - Source CV upload entry points keep the current five-step Search Pro
           }
           const data=await res.json()
           if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
---- lines 5266-5459 ---
+--- lines 5087-5280 ---
           masterPoolSize:successful.reduce((sum,result)=>sum+Number(result.data.stats?.masterPoolSize??result.data.stats?.discovered??0),0),
           fullJdVerified:successful.reduce((sum,result)=>sum+Number(result.data.stats?.fullJdVerified??0),0),
           returned:mergedJobs.length,
@@ -2217,7 +1959,7 @@ not ok 440 - Source CV upload entry points keep the current five-step Search Pro
       }
     
       function setDecision(blockId,value){
---- lines 5464-5537 ---
+--- lines 5285-5358 ---
     
       function acceptAll(){
         if(!activeAdaptationBaseline) return
@@ -2292,18 +2034,18 @@ not ok 440 - Source CV upload entry points keep the current five-step Search Pro
           {companyWatchOpen&&<div className="companyWatchList">
             {TARGET_COMPANIES.map(name=>{const connection=companyConnection(name);return <label key={name}><input type="checkbox" checked={companyWatch.selected.includes(name)} onChange={()=>toggleCompany(name)}/><span>{name}</span><small className={connection.status==='connected'?'ready':''}>{connection.status==='connected'?('Connected · '+connection.connector):'Connection pending'}</small></label>})}
           </div>}
---- lines 5722-5780 ---
+--- lines 5543-5601 ---
   ...
 # Subtest: Version 2 Step 1 refuses a truncated legacy preview instead of tailoring a partial Summary
 ok 448 - Version 2 Step 1 refuses a truncated legacy preview instead of tailoring a partial Summary
   ---
-  duration_ms: 0.131608
+  duration_ms: 0.168052
   type: 'test'
   ...
 # Subtest: page promotes the saved Union Search Plan to LIVE while preserving legacy fallback payload
 not ok 449 - page promotes the saved Union Search Plan to LIVE while preserving legacy fallback payload
   ---
-  duration_ms: 7.820291
+  duration_ms: 8.290349
   type: 'test'
   location: '/home/runner/work/applypilot/applypilot/app/lib/profile-shadow-wiring.test.mjs:5:1'
   failureType: 'testCodeFailure'
@@ -2352,7 +2094,7 @@ not ok 449 - page promotes the saved Union Search Plan to LIVE while preserving 
       '      }\n' +
       '      const data=await res.json()\n' +
       "      if(!res.ok) throw new Error(data.error||'LinkedIn search failed')\n" +
---- lines 5874-5936 ---
+--- lines 5695-5757 ---
       '      masterPoolSize:successful.reduce((sum,result)=>sum+Number(result.data.stats?.masterPoolSize??result.data.stats?.discovered??0),0),\n' +
       '      fullJdVerified:successful.reduce((sum,result)=>sum+Number(result.data.stats?.fullJdVerified??0),0),\n' +
       '      returned:mergedJobs.length,\n' +
@@ -2416,7 +2158,7 @@ not ok 449 - page promotes the saved Union Search Plan to LIVE while preserving 
           }
           const data=await res.json()
           if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
---- lines 6030-6106 ---
+--- lines 5851-5927 ---
           masterPoolSize:successful.reduce((sum,result)=>sum+Number(result.data.stats?.masterPoolSize??result.data.stats?.discovered??0),0),
           fullJdVerified:successful.reduce((sum,result)=>sum+Number(result.data.stats?.fullJdVerified??0),0),
           returned:mergedJobs.length,
@@ -2442,25 +2184,25 @@ not ok 449 - page promotes the saved Union Search Plan to LIVE while preserving 
 # Subtest: parse-cv endpoint accepts resume uploads instead of being retired
 ok 450 - parse-cv endpoint accepts resume uploads instead of being retired
   ---
-  duration_ms: 0.806524
+  duration_ms: 0.990188
   type: 'test'
   ...
 # Subtest: Feature 2 UI persists the complete active Source CV and supports legacy migration
 ok 451 - Feature 2 UI persists the complete active Source CV and supports legacy migration
   ---
-  duration_ms: 0.211731
+  duration_ms: 0.242043
   type: 'test'
   ...
 # Subtest: Feature 2 retains the extracted Professional Summary separately from the short preview
 ok 452 - Feature 2 retains the extracted Professional Summary separately from the short preview
   ---
-  duration_ms: 0.117148
+  duration_ms: 0.146299
   type: 'test'
   ...
 # Subtest: right panel uses dedicated Expertise Match analysis and keeps the agreed vacancy header
 not ok 453 - right panel uses dedicated Expertise Match analysis and keeps the agreed vacancy header
   ---
-  duration_ms: 2.693607
+  duration_ms: 3.056263
   type: 'test'
   location: '/home/runner/work/applypilot/applypilot/app/lib/right-panel-expertise-ui.contract.test.mjs:8:1'
   failureType: 'testCodeFailure'
@@ -2494,7 +2236,7 @@ not ok 453 - right panel uses dedicated Expertise Match analysis and keeps the a
       "import AppliedJobsArchive from './components/applied-jobs-archive.js'\n" +
       "import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'\n" +
       "import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'\n" +
---- lines 6111-6212 ---
+--- lines 5932-6033 ---
       "import CvLibraryStep from './components/cv-library-step.js'\n" +
       "import SearchProfileRolesStep from './components/search-profile-roles-step.js'\n" +
       "import SearchPlanPreview from './components/search-plan-preview.js'\n" +
@@ -2597,7 +2339,7 @@ not ok 453 - right panel uses dedicated Expertise Match analysis and keeps the a
     import AppliedJobsArchive from './components/applied-jobs-archive.js'
     import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
     import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
---- lines 6217-6306 ---
+--- lines 6038-6127 ---
     import CvLibraryStep from './components/cv-library-step.js'
     import SearchProfileRolesStep from './components/search-profile-roles-step.js'
     import SearchPlanPreview from './components/search-plan-preview.js'
@@ -2688,7 +2430,7 @@ not ok 453 - right panel uses dedicated Expertise Match analysis and keeps the a
           }
           setProfile(hydrated)
           setDraft(hydrated)
---- lines 6346-6430 ---
+--- lines 6167-6251 ---
       const allReviewDecisionsMade=Boolean(currentAdaptationResult)&&reviewedCount===reviewChanges.length
       const selectedSourceDocx=activeAdaptationBaseline?sourceDocxFiles[activeAdaptationBaseline.sourceVersion]||null:null
       const profileCompletion=useMemo(()=>{
@@ -2774,7 +2516,7 @@ not ok 453 - right panel uses dedicated Expertise Match analysis and keeps the a
       function toggleJobFilter(setter,id){
         setter(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id])
       }
---- lines 6461-6508 ---
+--- lines 6282-6329 ---
         setConsultantPortals(current=>{
           const selected=current.selected.includes(id)?current.selected.filter(value=>value!==id):[...current.selected,id]
           return writeConsultantPortals(localStorage,{...current,selected})
@@ -2823,7 +2565,7 @@ not ok 453 - right panel uses dedicated Expertise Match analysis and keeps the a
           }
           const data=await res.json()
           if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
---- lines 6602-6795 ---
+--- lines 6423-6616 ---
           masterPoolSize:successful.reduce((sum,result)=>sum+Number(result.data.stats?.masterPoolSize??result.data.stats?.discovered??0),0),
           fullJdVerified:successful.reduce((sum,result)=>sum+Number(result.data.stats?.fullJdVerified??0),0),
           returned:mergedJobs.length,
@@ -3018,7 +2760,7 @@ not ok 453 - right panel uses dedicated Expertise Match analysis and keeps the a
       }
     
       function setDecision(blockId,value){
---- lines 6800-6873 ---
+--- lines 6621-6694 ---
     
       function acceptAll(){
         if(!activeAdaptationBaseline) return
@@ -3093,18 +2835,18 @@ not ok 453 - right panel uses dedicated Expertise Match analysis and keeps the a
           {companyWatchOpen&&<div className="companyWatchList">
             {TARGET_COMPANIES.map(name=>{const connection=companyConnection(name);return <label key={name}><input type="checkbox" checked={companyWatch.selected.includes(name)} onChange={()=>toggleCompany(name)}/><span>{name}</span><small className={connection.status==='connected'?'ready':''}>{connection.status==='connected'?('Connected · '+connection.connector):'Connection pending'}</small></label>})}
           </div>}
---- lines 7026-7069 ---
+--- lines 6847-6890 ---
   ...
 # Subtest: job conditions never alter Expertise Match
 ok 456 - job conditions never alter Expertise Match
   ---
-  duration_ms: 23.429388
+  duration_ms: 20.439065
   type: 'test'
   ...
 # Subtest: page wires API audit rows into a closed-by-default Search Audit component
 not ok 457 - page wires API audit rows into a closed-by-default Search Audit component
   ---
-  duration_ms: 5.175565
+  duration_ms: 8.39797
   type: 'test'
   location: '/home/runner/work/applypilot/applypilot/app/lib/search-audit-ui.contract.test.mjs:8:1'
   failureType: 'testCodeFailure'
@@ -3138,7 +2880,7 @@ not ok 457 - page wires API audit rows into a closed-by-default Search Audit com
       "import AppliedJobsArchive from './components/applied-jobs-archive.js'\n" +
       "import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'\n" +
       "import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'\n" +
---- lines 7074-7175 ---
+--- lines 6895-6996 ---
       "import CvLibraryStep from './components/cv-library-step.js'\n" +
       "import SearchProfileRolesStep from './components/search-profile-roles-step.js'\n" +
       "import SearchPlanPreview from './components/search-plan-preview.js'\n" +
@@ -3241,7 +2983,7 @@ not ok 457 - page wires API audit rows into a closed-by-default Search Audit com
     import AppliedJobsArchive from './components/applied-jobs-archive.js'
     import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
     import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
---- lines 7180-7269 ---
+--- lines 7001-7090 ---
     import CvLibraryStep from './components/cv-library-step.js'
     import SearchProfileRolesStep from './components/search-profile-roles-step.js'
     import SearchPlanPreview from './components/search-plan-preview.js'
@@ -3332,7 +3074,7 @@ not ok 457 - page wires API audit rows into a closed-by-default Search Audit com
           }
           setProfile(hydrated)
           setDraft(hydrated)
---- lines 7309-7393 ---
+--- lines 7130-7214 ---
       const allReviewDecisionsMade=Boolean(currentAdaptationResult)&&reviewedCount===reviewChanges.length
       const selectedSourceDocx=activeAdaptationBaseline?sourceDocxFiles[activeAdaptationBaseline.sourceVersion]||null:null
       const profileCompletion=useMemo(()=>{
@@ -3418,7 +3160,7 @@ not ok 457 - page wires API audit rows into a closed-by-default Search Audit com
       function toggleJobFilter(setter,id){
         setter(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id])
       }
---- lines 7424-7471 ---
+--- lines 7245-7292 ---
         setConsultantPortals(current=>{
           const selected=current.selected.includes(id)?current.selected.filter(value=>value!==id):[...current.selected,id]
           return writeConsultantPortals(localStorage,{...current,selected})
@@ -3467,7 +3209,7 @@ not ok 457 - page wires API audit rows into a closed-by-default Search Audit com
           }
           const data=await res.json()
           if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
---- lines 7565-7758 ---
+--- lines 7386-7579 ---
           masterPoolSize:successful.reduce((sum,result)=>sum+Number(result.data.stats?.masterPoolSize??result.data.stats?.discovered??0),0),
           fullJdVerified:successful.reduce((sum,result)=>sum+Number(result.data.stats?.fullJdVerified??0),0),
           returned:mergedJobs.length,
@@ -3662,7 +3404,7 @@ not ok 457 - page wires API audit rows into a closed-by-default Search Audit com
       }
     
       function setDecision(blockId,value){
---- lines 7763-7836 ---
+--- lines 7584-7657 ---
     
       function acceptAll(){
         if(!activeAdaptationBaseline) return
@@ -3737,18 +3479,18 @@ not ok 457 - page wires API audit rows into a closed-by-default Search Audit com
           {companyWatchOpen&&<div className="companyWatchList">
             {TARGET_COMPANIES.map(name=>{const connection=companyConnection(name);return <label key={name}><input type="checkbox" checked={companyWatch.selected.includes(name)} onChange={()=>toggleCompany(name)}/><span>{name}</span><small className={connection.status==='connected'?'ready':''}>{connection.status==='connected'?('Connected · '+connection.connector):'Connection pending'}</small></label>})}
           </div>}
---- lines 8041-8084 ---
+--- lines 7862-7905 ---
   ...
 # Subtest: blank exclusions use zero AI calls
 ok 469 - blank exclusions use zero AI calls
   ---
-  duration_ms: 0.238643
+  duration_ms: 0.244347
   type: 'test'
   ...
 # Subtest: custom exclusions are compiled only on Save profile and then passed to profile-driven LIVE Search
 not ok 470 - custom exclusions are compiled only on Save profile and then passed to profile-driven LIVE Search
   ---
-  duration_ms: 4.016588
+  duration_ms: 4.375966
   type: 'test'
   location: '/home/runner/work/applypilot/applypilot/app/lib/search-profile-exclusions-save-ui.test.mjs:5:1'
   failureType: 'testCodeFailure'
@@ -3782,7 +3524,7 @@ not ok 470 - custom exclusions are compiled only on Save profile and then passed
       "import AppliedJobsArchive from './components/applied-jobs-archive.js'\n" +
       "import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'\n" +
       "import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'\n" +
---- lines 8089-8190 ---
+--- lines 7910-8011 ---
       "import CvLibraryStep from './components/cv-library-step.js'\n" +
       "import SearchProfileRolesStep from './components/search-profile-roles-step.js'\n" +
       "import SearchPlanPreview from './components/search-plan-preview.js'\n" +
@@ -3885,7 +3627,7 @@ not ok 470 - custom exclusions are compiled only on Save profile and then passed
     import AppliedJobsArchive from './components/applied-jobs-archive.js'
     import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
     import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
---- lines 8195-8284 ---
+--- lines 8016-8105 ---
     import CvLibraryStep from './components/cv-library-step.js'
     import SearchProfileRolesStep from './components/search-profile-roles-step.js'
     import SearchPlanPreview from './components/search-plan-preview.js'
@@ -3976,7 +3718,7 @@ not ok 470 - custom exclusions are compiled only on Save profile and then passed
           }
           setProfile(hydrated)
           setDraft(hydrated)
---- lines 8324-8408 ---
+--- lines 8145-8229 ---
       const allReviewDecisionsMade=Boolean(currentAdaptationResult)&&reviewedCount===reviewChanges.length
       const selectedSourceDocx=activeAdaptationBaseline?sourceDocxFiles[activeAdaptationBaseline.sourceVersion]||null:null
       const profileCompletion=useMemo(()=>{
@@ -4062,7 +3804,7 @@ not ok 470 - custom exclusions are compiled only on Save profile and then passed
       function toggleJobFilter(setter,id){
         setter(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id])
       }
---- lines 8439-8486 ---
+--- lines 8260-8307 ---
         setConsultantPortals(current=>{
           const selected=current.selected.includes(id)?current.selected.filter(value=>value!==id):[...current.selected,id]
           return writeConsultantPortals(localStorage,{...current,selected})
@@ -4111,7 +3853,7 @@ not ok 470 - custom exclusions are compiled only on Save profile and then passed
           }
           const data=await res.json()
           if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
---- lines 8580-8773 ---
+--- lines 8401-8594 ---
           masterPoolSize:successful.reduce((sum,result)=>sum+Number(result.data.stats?.masterPoolSize??result.data.stats?.discovered??0),0),
           fullJdVerified:successful.reduce((sum,result)=>sum+Number(result.data.stats?.fullJdVerified??0),0),
           returned:mergedJobs.length,
@@ -4306,7 +4048,7 @@ not ok 470 - custom exclusions are compiled only on Save profile and then passed
       }
     
       function setDecision(blockId,value){
---- lines 8778-8851 ---
+--- lines 8599-8672 ---
     
       function acceptAll(){
         if(!activeAdaptationBaseline) return
@@ -4381,18 +4123,18 @@ not ok 470 - custom exclusions are compiled only on Save profile and then passed
           {companyWatchOpen&&<div className="companyWatchList">
             {TARGET_COMPANIES.map(name=>{const connection=companyConnection(name);return <label key={name}><input type="checkbox" checked={companyWatch.selected.includes(name)} onChange={()=>toggleCompany(name)}/><span>{name}</span><small className={connection.status==='connected'?'ready':''}>{connection.status==='connected'?('Connected · '+connection.connector):'Connection pending'}</small></label>})}
           </div>}
---- lines 9046-9089 ---
+--- lines 8867-8910 ---
   ...
 # Subtest: library fingerprint is stable by slot and changes only with CV membership/sourceVersion or builder version
 ok 480 - library fingerprint is stable by slot and changes only with CV membership/sourceVersion or builder version
   ---
-  duration_ms: 0.254432
+  duration_ms: 0.310627
   type: 'test'
   ...
 # Subtest: Search Profile wizard has five steps and no salary screen or salary scoring label
 not ok 481 - Search Profile wizard has five steps and no salary screen or salary scoring label
   ---
-  duration_ms: 3.629418
+  duration_ms: 4.229426
   type: 'test'
   location: '/home/runner/work/applypilot/applypilot/app/lib/search-profile-no-salary-ui.test.mjs:5:1'
   failureType: 'testCodeFailure'
@@ -4426,7 +4168,7 @@ not ok 481 - Search Profile wizard has five steps and no salary screen or salary
       "import AppliedJobsArchive from './components/applied-jobs-archive.js'\n" +
       "import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'\n" +
       "import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'\n" +
---- lines 9094-9195 ---
+--- lines 8915-9016 ---
       "import CvLibraryStep from './components/cv-library-step.js'\n" +
       "import SearchProfileRolesStep from './components/search-profile-roles-step.js'\n" +
       "import SearchPlanPreview from './components/search-plan-preview.js'\n" +
@@ -4529,7 +4271,7 @@ not ok 481 - Search Profile wizard has five steps and no salary screen or salary
     import AppliedJobsArchive from './components/applied-jobs-archive.js'
     import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
     import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
---- lines 9200-9289 ---
+--- lines 9021-9110 ---
     import CvLibraryStep from './components/cv-library-step.js'
     import SearchProfileRolesStep from './components/search-profile-roles-step.js'
     import SearchPlanPreview from './components/search-plan-preview.js'
@@ -4620,7 +4362,7 @@ not ok 481 - Search Profile wizard has five steps and no salary screen or salary
           }
           setProfile(hydrated)
           setDraft(hydrated)
---- lines 9329-9413 ---
+--- lines 9150-9234 ---
       const allReviewDecisionsMade=Boolean(currentAdaptationResult)&&reviewedCount===reviewChanges.length
       const selectedSourceDocx=activeAdaptationBaseline?sourceDocxFiles[activeAdaptationBaseline.sourceVersion]||null:null
       const profileCompletion=useMemo(()=>{
@@ -4706,7 +4448,7 @@ not ok 481 - Search Profile wizard has five steps and no salary screen or salary
       function toggleJobFilter(setter,id){
         setter(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id])
       }
---- lines 9444-9491 ---
+--- lines 9265-9312 ---
         setConsultantPortals(current=>{
           const selected=current.selected.includes(id)?current.selected.filter(value=>value!==id):[...current.selected,id]
           return writeConsultantPortals(localStorage,{...current,selected})
@@ -4755,7 +4497,7 @@ not ok 481 - Search Profile wizard has five steps and no salary screen or salary
           }
           const data=await res.json()
           if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
---- lines 9585-9778 ---
+--- lines 9406-9599 ---
           masterPoolSize:successful.reduce((sum,result)=>sum+Number(result.data.stats?.masterPoolSize??result.data.stats?.discovered??0),0),
           fullJdVerified:successful.reduce((sum,result)=>sum+Number(result.data.stats?.fullJdVerified??0),0),
           returned:mergedJobs.length,
@@ -4950,7 +4692,7 @@ not ok 481 - Search Profile wizard has five steps and no salary screen or salary
       }
     
       function setDecision(blockId,value){
---- lines 9783-9856 ---
+--- lines 9604-9677 ---
     
       function acceptAll(){
         if(!activeAdaptationBaseline) return
@@ -5025,18 +4767,18 @@ not ok 481 - Search Profile wizard has five steps and no salary screen or salary
           {companyWatchOpen&&<div className="companyWatchList">
             {TARGET_COMPANIES.map(name=>{const connection=companyConnection(name);return <label key={name}><input type="checkbox" checked={companyWatch.selected.includes(name)} onChange={()=>toggleCompany(name)}/><span>{name}</span><small className={connection.status==='connected'?'ready':''}>{connection.status==='connected'?('Connected · '+connection.connector):'Connection pending'}</small></label>})}
           </div>}
---- lines 10021-10064 ---
+--- lines 9842-9885 ---
   ...
 # Subtest: Search Profile step 2 combines all ready CVs while legacy Search keeps CV 1
 ok 486 - Search Profile step 2 combines all ready CVs while legacy Search keeps CV 1
   ---
-  duration_ms: 2.736911
+  duration_ms: 2.493733
   type: 'test'
   ...
 # Subtest: Search Profile Step 3 separates location from work model
 not ok 487 - Search Profile Step 3 separates location from work model
   ---
-  duration_ms: 3.637569
+  duration_ms: 4.732161
   type: 'test'
   location: '/home/runner/work/applypilot/applypilot/app/lib/search-profile-step3-ui-contract.test.mjs:5:1'
   failureType: 'testCodeFailure'
@@ -5070,7 +4812,7 @@ not ok 487 - Search Profile Step 3 separates location from work model
       "import AppliedJobsArchive from './components/applied-jobs-archive.js'\n" +
       "import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'\n" +
       "import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'\n" +
---- lines 10069-10170 ---
+--- lines 9890-9991 ---
       "import CvLibraryStep from './components/cv-library-step.js'\n" +
       "import SearchProfileRolesStep from './components/search-profile-roles-step.js'\n" +
       "import SearchPlanPreview from './components/search-plan-preview.js'\n" +
@@ -5173,7 +4915,7 @@ not ok 487 - Search Profile Step 3 separates location from work model
     import AppliedJobsArchive from './components/applied-jobs-archive.js'
     import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
     import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
---- lines 10175-10264 ---
+--- lines 9996-10085 ---
     import CvLibraryStep from './components/cv-library-step.js'
     import SearchProfileRolesStep from './components/search-profile-roles-step.js'
     import SearchPlanPreview from './components/search-plan-preview.js'
@@ -5264,7 +5006,7 @@ not ok 487 - Search Profile Step 3 separates location from work model
           }
           setProfile(hydrated)
           setDraft(hydrated)
---- lines 10304-10388 ---
+--- lines 10125-10209 ---
       const allReviewDecisionsMade=Boolean(currentAdaptationResult)&&reviewedCount===reviewChanges.length
       const selectedSourceDocx=activeAdaptationBaseline?sourceDocxFiles[activeAdaptationBaseline.sourceVersion]||null:null
       const profileCompletion=useMemo(()=>{
@@ -5350,7 +5092,7 @@ not ok 487 - Search Profile Step 3 separates location from work model
       function toggleJobFilter(setter,id){
         setter(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id])
       }
---- lines 10419-10466 ---
+--- lines 10240-10287 ---
         setConsultantPortals(current=>{
           const selected=current.selected.includes(id)?current.selected.filter(value=>value!==id):[...current.selected,id]
           return writeConsultantPortals(localStorage,{...current,selected})
@@ -5399,7 +5141,7 @@ not ok 487 - Search Profile Step 3 separates location from work model
           }
           const data=await res.json()
           if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
---- lines 10560-10753 ---
+--- lines 10381-10574 ---
           masterPoolSize:successful.reduce((sum,result)=>sum+Number(result.data.stats?.masterPoolSize??result.data.stats?.discovered??0),0),
           fullJdVerified:successful.reduce((sum,result)=>sum+Number(result.data.stats?.fullJdVerified??0),0),
           returned:mergedJobs.length,
@@ -5594,7 +5336,7 @@ not ok 487 - Search Profile Step 3 separates location from work model
       }
     
       function setDecision(blockId,value){
---- lines 10758-10831 ---
+--- lines 10579-10652 ---
     
       function acceptAll(){
         if(!activeAdaptationBaseline) return
@@ -5669,18 +5411,18 @@ not ok 487 - Search Profile Step 3 separates location from work model
           {companyWatchOpen&&<div className="companyWatchList">
             {TARGET_COMPANIES.map(name=>{const connection=companyConnection(name);return <label key={name}><input type="checkbox" checked={companyWatch.selected.includes(name)} onChange={()=>toggleCompany(name)}/><span>{name}</span><small className={connection.status==='connected'?'ready':''}>{connection.status==='connected'?('Connected · '+connection.connector):'Connection pending'}</small></label>})}
           </div>}
---- lines 11296-11354 ---
+--- lines 11117-11175 ---
   ...
 # Subtest: page wires the edited draft into a saved Union Search Plan preview
 ok 542 - page wires the edited draft into a saved Union Search Plan preview
   ---
-  duration_ms: 5.240125
+  duration_ms: 6.923334
   type: 'test'
   ...
 # Subtest: saved Union Search Plan drives profile LIVE while legacy fallback stays isolated
 not ok 543 - saved Union Search Plan drives profile LIVE while legacy fallback stays isolated
   ---
-  duration_ms: 4.001891
+  duration_ms: 5.604698
   type: 'test'
   location: '/home/runner/work/applypilot/applypilot/app/lib/union-search-plan-wiring.test.mjs:22:1'
   failureType: 'testCodeFailure'
@@ -5729,7 +5471,7 @@ not ok 543 - saved Union Search Plan drives profile LIVE while legacy fallback s
       '      }\n' +
       '      const data=await res.json()\n' +
       "      if(!res.ok) throw new Error(data.error||'LinkedIn search failed')\n" +
---- lines 11448-11510 ---
+--- lines 11269-11331 ---
       '      masterPoolSize:successful.reduce((sum,result)=>sum+Number(result.data.stats?.masterPoolSize??result.data.stats?.discovered??0),0),\n' +
       '      fullJdVerified:successful.reduce((sum,result)=>sum+Number(result.data.stats?.fullJdVerified??0),0),\n' +
       '      returned:mergedJobs.length,\n' +
@@ -5793,7 +5535,7 @@ not ok 543 - saved Union Search Plan drives profile LIVE while legacy fallback s
           }
           const data=await res.json()
           if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
---- lines 11604-11647 ---
+--- lines 11425-11468 ---
           masterPoolSize:successful.reduce((sum,result)=>sum+Number(result.data.stats?.masterPoolSize??result.data.stats?.discovered??0),0),
           fullJdVerified:successful.reduce((sum,result)=>sum+Number(result.data.stats?.fullJdVerified??0),0),
           returned:mergedJobs.length,
@@ -5819,37 +5561,37 @@ not ok 543 - saved Union Search Plan drives profile LIVE while legacy fallback s
 # Subtest: compiles edited roles in primary-then-adjacent order and primary wins duplicates
 ok 544 - compiles edited roles in primary-then-adjacent order and primary wins duplicates
   ---
-  duration_ms: 1.877888
+  duration_ms: 2.653367
   type: 'test'
   ...
 # Subtest: removed raw CV-proposed roles do not survive the edited plan
 ok 545 - removed raw CV-proposed roles do not survive the edited plan
   ---
-  duration_ms: 1.102772
+  duration_ms: 1.522148
   type: 'test'
   ...
 # Subtest: manual roles are preserved without invented CV provenance
 ok 546 - manual roles are preserved without invented CV provenance
   ---
-  duration_ms: 0.265131
+  duration_ms: 0.351028
   type: 'test'
   ...
 # Subtest: CV-supported roles preserve all supporting CV ids, slots and raw support kinds
 ok 547 - CV-supported roles preserve all supporting CV ids, slots and raw support kinds
   ---
-  duration_ms: 0.244837
---- lines 11745-11788 ---
+  duration_ms: 0.352519
+--- lines 11566-11609 ---
   ...
 # Subtest: CV Update Review keeps a focused ORIGINAL UPDATED review without the obsolete Truth Guard panel
 ok 564 - CV Update Review keeps a focused ORIGINAL UPDATED review without the obsolete Truth Guard panel
   ---
-  duration_ms: 0.405017
+  duration_ms: 0.403657
   type: 'test'
   ...
 # Subtest: review cards show Original, Updated, Why changed and independent decisions
 not ok 565 - review cards show Original, Updated, Why changed and independent decisions
   ---
-  duration_ms: 1.958722
+  duration_ms: 2.356011
   type: 'test'
   location: '/home/runner/work/applypilot/applypilot/app/lib/v16-cv-review.contract.test.mjs:24:1'
   failureType: 'testCodeFailure'
@@ -5883,7 +5625,7 @@ not ok 565 - review cards show Original, Updated, Why changed and independent de
       "import AppliedJobsArchive from './components/applied-jobs-archive.js'\n" +
       "import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'\n" +
       "import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'\n" +
---- lines 11793-11894 ---
+--- lines 11614-11715 ---
       "import CvLibraryStep from './components/cv-library-step.js'\n" +
       "import SearchProfileRolesStep from './components/search-profile-roles-step.js'\n" +
       "import SearchPlanPreview from './components/search-plan-preview.js'\n" +
@@ -5986,7 +5728,7 @@ not ok 565 - review cards show Original, Updated, Why changed and independent de
     import AppliedJobsArchive from './components/applied-jobs-archive.js'
     import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
     import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
---- lines 11899-11988 ---
+--- lines 11720-11809 ---
     import CvLibraryStep from './components/cv-library-step.js'
     import SearchProfileRolesStep from './components/search-profile-roles-step.js'
     import SearchPlanPreview from './components/search-plan-preview.js'
@@ -6077,7 +5819,7 @@ not ok 565 - review cards show Original, Updated, Why changed and independent de
           }
           setProfile(hydrated)
           setDraft(hydrated)
---- lines 12028-12112 ---
+--- lines 11849-11933 ---
       const allReviewDecisionsMade=Boolean(currentAdaptationResult)&&reviewedCount===reviewChanges.length
       const selectedSourceDocx=activeAdaptationBaseline?sourceDocxFiles[activeAdaptationBaseline.sourceVersion]||null:null
       const profileCompletion=useMemo(()=>{
@@ -6163,7 +5905,7 @@ not ok 565 - review cards show Original, Updated, Why changed and independent de
       function toggleJobFilter(setter,id){
         setter(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id])
       }
---- lines 12143-12190 ---
+--- lines 11964-12011 ---
         setConsultantPortals(current=>{
           const selected=current.selected.includes(id)?current.selected.filter(value=>value!==id):[...current.selected,id]
           return writeConsultantPortals(localStorage,{...current,selected})
@@ -6212,7 +5954,7 @@ not ok 565 - review cards show Original, Updated, Why changed and independent de
           }
           const data=await res.json()
           if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
---- lines 12284-12477 ---
+--- lines 12105-12298 ---
           masterPoolSize:successful.reduce((sum,result)=>sum+Number(result.data.stats?.masterPoolSize??result.data.stats?.discovered??0),0),
           fullJdVerified:successful.reduce((sum,result)=>sum+Number(result.data.stats?.fullJdVerified??0),0),
           returned:mergedJobs.length,
@@ -6407,7 +6149,7 @@ not ok 565 - review cards show Original, Updated, Why changed and independent de
       }
     
       function setDecision(blockId,value){
---- lines 12482-12555 ---
+--- lines 12303-12376 ---
     
       function acceptAll(){
         if(!activeAdaptationBaseline) return
@@ -6490,13 +6232,13 @@ exit_code=1
 # Subtest: the mistaken floating company discovery drawer is absent
 ok 98 - the mistaken floating company discovery drawer is absent
   ---
-  duration_ms: 0.156111
+  duration_ms: 0.192969
   type: 'test'
   ...
 # Subtest: Step 5 labels CV1 explicitly as the Primary Search CV
 not ok 99 - Step 5 labels CV1 explicitly as the Primary Search CV
   ---
-  duration_ms: 2.634216
+  duration_ms: 2.657013
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/cosmetic-ui.contract.test.mjs:8:1'
   failureType: 'testCodeFailure'
@@ -7133,13 +6875,13 @@ not ok 99 - Step 5 labels CV1 explicitly as the Primary Search CV
 # Subtest: Accept and Keep handlers mutate decision state only, not CV Library or Source CV
 ok 129 - Accept and Keep handlers mutate decision state only, not CV Library or Source CV
   ---
-  duration_ms: 0.371516
+  duration_ms: 0.329435
   type: 'test'
   ...
 # Subtest: review UI renders the three-block contract and WHY CHANGED from direct AI review blocks
 not ok 130 - review UI renders the three-block contract and WHY CHANGED from direct AI review blocks
   ---
-  duration_ms: 1.692411
+  duration_ms: 1.462708
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/cv-adaptation-review-ui.contract.test.mjs:41:1'
   failureType: 'testCodeFailure'
@@ -7776,13 +7518,13 @@ not ok 130 - review UI renders the three-block contract and WHY CHANGED from dir
 # Subtest: Help opens in a separate tab from the authenticated app utility navigation
 ok 224 - Help opens in a separate tab from the authenticated app utility navigation
   ---
-  duration_ms: 5.757211
+  duration_ms: 6.171884
   type: 'test'
   ...
 # Subtest: Help page covers the complete MVP user flow and current screenshot
 not ok 225 - Help page covers the complete MVP user flow and current screenshot
   ---
-  duration_ms: 3.148846
+  duration_ms: 5.032246
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/help-page.contract.test.mjs:17:1'
   failureType: 'testCodeFailure'
@@ -7861,13 +7603,13 @@ not ok 225 - Help page covers the complete MVP user flow and current screenshot
 # Subtest: manual job statuses are local informational metadata with three explicit states
 ok 248 - manual job statuses are local informational metadata with three explicit states
   ---
-  duration_ms: 0.846053
+  duration_ms: 1.455928
   type: 'test'
   ...
 # Subtest: manual job statuses never enter Search and only filter the post-search list
 not ok 249 - manual job statuses never enter Search and only filter the post-search list
   ---
-  duration_ms: 2.099804
+  duration_ms: 2.305945
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/job-list-ui-milestone.contract.test.mjs:26:1'
   failureType: 'testCodeFailure'
@@ -8010,19 +7752,19 @@ not ok 249 - manual job statuses never enter Search and only filter the post-sea
 # Subtest: Area, Employment type and Work model render directly under the vacancy header before Best CV
 ok 250 - Area, Employment type and Work model render directly under the vacancy header before Best CV
   ---
-  duration_ms: 0.220028
+  duration_ms: 0.269756
   type: 'test'
   ...
 # Subtest: All filters is the first filter row and controls only Search Areas and Work Model
 ok 251 - All filters is the first filter row and controls only Search Areas and Work Model
   ---
-  duration_ms: 0.254077
+  duration_ms: 0.325359
   type: 'test'
   ...
 # Subtest: Status is a third independent filter group and replaces Show ignored
 ok 252 - Status is a third independent filter group and replaces Show ignored
   ---
-  duration_ms: 0.270437
+  duration_ms: 0.305939
   type: 'test'
   ...
 --- lines 4323-4372 ---
@@ -8030,13 +7772,13 @@ ok 252 - Status is a third independent filter group and replaces Show ignored
 # Subtest: profile-driven search returns legacy-compatible result shape and full-JD statistics
 ok 292 - profile-driven search returns legacy-compatible result shape and full-JD statistics
   ---
-  duration_ms: 21.794661
+  duration_ms: 24.595779
   type: 'test'
   ...
 # Subtest: 7-day profile discovery uses repeated deep LinkedIn pages instead of shadow start=0 only
 not ok 293 - 7-day profile discovery uses repeated deep LinkedIn pages instead of shadow start=0 only
   ---
-  duration_ms: 7.085037
+  duration_ms: 7.579659
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/linkedin-profile-search.test.mjs:82:1'
   failureType: 'testCodeFailure'
@@ -8058,19 +7800,19 @@ not ok 293 - 7-day profile discovery uses repeated deep LinkedIn pages instead o
 # Subtest: role evaluation uses the full approved Search Profile, not only the discovery path
 ok 294 - role evaluation uses the full approved Search Profile, not only the discovery path
   ---
-  duration_ms: 1.690988
+  duration_ms: 2.12321
   type: 'test'
   ...
 # Subtest: same verified job and Search Profile keep the same role decision and score across different discovery paths
 ok 295 - same verified job and Search Profile keep the same role decision and score across different discovery paths
   ---
-  duration_ms: 2.637753
+  duration_ms: 3.505367
   type: 'test'
   ...
 # Subtest: each freshness view performs fresh LinkedIn discovery for its selected window
 ok 296 - each freshness view performs fresh LinkedIn discovery for its selected window
   ---
-  duration_ms: 3.854482
+  duration_ms: 5.21081
   type: 'test'
   ...
 # Subtest: 1/3/7/14-day views are local subsets over the same discovered jobs
@@ -8081,13 +7823,13 @@ ok 297 - 1/3/7/14-day views are local subsets over the same discovered jobs
 # Subtest: exact Technical Project Manager in a non-enterprise engineering context is demoted but kept
 ok 304 - exact Technical Project Manager in a non-enterprise engineering context is demoted but kept
   ---
-  duration_ms: 1.546285
+  duration_ms: 1.272422
   type: 'test'
   ...
 # Subtest: exact Technical Project Manager with strong enterprise IT context remains High
 not ok 305 - exact Technical Project Manager with strong enterprise IT context remains High
   ---
-  duration_ms: 1.627167
+  duration_ms: 1.037659
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/linkedin-profile-search.test.mjs:391:1'
   failureType: 'testCodeFailure'
@@ -8109,19 +7851,19 @@ not ok 305 - exact Technical Project Manager with strong enterprise IT context r
 # Subtest: specialist adjacent Implementation Manager remains visible but payroll context lowers top-score inflation
 ok 306 - specialist adjacent Implementation Manager remains visible but payroll context lowers top-score inflation
   ---
-  duration_ms: 1.318163
+  duration_ms: 1.901067
   type: 'test'
   ...
 # Subtest: generic hands-on engineer titles are rejected before JD fetch
 ok 307 - generic hands-on engineer titles are rejected before JD fetch
   ---
-  duration_ms: 3.404162
+  duration_ms: 4.892291
   type: 'test'
   ...
 # Subtest: director and stream-owner career tracks are rejected before JD fetch
 ok 308 - director and stream-owner career tracks are rejected before JD fetch
   ---
-  duration_ms: 0.382185
+  duration_ms: 0.556997
   type: 'test'
   ...
 # Subtest: people-manager hybrid title is rejected even though it contains Project Manager
@@ -8132,13 +7874,13 @@ ok 309 - people-manager hybrid title is rejected even though it contains Project
 # Subtest: audit helper allow-list cannot copy CV or JD source payloads
 ok 335 - audit helper allow-list cannot copy CV or JD source payloads
   ---
-  duration_ms: 1.545675
+  duration_ms: 2.540197
   type: 'test'
   ...
 # Subtest: creates a privacy-safe discovery audit record
 not ok 336 - creates a privacy-safe discovery audit record
   ---
-  duration_ms: 3.002091
+  duration_ms: 3.306509
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/linkedin-search-audit.test.mjs:5:1'
   failureType: 'testCodeFailure'
@@ -8186,7 +7928,7 @@ not ok 336 - creates a privacy-safe discovery audit record
 # Subtest: updates one audit record without leaking arbitrary source fields
 not ok 337 - updates one audit record without leaking arbitrary source fields
   ---
-  duration_ms: 0.821625
+  duration_ms: 0.904148
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/linkedin-search-audit.test.mjs:13:1'
   failureType: 'testCodeFailure'
@@ -8241,13 +7983,13 @@ not ok 337 - updates one audit record without leaking arbitrary source fields
 # Subtest: requestPreviousRoleOverview fails safely if the previous-role stage is rejected
 ok 398 - requestPreviousRoleOverview fails safely if the previous-role stage is rejected
   ---
-  duration_ms: 1.115878
+  duration_ms: 1.513534
   type: 'test'
   ...
 # Subtest: writePreviousRoleOverview uses only evidence from the detected previous employment section
 not ok 399 - writePreviousRoleOverview uses only evidence from the detected previous employment section
   ---
-  duration_ms: 3.907185
+  duration_ms: 6.21612
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/previous-role-overview.test.mjs:54:1'
   failureType: 'testCodeFailure'
@@ -8271,7 +8013,7 @@ not ok 399 - writePreviousRoleOverview uses only evidence from the detected prev
 # Subtest: writePreviousRoleOverview rejects evidence IDs from the latest employment role
 not ok 400 - writePreviousRoleOverview rejects evidence IDs from the latest employment role
   ---
-  duration_ms: 0.39869
+  duration_ms: 0.593673
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/previous-role-overview.test.mjs:86:1'
   failureType: 'testCodeFailure'
@@ -8295,7 +8037,7 @@ not ok 400 - writePreviousRoleOverview rejects evidence IDs from the latest empl
 # Subtest: writePreviousRoleOverview rejects numbers absent from previous-role evidence
 not ok 401 - writePreviousRoleOverview rejects numbers absent from previous-role evidence
   ---
-  duration_ms: 0.332055
+  duration_ms: 0.482625
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/previous-role-overview.test.mjs:98:1'
   failureType: 'testCodeFailure'
@@ -8319,7 +8061,7 @@ not ok 401 - writePreviousRoleOverview rejects numbers absent from previous-role
 # Subtest: writePreviousRoleOverview enforces the existing previous-role overview length window
 not ok 402 - writePreviousRoleOverview enforces the existing previous-role overview length window
   ---
-  duration_ms: 0.373576
+  duration_ms: 0.490467
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/previous-role-overview.test.mjs:110:1'
   failureType: 'testCodeFailure'
@@ -8343,7 +8085,7 @@ not ok 402 - writePreviousRoleOverview enforces the existing previous-role overv
 # Subtest: writePreviousRoleOverview returns unavailable when the selected CV has no previous role
 not ok 403 - writePreviousRoleOverview returns unavailable when the selected CV has no previous role
   ---
-  duration_ms: 1.354918
+  duration_ms: 0.554554
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/previous-role-overview.test.mjs:119:1'
   failureType: 'testCodeFailure'
@@ -8367,19 +8109,19 @@ not ok 403 - writePreviousRoleOverview returns unavailable when the selected CV 
 # Subtest: LIVE Search uses the profile-driven endpoint when a saved Union Search Plan exists
 ok 404 - LIVE Search uses the profile-driven endpoint when a saved Union Search Plan exists
   ---
-  duration_ms: 2.184361
+  duration_ms: 1.74395
   type: 'test'
   ...
 # Subtest: LIVE Search keeps the frozen legacy endpoint as fallback
 ok 405 - LIVE Search keeps the frozen legacy endpoint as fallback
   ---
-  duration_ms: 0.178637
+  duration_ms: 0.146641
   type: 'test'
   ...
 # Subtest: profile-driven LIVE endpoint exists separately from the frozen legacy endpoint
 ok 406 - profile-driven LIVE endpoint exists separately from the frozen legacy endpoint
   ---
-  duration_ms: 0.267162
+  duration_ms: 0.242494
   type: 'test'
   ...
 # Subtest: 1 day means the current Denmark calendar day from 00:00, not yesterday
@@ -8390,13 +8132,13 @@ ok 407 - 1 day means the current Denmark calendar day from 00:00, not yesterday
 # Subtest: review helpers accept current live LinkedIn result shape
 ok 414 - review helpers accept current live LinkedIn result shape
   ---
-  duration_ms: 0.951751
+  duration_ms: 1.042727
   type: 'test'
   ...
 # Subtest: merged UI restores Search Profile persistence without wiring it into LinkedIn search
 not ok 415 - merged UI restores Search Profile persistence without wiring it into LinkedIn search
   ---
-  duration_ms: 1.395464
+  duration_ms: 1.447575
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/profile-review.test.mjs:77:1'
   failureType: 'testCodeFailure'
@@ -9039,7 +8781,7 @@ not ok 415 - merged UI restores Search Profile persistence without wiring it int
 # Subtest: merged UI keeps Application Pack and exposes the direct M4 review flow
 not ok 416 - merged UI keeps Application Pack and exposes the direct M4 review flow
   ---
-  duration_ms: 1.43211
+  duration_ms: 1.539674
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/profile-review.test.mjs:86:1'
   failureType: 'testCodeFailure'
@@ -9676,13 +9418,13 @@ not ok 416 - merged UI keeps Application Pack and exposes the direct M4 review f
 # Subtest: M4 CV review shows a neutral empty state when AI returns no changed block
 ok 418 - M4 CV review shows a neutral empty state when AI returns no changed block
   ---
-  duration_ms: 1.201801
+  duration_ms: 1.270389
   type: 'test'
   ...
 # Subtest: Source CV upload entry points keep the current five-step Search Profile flow
 not ok 419 - Source CV upload entry points keep the current five-step Search Profile flow
   ---
-  duration_ms: 1.100575
+  duration_ms: 1.331891
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/profile-review.test.mjs:116:1'
   failureType: 'testCodeFailure'
@@ -10319,13 +10061,13 @@ not ok 419 - Source CV upload entry points keep the current five-step Search Pro
 # Subtest: Version 2 Step 1 refuses a truncated legacy preview instead of tailoring a partial Summary
 ok 427 - Version 2 Step 1 refuses a truncated legacy preview instead of tailoring a partial Summary
   ---
-  duration_ms: 0.126652
+  duration_ms: 0.176225
   type: 'test'
   ...
 # Subtest: page promotes the saved Union Search Plan to LIVE while preserving legacy fallback payload
 not ok 428 - page promotes the saved Union Search Plan to LIVE while preserving legacy fallback payload
   ---
-  duration_ms: 7.098845
+  duration_ms: 8.785221
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/profile-shadow-wiring.test.mjs:5:1'
   failureType: 'testCodeFailure'
@@ -10464,25 +10206,25 @@ not ok 428 - page promotes the saved Union Search Plan to LIVE while preserving 
 # Subtest: parse-cv endpoint accepts resume uploads instead of being retired
 ok 429 - parse-cv endpoint accepts resume uploads instead of being retired
   ---
-  duration_ms: 1.183169
+  duration_ms: 1.303409
   type: 'test'
   ...
 # Subtest: Feature 2 UI persists the complete active Source CV and supports legacy migration
 ok 430 - Feature 2 UI persists the complete active Source CV and supports legacy migration
   ---
-  duration_ms: 0.306741
+  duration_ms: 0.339981
   type: 'test'
   ...
 # Subtest: Feature 2 retains the extracted Professional Summary separately from the short preview
 ok 431 - Feature 2 retains the extracted Professional Summary separately from the short preview
   ---
-  duration_ms: 0.183952
+  duration_ms: 0.231197
   type: 'test'
   ...
 # Subtest: right panel uses dedicated Expertise Match analysis and keeps the agreed vacancy header
 not ok 432 - right panel uses dedicated Expertise Match analysis and keeps the agreed vacancy header
   ---
-  duration_ms: 3.048338
+  duration_ms: 3.123694
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/right-panel-expertise-ui.contract.test.mjs:8:1'
   failureType: 'testCodeFailure'
@@ -11119,13 +10861,13 @@ not ok 432 - right panel uses dedicated Expertise Match analysis and keeps the a
 # Subtest: job conditions never alter Expertise Match
 ok 435 - job conditions never alter Expertise Match
   ---
-  duration_ms: 22.243373
+  duration_ms: 21.620068
   type: 'test'
   ...
 # Subtest: page wires API audit rows into a closed-by-default Search Audit component
 not ok 436 - page wires API audit rows into a closed-by-default Search Audit component
   ---
-  duration_ms: 5.602529
+  duration_ms: 9.098902
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/search-audit-ui.contract.test.mjs:8:1'
   failureType: 'testCodeFailure'
@@ -11762,13 +11504,13 @@ not ok 436 - page wires API audit rows into a closed-by-default Search Audit com
 # Subtest: blank exclusions use zero AI calls
 ok 448 - blank exclusions use zero AI calls
   ---
-  duration_ms: 0.272154
+  duration_ms: 0.28615
   type: 'test'
   ...
 # Subtest: custom exclusions are compiled only on Save profile and then passed to profile-driven LIVE Search
 not ok 449 - custom exclusions are compiled only on Save profile and then passed to profile-driven LIVE Search
   ---
-  duration_ms: 3.804783
+  duration_ms: 5.554777
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/search-profile-exclusions-save-ui.test.mjs:5:1'
   failureType: 'testCodeFailure'
@@ -12405,13 +12147,13 @@ not ok 449 - custom exclusions are compiled only on Save profile and then passed
 # Subtest: library fingerprint is stable by slot and changes only with CV membership/sourceVersion or builder version
 ok 459 - library fingerprint is stable by slot and changes only with CV membership/sourceVersion or builder version
   ---
-  duration_ms: 0.369816
+  duration_ms: 0.405379
   type: 'test'
   ...
 # Subtest: Search Profile wizard has five steps and no salary screen or salary scoring label
 not ok 460 - Search Profile wizard has five steps and no salary screen or salary scoring label
   ---
-  duration_ms: 3.901999
+  duration_ms: 3.343254
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/search-profile-no-salary-ui.test.mjs:5:1'
   failureType: 'testCodeFailure'
@@ -13048,13 +12790,13 @@ not ok 460 - Search Profile wizard has five steps and no salary screen or salary
 # Subtest: Search Profile step 2 combines all ready CVs while legacy Search keeps CV 1
 ok 465 - Search Profile step 2 combines all ready CVs while legacy Search keeps CV 1
   ---
-  duration_ms: 1.913662
+  duration_ms: 2.332605
   type: 'test'
   ...
 # Subtest: Search Profile Step 3 separates location from work model
 not ok 466 - Search Profile Step 3 separates location from work model
   ---
-  duration_ms: 3.40721
+  duration_ms: 4.256135
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/search-profile-step3-ui-contract.test.mjs:5:1'
   failureType: 'testCodeFailure'
@@ -13691,13 +13433,13 @@ not ok 466 - Search Profile Step 3 separates location from work model
 # Subtest: page wires the edited draft into a saved Union Search Plan preview
 ok 521 - page wires the edited draft into a saved Union Search Plan preview
   ---
-  duration_ms: 5.935821
+  duration_ms: 5.39084
   type: 'test'
   ...
 # Subtest: saved Union Search Plan drives profile LIVE while legacy fallback stays isolated
 not ok 522 - saved Union Search Plan drives profile LIVE while legacy fallback stays isolated
   ---
-  duration_ms: 4.470596
+  duration_ms: 4.359651
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/union-search-plan-wiring.test.mjs:22:1'
   failureType: 'testCodeFailure'
@@ -13836,37 +13578,37 @@ not ok 522 - saved Union Search Plan drives profile LIVE while legacy fallback s
 # Subtest: compiles edited roles in primary-then-adjacent order and primary wins duplicates
 ok 523 - compiles edited roles in primary-then-adjacent order and primary wins duplicates
   ---
-  duration_ms: 2.079763
+  duration_ms: 3.096352
   type: 'test'
   ...
 # Subtest: removed raw CV-proposed roles do not survive the edited plan
 ok 524 - removed raw CV-proposed roles do not survive the edited plan
   ---
-  duration_ms: 1.291296
+  duration_ms: 2.159996
   type: 'test'
   ...
 # Subtest: manual roles are preserved without invented CV provenance
 ok 525 - manual roles are preserved without invented CV provenance
   ---
-  duration_ms: 0.27164
+  duration_ms: 0.447883
   type: 'test'
   ...
 # Subtest: CV-supported roles preserve all supporting CV ids, slots and raw support kinds
 ok 526 - CV-supported roles preserve all supporting CV ids, slots and raw support kinds
   ---
-  duration_ms: 0.251541
+  duration_ms: 0.462965
 --- lines 14134-14177 ---
   ...
 # Subtest: CV Update Review keeps a focused ORIGINAL UPDATED review without the obsolete Truth Guard panel
 ok 543 - CV Update Review keeps a focused ORIGINAL UPDATED review without the obsolete Truth Guard panel
   ---
-  duration_ms: 0.322946
+  duration_ms: 0.387362
   type: 'test'
   ...
 # Subtest: review cards show Original, Updated, Why changed and independent decisions
 not ok 544 - review cards show Original, Updated, Why changed and independent decisions
   ---
-  duration_ms: 1.496191
+  duration_ms: 1.59759
   type: 'test'
   location: '/tmp/applypilot-baseline/app/lib/v16-cv-review.contract.test.mjs:24:1'
   failureType: 'testCodeFailure'
