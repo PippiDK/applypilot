@@ -79,7 +79,7 @@ test('merged UI restores Search Profile persistence without wiring it into Linke
   assert.match(source,/localStorage\.getItem\('applypilot-profile'\)/)
   assert.match(source,/localStorage\.setItem\('applypilot-profile'/)
   assert.match(source,/BUILD YOUR SEARCH AGENT/)
-  assert.match(source,/Step \{profileStep\} of 5/)
+  assert.match(source,/Step \{profileStep\} of 4/)
   assert.match(source,/Save profile/)
 })
 
@@ -113,7 +113,7 @@ test('M4 CV review shows a neutral empty state when AI returns no changed block'
   assert.doesNotMatch(source,/No usable CV evidence was found for this review/)
 })
 
-test('Source CV upload entry points keep the current five-step Search Profile flow',()=>{
+test('Source CV upload entry points keep the current four-step Search Profile flow',()=>{
   const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
   const cvLibraryStep=fs.readFileSync(new URL('../components/cv-library-step.js',import.meta.url),'utf8')
   assert.doesNotMatch(source,/setCvOpen/)
@@ -124,7 +124,7 @@ test('Source CV upload entry points keep the current five-step Search Profile fl
   assert.doesNotMatch(source,/Upload your master CV/i)
   assert.doesNotMatch(source,/onClick=\{\(\)=>setCvOpen\(true\)\}[^>]*>Upload \/ analyse CV/)
   assert.match(cvLibraryStep,/Detected signals from CV 1:/)
-  assert.match(source,/Step \{profileStep\} of 5/)
+  assert.match(source,/Step \{profileStep\} of 4/)
 })
 
 
