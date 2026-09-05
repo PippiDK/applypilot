@@ -86,7 +86,8 @@ test('merged UI restores Search Profile persistence without wiring it into Linke
 test('merged UI keeps Application Pack and exposes the direct M4 review flow',()=>{
   const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
   assert.match(source,/Application pack/)
-  assert.match(source,/Adapt & review CV/)
+  assert.match(source,/Generate CV update/)
+  assert.match(source,/View CV update/)
   assert.match(source,/CV UPDATE REVIEW/)
   assert.match(source,/Adaptation complete/)
   assert.match(source,/AI UPDATED text is shown directly/)
