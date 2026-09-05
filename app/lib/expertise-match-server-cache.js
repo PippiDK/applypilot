@@ -130,7 +130,7 @@ export async function resolveManualExpertiseMatch({
   return {
     analysis,
     matchCacheKey:null,
-    logicalJobKey:logicalExpertiseJobKey(job),
+    logicalJobKey:null,
     cacheHit:false,
   }
 }
