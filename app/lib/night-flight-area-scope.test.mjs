@@ -24,6 +24,9 @@ const item=(id,location,source='linkedin')=>({
 const batch=areasSnapshot=>Object.freeze({
   targetDate:'2026-09-04',
   profileFingerprint:'profile-fp-5',
+  searchProfileSnapshot:Object.freeze({unionSearchPlan:{directions:[{role:'Senior Project Manager'}]}}),
+  cvTextSnapshot:'Frozen CV text for Task 8',
+  cvSourceVersion:'cv-v5',
   sourcesSnapshot:Object.freeze(['linkedin','jobindex']),
   areasSnapshot:Object.freeze([...areasSnapshot]),
   jobs:Object.freeze([
@@ -99,7 +102,8 @@ test('Task 5 persists one run plus ALL discovered jobs with initial area-scope s
   const mod=await loadModule()
   assert.ok(mod,'night-flight-area-scope.js must exist')
   const supabase=fakeSupabase()
-  const result=await mod.persistNightFlightAreaScope({supabase,userId:'user-5',batch:batch(['copenhagen_north'])})
+  const frozen=batch(['copenhagen_north'])
+  const result=await mod.persistNightFlightAreaScope({supabase,userId:'user-5',batch:frozen})
 
   const runCall=supabase.calls.find(call=>call.table==='night_flight_runs'&&call.op==='insert')
   const jobsCall=supabase.calls.find(call=>call.table==='night_flight_jobs'&&call.op==='insert')
@@ -107,6 +111,10 @@ test('Task 5 persists one run plus ALL discovered jobs with initial area-scope s
   assert.ok(jobsCall)
   assert.equal(runCall.rows.user_id,'user-5')
   assert.equal(runCall.rows.target_date,'2026-09-04')
+  assert.equal(runCall.rows.profile_fingerprint,'profile-fp-5')
+  assert.deepEqual(runCall.rows.search_profile_snapshot,frozen.searchProfileSnapshot)
+  assert.equal(runCall.rows.cv_text_snapshot,frozen.cvTextSnapshot)
+  assert.equal(runCall.rows.cv_source_version,'cv-v5')
   assert.equal(runCall.rows.jobs_discovered,3)
   assert.equal(runCall.rows.jobs_queued,1)
   assert.equal(runCall.rows.jobs_skipped,2)
