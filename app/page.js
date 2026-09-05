@@ -4,6 +4,7 @@ import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,applicationPackState} from 
 import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'
 import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'
 import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'
+import {requestNightFlightProfileSync} from './lib/night-flight-profile-client.js'
 import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'
 import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'
 import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'
@@ -521,6 +522,7 @@ export default function Home(){
       const compiledExclusions=await resolveSearchProfileExclusions({storage:localStorage,exclusionsText:draft.exclusions,savedProfile:profile,parse:requestSearchProfileExclusions})
       const exclusions=String(draft.exclusions??'').replace(/\s+/g,' ').trim()
       const saved={...resumeToProfile(draft,cvData),primaryRoles,adjacentRoles,roles:combinedRoles(primaryRoles,adjacentRoles),rolesSourceVersion:cvData?.sourceVersion||draft.rolesSourceVersion||'',cvRoleProfiles:Array.isArray(draft.cvRoleProfiles)?draft.cvRoleProfiles:[],roleSources:Array.isArray(draft.roleSources)?draft.roleSources:[],rolesLibraryFingerprint:draft.rolesLibraryFingerprint||rolesLibraryFingerprint,rolesBuilderVersion:SEARCH_PROFILE_BUILDER_VERSION,unionSearchPlan:draftUnionSearchPlan,unionSearchPlanVersion:UNION_SEARCH_PLAN_VERSION,unionSearchPlanFingerprint:draftUnionSearchPlan.fingerprint,locations,workModels,geography,exclusions,exclusionRules:compiledExclusions.rules,exclusionsFingerprint:compiledExclusions.fingerprint,exclusionsParserVersion:compiledExclusions.parserVersion,exclusionsParsedAt:exclusions?new Date().toISOString():'',savedAt:new Date().toISOString()}
+      await requestNightFlightProfileSync({searchProfile:saved,cv:cvData?{text:cvData.cvText,sourceVersion:cvData.sourceVersion}:null})
       localStorage.setItem('applypilot-profile',JSON.stringify(saved))
       setProfile(saved)
       setDraft(saved)
