@@ -93,7 +93,7 @@ test('Task 4 filters every source to exact Previous Day in Copenhagen before mer
   const sourceRunners={
     linkedin:async()=>({jobs:[
       item({source:'linkedin',id:'keep-1',publishedAt:'2026-09-04T12:00:00.000Z'}),
-      item({source:'linkedin',id:'keep-2',publishedAt:'2026-09-03T22:30:00.000Z'}),
+      item({source:'linkedin',id:'keep-2',company:'Beta',publishedAt:'2026-09-03T22:30:00.000Z'}),
       item({source:'linkedin',id:'today',publishedAt:'2026-09-05T00:30:00.000Z'}),
       item({source:'linkedin',id:'old',publishedAt:'2026-09-03T12:00:00.000Z'}),
     ]}),
