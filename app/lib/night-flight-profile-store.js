@@ -32,3 +32,22 @@ export async function persistNightFlightProfileState({
 
   return payload
 }
+
+export async function loadLatestNightFlightProfileState({ supabase, userId } = {}) {
+  if (!userId) throw new Error('Authenticated user is required')
+  if (!supabase || typeof supabase.from !== 'function') {
+    throw new Error('Supabase client is required')
+  }
+
+  const { data, error } = await supabase
+    .from('night_flight_profiles')
+    .select('user_id, search_profile, cv_text, cv_source_version, profile_fingerprint, synced_at, updated_at')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(`Night Flight profile read failed: ${error.message || 'unknown Supabase error'}`)
+  }
+
+  return data ?? null
+}
