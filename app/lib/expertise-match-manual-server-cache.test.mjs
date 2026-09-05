@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {getOrCreateExpertiseMatch,logicalExpertiseJobKey,expertiseMatchCacheReference,EXPERTISE_MATCH_ENGINE_VERSION,resolveManualExpertiseMatch} from './expertise-match-server-cache.js'
+import {logicalExpertiseJobKey,expertiseMatchCacheReference,EXPERTISE_MATCH_ENGINE_VERSION,resolveManualExpertiseMatch} from './expertise-match-server-cache.js'
 
 function fakeCacheSupabase(initial=[]){
   const rows=initial.map(row=>({...row}))
@@ -95,5 +95,26 @@ test('Task 11 preserves Manual Match when synchronized cache identity is stale i
   assert.equal(result.cacheHit,false)
   assert.equal(result.matchCacheKey,null)
   assert.deepEqual(result.analysis,analysis)
+  assert.equal(supabase.rows.length,0)
+})
+
+test('Task 11 legacy Manual Match without stable job identity still runs directly when cache reuse is unavailable',async()=>{
+  const supabase=fakeCacheSupabase()
+  const legacyJob={
+    title:'Senior Project Manager',company:'Legacy Company',location:'Copenhagen',
+    description:'Legacy manual result with enough JD text but no source id or published date.',
+  }
+  let aiCalls=0
+  const analysis={expertiseMatch:74}
+
+  const result=await resolveManualExpertiseMatch({
+    supabase,userId:'u1',job:legacyJob,cvText:'Different current CV '.repeat(8),profileState,
+    analyze:async()=>{aiCalls+=1;return analysis},
+  })
+
+  assert.equal(aiCalls,1)
+  assert.deepEqual(result.analysis,analysis)
+  assert.equal(result.matchCacheKey,null)
+  assert.equal(result.cacheHit,false)
   assert.equal(supabase.rows.length,0)
 })
