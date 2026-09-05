@@ -145,3 +145,18 @@ test('Task 4 freezes the discovery batch snapshot and rejects unusable server st
     /Select at least one source/i
   )
 })
+
+test('Task 8 freezes exact Search Profile and CV state into the discovery batch for durable Match',async()=>{
+  const mod=await loadModule()
+  assert.ok(mod,'night-flight-last-completed-day.js must exist')
+  const profile=profileRow()
+  const batch=await mod.runNightFlightLastCompletedDayDiscovery({
+    supabase:fakeSupabase({profileRow:profile,settingsRow:settingsRow(['linkedin'])}),
+    userId:'user-1',now:new Date('2026-09-05T10:00:00.000Z'),
+    sourceRunners:{linkedin:async()=>({jobs:[]})},
+  })
+  assert.deepEqual(batch.searchProfileSnapshot,profile.search_profile)
+  assert.equal(batch.cvTextSnapshot,profile.cv_text)
+  assert.equal(batch.cvSourceVersion,profile.cv_source_version)
+  assert.equal(Object.isFrozen(batch.searchProfileSnapshot),true)
+})
