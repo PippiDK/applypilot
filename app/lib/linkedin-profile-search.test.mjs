@@ -79,20 +79,21 @@ test('profile-driven search returns legacy-compatible result shape and full-JD s
   assert.equal(result.jobs[0].job.fullJdVerified,true)
 })
 
-test('7-day profile discovery uses repeated deep LinkedIn pages instead of shadow start=0 only',async()=>{
+test('7-day profile discovery follows LinkedIn pagination while pages stay full',async()=>{
   const searchStarts=[]
   const fetcher=async url=>{
     if(url.includes('/seeMoreJobPostings/search')){
-      searchStarts.push(Number(new URL(url).searchParams.get('start')))
-      return card('7777777777','Software Developer')
+      const start=Number(new URL(url).searchParams.get('start'))
+      searchStarts.push(start)
+      return start<50
+        ?Array.from({length:25},()=>card('7777777777','Software Developer')).join('')
+        :card('7777777777','Software Developer')
     }
     return detailHtml({title:'Software Developer',description:'Develop, test and maintain production software and APIs for customer-facing services. '.repeat(8)})
   }
   const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:plan('Software Developer'),fetcher,now:new Date('2026-08-27T12:00:00Z')})
-  assert.ok(searchStarts.includes(25))
-  assert.ok(searchStarts.includes(50))
-  assert.ok(searchStarts.filter(start=>start===0).length>=2)
-  assert.ok(Array.isArray(result.stats.discoveryPasses))
+  assert.deepEqual(searchStarts,[0,25,50])
+  assert.equal(result.stats.searchRequests,3)
   assert.equal(result.jobs.length,1)
 })
 
@@ -139,18 +140,8 @@ test('same verified job and Search Profile keep the same role decision and score
       description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies, governance and senior stakeholder delivery outcomes. '.repeat(5),
     })
   }
-  const first=await searchLinkedInProfile({
-    freshnessDays:7,
-    unionSearchPlan,
-    fetcher:makeFetcher('Senior IT Project Manager'),
-    now:new Date('2026-08-27T12:00:00Z'),
-  })
-  const second=await searchLinkedInProfile({
-    freshnessDays:7,
-    unionSearchPlan,
-    fetcher:makeFetcher('Transformation Project Manager'),
-    now:new Date('2026-08-27T12:00:00Z'),
-  })
+  const first=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan,fetcher:makeFetcher('Senior IT Project Manager'),now:new Date('2026-08-27T12:00:00Z')})
+  const second=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan,fetcher:makeFetcher('Transformation Project Manager'),now:new Date('2026-08-27T12:00:00Z')})
   assert.equal(first.jobs.length,1)
   assert.equal(second.jobs.length,1)
   assert.equal(first.jobs[0].evaluation.breakdown.roleDirection,second.jobs[0].evaluation.breakdown.roleDirection)
@@ -167,11 +158,7 @@ test('each freshness view performs fresh LinkedIn discovery for its selected win
       horizons.push(new URL(url).searchParams.get('f_TPR'))
       return card('1212121212','Senior IT Project Manager','Stable Co')
     }
-    return detailHtml({
-      title:'Senior IT Project Manager',
-      company:'Stable Co',
-      description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies and governance. '.repeat(5)
-    })
+    return detailHtml({title:'Senior IT Project Manager',company:'Stable Co',description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies and governance. '.repeat(5)})
   }
   const searchPlan=plan('Senior IT Project Manager')
   await searchLinkedInProfile({freshnessDays:1,unionSearchPlan:searchPlan,fetcher,now:new Date('2026-08-27T12:00:00Z')})
@@ -182,32 +169,19 @@ test('each freshness view performs fresh LinkedIn discovery for its selected win
 })
 
 test('1/3/7/14-day views are local subsets over the same discovered jobs',async()=>{
-  const datedDetail=(title,company,datePosted)=>detailHtml({
-    title,
-    company,
-    description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies and governance. '.repeat(5)
-  }).replace('"datePosted":"2026-08-27"',`"datePosted":"${datePosted}"`)
-
-  const searchHtml=[
-    card('1313131313','Senior IT Project Manager','Today Co'),
-    card('1414141414','Senior IT Project Manager','Three Day Co'),
-    card('1515151515','Senior IT Project Manager','Seven Day Co'),
-    card('1616161616','Senior IT Project Manager','Fourteen Day Co')
-  ].join('')
-
+  const datedDetail=(title,company,datePosted)=>detailHtml({title,company,description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies and governance. '.repeat(5)}).replace('"datePosted":"2026-08-27"',`"datePosted":"${datePosted}"`)
+  const searchHtml=[card('1313131313','Senior IT Project Manager','Today Co'),card('1414141414','Senior IT Project Manager','Three Day Co'),card('1515151515','Senior IT Project Manager','Seven Day Co'),card('1616161616','Senior IT Project Manager','Fourteen Day Co')].join('')
   const details={
     '1313131313':datedDetail('Senior IT Project Manager','Today Co','2026-08-27'),
     '1414141414':datedDetail('Senior IT Project Manager','Three Day Co','2026-08-25'),
     '1515151515':datedDetail('Senior IT Project Manager','Seven Day Co','2026-08-22'),
     '1616161616':datedDetail('Senior IT Project Manager','Fourteen Day Co','2026-08-15')
   }
-
   const fetcher=scenarioFetcher({searchHtml,details})
   const searchPlan=plan('Senior IT Project Manager')
   const run=days=>searchLinkedInProfile({freshnessDays:days,unionSearchPlan:searchPlan,fetcher,now:new Date('2026-08-27T12:00:00Z')})
   const [one,three,seven,fourteen]=await Promise.all([run(1),run(3),run(7),run(14)])
   const companies=result=>result.jobs.map(item=>item.job.company).sort()
-
   assert.deepEqual(companies(one),['Today Co'])
   assert.deepEqual(companies(three),['Three Day Co','Today Co'])
   assert.deepEqual(companies(seven),['Seven Day Co','Three Day Co','Today Co'])
@@ -216,30 +190,12 @@ test('1/3/7/14-day views are local subsets over the same discovered jobs',async(
 
 
 test('previous in-window candidate remains in the 14-day master pool when LinkedIn omits it on refresh',async()=>{
-  const previous=[{
-    jobId:'1717171717',
-    url:'https://www.linkedin.com/jobs/view/1717171717/',
-    title:'Senior IT Project Manager',
-    company:'Remembered Co',
-    location:'Copenhagen',
-    publishedAt:'2026-08-25',
-    foundBy:[]
-  }]
+  const previous=[{jobId:'1717171717',url:'https://www.linkedin.com/jobs/view/1717171717/',title:'Senior IT Project Manager',company:'Remembered Co',location:'Copenhagen',publishedAt:'2026-08-25',foundBy:[]}]
   const fetcher=async url=>{
     if(url.includes('/seeMoreJobPostings/search')) return ''
-    return detailHtml({
-      title:'Senior IT Project Manager',
-      company:'Remembered Co',
-      description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies and governance. '.repeat(5)
-    }).replace('"datePosted":"2026-08-27"','"datePosted":"2026-08-25"')
+    return detailHtml({title:'Senior IT Project Manager',company:'Remembered Co',description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies and governance. '.repeat(5)}).replace('"datePosted":"2026-08-27"','"datePosted":"2026-08-25"')
   }
-  const result=await searchLinkedInProfile({
-    freshnessDays:7,
-    unionSearchPlan:plan('Senior IT Project Manager'),
-    previousCandidates:previous,
-    fetcher,
-    now:new Date('2026-08-27T12:00:00Z')
-  })
+  const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:plan('Senior IT Project Manager'),previousCandidates:previous,fetcher,now:new Date('2026-08-27T12:00:00Z')})
   assert.equal(result.masterCandidates.length,1)
   assert.equal(result.masterCandidates[0].jobId,'1717171717')
   assert.equal(result.jobs.length,1)
@@ -249,27 +205,9 @@ test('previous in-window candidate remains in the 14-day master pool when Linked
 
 test('master pool drops a previous candidate once its known posting date is outside 14 days',async()=>{
   let detailRequests=0
-  const previous=[{
-    jobId:'1818181818',
-    url:'https://www.linkedin.com/jobs/view/1818181818/',
-    title:'Senior IT Project Manager',
-    company:'Expired Co',
-    location:'Copenhagen',
-    publishedAt:'2026-08-01',
-    foundBy:[]
-  }]
-  const fetcher=async url=>{
-    if(url.includes('/seeMoreJobPostings/search')) return ''
-    detailRequests++
-    return detailHtml({title:'Senior IT Project Manager',company:'Expired Co'})
-  }
-  const result=await searchLinkedInProfile({
-    freshnessDays:14,
-    unionSearchPlan:plan('Senior IT Project Manager'),
-    previousCandidates:previous,
-    fetcher,
-    now:new Date('2026-08-27T12:00:00Z')
-  })
+  const previous=[{jobId:'1818181818',url:'https://www.linkedin.com/jobs/view/1818181818/',title:'Senior IT Project Manager',company:'Expired Co',location:'Copenhagen',publishedAt:'2026-08-01',foundBy:[]}]
+  const fetcher=async url=>{if(url.includes('/seeMoreJobPostings/search')) return '';detailRequests++;return detailHtml({title:'Senior IT Project Manager',company:'Expired Co'})}
+  const result=await searchLinkedInProfile({freshnessDays:14,unionSearchPlan:plan('Senior IT Project Manager'),previousCandidates:previous,fetcher,now:new Date('2026-08-27T12:00:00Z')})
   assert.deepEqual(result.masterCandidates,[])
   assert.equal(result.jobs.length,0)
   assert.equal(detailRequests,0)
@@ -298,22 +236,10 @@ test('fresh discovery always runs while cached verified JDs avoid repeat detail 
   ]
   const mk=(id,company,date)=>({source:'LinkedIn Jobs',sourceJobId:id,originalUrl:'https://www.linkedin.com/jobs/view/'+id+'/',officialUrl:null,title:'Senior IT Project Manager',company,location:'Copenhagen',country:'Denmark',description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies and governance. '.repeat(5),publishedAt:date,deadline:'2026-09-30T00:00:00.000Z',remoteType:'unknown',remoteEligibility:'UNVERIFIED',employmentType:'permanent',salaryMinDkkMonth:null,salaryMaxDkkMonth:null,vacancyStatus:'ACTIVE VIA THIRD PARTY',fullJdVerified:true})
   const fetcher=async url=>{
-    if(url.includes('/seeMoreJobPostings/search')){
-      searchCalls++
-      assert.equal(new URL(url).searchParams.get('f_TPR'),'r259200')
-      return card('2020202020','Senior IT Project Manager','Today Co')
-    }
-    detailCalls++
-    throw new Error('cached detail should not be fetched')
+    if(url.includes('/seeMoreJobPostings/search')){searchCalls++;assert.equal(new URL(url).searchParams.get('f_TPR'),'r259200');return card('2020202020','Senior IT Project Manager','Today Co')}
+    detailCalls++;throw new Error('cached detail should not be fetched')
   }
-  const result=await searchLinkedInProfile({
-    freshnessDays:3,
-    unionSearchPlan:plan('Senior IT Project Manager'),
-    previousCandidates,
-    previousVerifiedJobs:[mk('2020202020','Today Co','2026-08-27'),mk('2121212121','Old Co','2026-08-20')],
-    fetcher,
-    now:new Date('2026-08-27T12:00:00Z')
-  })
+  const result=await searchLinkedInProfile({freshnessDays:3,unionSearchPlan:plan('Senior IT Project Manager'),previousCandidates,previousVerifiedJobs:[mk('2020202020','Today Co','2026-08-27'),mk('2121212121','Old Co','2026-08-20')],fetcher,now:new Date('2026-08-27T12:00:00Z')})
   assert.ok(searchCalls>0)
   assert.equal(detailCalls,0)
   assert.equal(result.stats.detailRequests,0)
@@ -324,26 +250,11 @@ test('fresh discovery always runs while cached verified JDs avoid repeat detail 
 
 test('scoring calibration keeps broad recall but reserves 9+ for strong direct role evidence',async()=>{
   const searchPlan=plan('Senior IT Project Manager')
-  const exactFetcher=scenarioFetcher({
-    searchHtml:card('2222222201','Senior IT Project Manager','Exact Co'),
-    details:{'2222222201':detailHtml({
-      title:'Senior IT Project Manager',
-      company:'Exact Co',
-      description:'Lead enterprise IT projects end-to-end. Own scope, timeline, milestones, risks, dependencies, governance, implementation, cutover and go-live. '.repeat(5)
-    })}
-  })
+  const exactFetcher=scenarioFetcher({searchHtml:card('2222222201','Senior IT Project Manager','Exact Co'),details:{'2222222201':detailHtml({title:'Senior IT Project Manager',company:'Exact Co',description:'Lead enterprise IT projects end-to-end. Own scope, timeline, milestones, risks, dependencies, governance, implementation, cutover and go-live. '.repeat(5)})}})
   const exact=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:searchPlan,fetcher:exactFetcher,now:new Date('2026-08-27T12:00:00Z')})
   assert.equal(exact.jobs.length,1)
   assert.ok(exact.jobs[0].evaluation.score>=9)
-
-  const weakFetcher=scenarioFetcher({
-    searchHtml:card('2222222202','Project Manager','Broad Co'),
-    details:{'2222222202':detailHtml({
-      title:'Project Manager',
-      company:'Broad Co',
-      description:'Coordinate projects, stakeholders, timelines and delivery activities across the organisation. Support implementation planning and project reporting. '.repeat(5)
-    })}
-  })
+  const weakFetcher=scenarioFetcher({searchHtml:card('2222222202','Project Manager','Broad Co'),details:{'2222222202':detailHtml({title:'Project Manager',company:'Broad Co',description:'Coordinate projects, stakeholders, timelines and delivery activities across the organisation. Support implementation planning and project reporting. '.repeat(5)})}})
   const weak=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:searchPlan,fetcher:weakFetcher,now:new Date('2026-08-27T12:00:00Z')})
   assert.equal(weak.jobs.length,1)
   assert.ok(weak.jobs[0].evaluation.score<8)
@@ -351,18 +262,8 @@ test('scoring calibration keeps broad recall but reserves 9+ for strong direct r
 })
 
 test('adjacent exact role stays visible but does not automatically outrank a strong primary match',async()=>{
-  const unionSearchPlan={version:'union-search-plan-v1',directions:[
-    {key:'senior-it-project-manager',role:'Senior IT Project Manager',tier:'primary',origin:'cv',cvSlots:[1]},
-    {key:'implementation-manager',role:'Implementation Manager',tier:'adjacent',origin:'cv',cvSlots:[1]},
-  ]}
-  const fetcher=scenarioFetcher({
-    searchHtml:card('2222222203','Implementation Manager','Adjacent Co'),
-    details:{'2222222203':detailHtml({
-      title:'Implementation Manager',
-      company:'Adjacent Co',
-      description:'Own implementation delivery, scope, timeline, risks, dependencies, stakeholders, cutover and go-live for enterprise software customers. '.repeat(5)
-    })}
-  })
+  const unionSearchPlan={version:'union-search-plan-v1',directions:[{key:'senior-it-project-manager',role:'Senior IT Project Manager',tier:'primary',origin:'cv',cvSlots:[1]},{key:'implementation-manager',role:'Implementation Manager',tier:'adjacent',origin:'cv',cvSlots:[1]}]}
+  const fetcher=scenarioFetcher({searchHtml:card('2222222203','Implementation Manager','Adjacent Co'),details:{'2222222203':detailHtml({title:'Implementation Manager',company:'Adjacent Co',description:'Own implementation delivery, scope, timeline, risks, dependencies, stakeholders, cutover and go-live for enterprise software customers. '.repeat(5)})}})
   const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan,fetcher,now:new Date('2026-08-27T12:00:00Z')})
   assert.equal(result.jobs.length,1)
   assert.ok(result.jobs[0].evaluation.score>=8)
@@ -373,14 +274,7 @@ test('adjacent exact role stays visible but does not automatically outrank a str
 
 test('exact Technical Project Manager in a non-enterprise engineering context is demoted but kept',async()=>{
   const searchPlan=plan('Technical Project Manager')
-  const fetcher=scenarioFetcher({
-    searchHtml:card('2323232301','Technical Project Manager | Lead project delivery for Grid Consultancy and Power Engineering','Grid Co'),
-    details:{'2323232301':detailHtml({
-      title:'Technical Project Manager | Lead project delivery for Grid Consultancy and Power Engineering',
-      company:'Grid Co',
-      description:'Lead grid consultancy and power engineering projects, coordinate electrical engineering specialists, customer schedules, risks, dependencies and technical delivery. '.repeat(5)
-    })}
-  })
+  const fetcher=scenarioFetcher({searchHtml:card('2323232301','Technical Project Manager | Lead project delivery for Grid Consultancy and Power Engineering','Grid Co'),details:{'2323232301':detailHtml({title:'Technical Project Manager | Lead project delivery for Grid Consultancy and Power Engineering',company:'Grid Co',description:'Lead grid consultancy and power engineering projects, coordinate electrical engineering specialists, customer schedules, risks, dependencies and technical delivery. '.repeat(5)})}})
   const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:searchPlan,fetcher,now:new Date('2026-08-27T12:00:00Z')})
   assert.equal(result.jobs.length,1)
   assert.ok(result.jobs[0].evaluation.score>=8)
@@ -390,32 +284,16 @@ test('exact Technical Project Manager in a non-enterprise engineering context is
 
 test('exact Technical Project Manager with strong enterprise IT context remains High',async()=>{
   const searchPlan=plan('Technical Project Manager')
-  const fetcher=scenarioFetcher({
-    searchHtml:card('2323232302','Technical Project Manager','Enterprise Co'),
-    details:{'2323232302':detailHtml({
-      title:'Technical Project Manager',
-      company:'Enterprise Co',
-      description:'Lead enterprise IT delivery for a cloud software platform, systems integration, business applications, data migration, risks, dependencies, cutover and go-live. '.repeat(5)
-    })}
-  })
+  const fetcher=scenarioFetcher({searchHtml:card('2323232302','Technical Project Manager','Enterprise Co'),details:{'2323232302':detailHtml({title:'Technical Project Manager',company:'Enterprise Co',description:'Lead enterprise IT delivery for a cloud software platform, systems integration, business applications, data migration, risks, dependencies, cutover and go-live. '.repeat(5)})}})
   const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:searchPlan,fetcher,now:new Date('2026-08-27T12:00:00Z')})
   assert.equal(result.jobs.length,1)
   assert.ok(result.jobs[0].evaluation.score>=9)
-  assert.equal(result.jobs[0].evaluation.breakdown.domainContextPenalty,.2)
+  assert.equal(result.jobs[0].evaluation.breakdown.domainContextPenalty,0)
 })
 
 test('specialist adjacent Implementation Manager remains visible but payroll context lowers top-score inflation',async()=>{
-  const unionSearchPlan={version:'union-search-plan-v1',directions:[
-    {key:'implementation-manager',role:'Implementation Manager',tier:'adjacent',origin:'cv',cvSlots:[1]},
-  ]}
-  const fetcher=scenarioFetcher({
-    searchHtml:card('2323232303','Payroll Implementation Manager | Denmark','Payroll Co'),
-    details:{'2323232303':detailHtml({
-      title:'Payroll Implementation Manager | Denmark',
-      company:'Payroll Co',
-      description:'Lead payroll implementation for customers, coordinate configuration, integrations, timelines, stakeholders, testing and go-live. '.repeat(5)
-    })}
-  })
+  const unionSearchPlan={version:'union-search-plan-v1',directions:[{key:'implementation-manager',role:'Implementation Manager',tier:'adjacent',origin:'cv',cvSlots:[1]}]}
+  const fetcher=scenarioFetcher({searchHtml:card('2323232303','Payroll Implementation Manager | Denmark','Payroll Co'),details:{'2323232303':detailHtml({title:'Payroll Implementation Manager | Denmark',company:'Payroll Co',description:'Lead payroll implementation for customers, coordinate configuration, integrations, timelines, stakeholders, testing and go-live. '.repeat(5)})}})
   const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan,fetcher,now:new Date('2026-08-27T12:00:00Z')})
   assert.equal(result.jobs.length,1)
   assert.ok(result.jobs[0].evaluation.score>=8)
