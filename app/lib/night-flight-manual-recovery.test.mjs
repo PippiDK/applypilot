@@ -63,7 +63,7 @@ test('Task 11 FAILED manual recovery uses shared Match service then transitions 
       matchCalls+=1
       assert.equal(input.userId,'u1')
       assert.equal(input.profileFingerprint,'profile-11')
-      assert.equal(input.cvText,run.cv_text_snapshot)
+      assert.equal(input.cvText,run.cv_text_snapshot.trim())
       return {analysis:{expertiseMatch:88},matchCacheKey:'expertise-match:shared-11',cacheHit:false}
     },
     reconcile:async input=>{reconcileCalls+=1;assert.equal(input.runId,'run-11');return {status:'READY'}},
