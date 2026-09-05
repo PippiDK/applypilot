@@ -90,6 +90,35 @@ test('Task 7 skips an existing same-date run before doing fresh discovery again'
   assert.equal(persists,0)
 })
 
+test('Task 8 processes both resumed and newly created Night Flight runs through the shared Match processor',async()=>{
+  const mod=await loadScheduler()
+  assert.ok(mod,'night-flight-scheduler.js must exist')
+  const resumedSupabase=fakeSupabase({runs:{
+    'u1|2026-07-14':{id:'run-existing',status:'RUNNING',target_date:'2026-07-14'},
+  }})
+  const processed=[]
+  const processMatches=async({userId,runId})=>{
+    processed.push([userId,runId])
+    return {runId,status:'READY',jobsReady:1}
+  }
+
+  const resumed=await mod.runNightFlightForUser({
+    supabase:resumedSupabase,userId:'u1',now:new Date('2026-07-15T00:00:00.000Z'),processMatches,
+  })
+  const fresh=await mod.runNightFlightForUser({
+    supabase:fakeSupabase(),userId:'u2',now:new Date('2026-07-15T00:00:00.000Z'),
+    discover:async()=>({targetDate:'2026-07-14'}),
+    persist:async()=>({runId:'run-new',status:'RUNNING'}),
+    processMatches,
+  })
+
+  assert.deepEqual(processed,[['u1','run-existing'],['u2','run-new']])
+  assert.equal(resumed.status,'READY')
+  assert.equal(resumed.resumed,true)
+  assert.equal(fresh.status,'READY')
+  assert.equal(fresh.resumed,false)
+})
+
 test('Task 7 isolates one user failure and continues the remaining enabled users',async()=>{
   const mod=await loadScheduler()
   assert.ok(mod,'night-flight-scheduler.js must exist')
