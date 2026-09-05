@@ -15,6 +15,7 @@ const OFFICIAL_SOURCES=['linkedin','jobindex','jobnet']
 
 const clean=value=>String(value??'').replace(/\s+/g,' ').trim()
 const identityText=value=>clean(value).toLowerCase().replace(/\b(a\/s|as)\b/g,'').replace(/[^a-z0-9æøå]+/g,' ').replace(/\s+/g,' ').trim()
+const cloneJson=value=>JSON.parse(JSON.stringify(value??{}))
 
 function sourceOf(item={},fallback=''){
   const job=item?.job||item||{}
@@ -236,6 +237,9 @@ export async function runNightFlightLastCompletedDayDiscovery({
   const batch={
     targetDate:lastCompletedCopenhagenDate(current),
     profileFingerprint:clean(profile.profile_fingerprint),
+    searchProfileSnapshot:cloneJson(searchProfile),
+    cvTextSnapshot:String(profile.cv_text??''),
+    cvSourceVersion:clean(profile.cv_source_version),
     sourcesSnapshot:[...settings.sources],
     areasSnapshot:[...settings.areas],
     jobs:mergeNightFlightDiscovery(sourceResults),

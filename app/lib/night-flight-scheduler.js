@@ -1,5 +1,6 @@
 import {lastCompletedCopenhagenDate,runNightFlightLastCompletedDayDiscovery} from './night-flight-last-completed-day.js'
 import {persistNightFlightAreaScope} from './night-flight-area-scope.js'
+import {processNightFlightRunMatches} from './night-flight-match-processor.js'
 
 const COPENHAGEN_TIME_ZONE='Europe/Copenhagen'
 
@@ -35,6 +36,7 @@ export async function runNightFlightForUser({
   now=new Date(),
   discover=runNightFlightLastCompletedDayDiscovery,
   persist=persistNightFlightAreaScope,
+  processMatches=processNightFlightRunMatches,
 }={}){
   requireSupabase(supabase)
   const id=clean(userId)
@@ -51,9 +53,10 @@ export async function runNightFlightForUser({
 
   if(existingError) throw new Error(`Night Flight run lookup failed: ${existingError.message||'unknown Supabase error'}`)
   if(existing?.id){
+    const processed=await processMatches({supabase,userId:id,runId:existing.id})
     return {
+      ...processed,
       runId:existing.id,
-      status:existing.status||'RUNNING',
       targetDate,
       resumed:true,
     }
@@ -62,9 +65,13 @@ export async function runNightFlightForUser({
   const batch=await discover({supabase,userId:id,now:current})
   if(clean(batch?.targetDate)!==targetDate) throw new Error('Night Flight discovery target date mismatch')
   const persisted=await persist({supabase,userId:id,batch})
+  if(!clean(persisted?.runId)) throw new Error('Night Flight persisted run is unavailable')
+  const processed=await processMatches({supabase,userId:id,runId:persisted.runId})
 
   return {
     ...persisted,
+    ...processed,
+    runId:persisted.runId,
     targetDate,
     resumed:false,
   }
