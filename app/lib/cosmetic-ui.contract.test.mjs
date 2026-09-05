@@ -4,9 +4,10 @@ import fs from 'node:fs'
 
 const page=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
 const css=fs.readFileSync(new URL('../globals.css',import.meta.url),'utf8')
+const cvLibraryStep=fs.readFileSync(new URL('../components/cv-library-step.js',import.meta.url),'utf8')
 
-test('Step 5 labels CV1 explicitly as the Primary Search CV',()=>{
-  assert.match(page,/<span>Primary Search CV<\/span>/)
+test('Step 5 identifies CV1 as the active Search CV',()=>{
+  assert.match(cvLibraryStep,/CV 1 remains the active Search CV for now\./)
 })
 
 test('profile strip shows a dynamic saved Union Search Plan summary instead of legacy role and score copy',()=>{
