@@ -4,12 +4,14 @@ import fs from 'node:fs'
 
 const componentPath=new URL('../components/night-flight-morning-review.js',import.meta.url)
 const pagePath=new URL('../page.js',import.meta.url)
+const layoutPath=new URL('../layout.js',import.meta.url)
 const component=fs.existsSync(componentPath)?fs.readFileSync(componentPath,'utf8'):''
 const page=fs.readFileSync(pagePath,'utf8')
+const layout=fs.readFileSync(layoutPath,'utf8')
 
 test('Task 9 mounts Morning Review as an isolated component without replacing Manual Search',()=>{
-  assert.match(page,/import NightFlightMorningReview from '\.\/components\/night-flight-morning-review\.js'/)
-  assert.match(page,/<NightFlightMorningReview\s*\/>/)
+  assert.match(layout,/import NightFlightMorningReview from '\.\/components\/night-flight-morning-review\.js'/)
+  assert.match(layout,/<NightFlightMorningReview\s*\/>/)
   assert.match(page,/async function search\(\)/,'Manual Search flow must remain present')
 })
 
