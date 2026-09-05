@@ -93,3 +93,44 @@ export async function getOrCreateExpertiseMatch({
 
   return {analysis,matchCacheKey:cacheKey,cacheHit:false}
 }
+
+export async function resolveManualExpertiseMatch({
+  supabase,
+  userId,
+  job={},
+  cvText,
+  cvSourceVersion,
+  profileState,
+  analyze=analyzeExpertiseMatch,
+}={}){
+  if(typeof analyze!=='function') throw new Error('Expertise Match analyzer is required')
+  const currentCv=clean(cvText)
+  const storedCv=clean(profileState?.cv_text)
+  const currentVersion=clean(cvSourceVersion)
+  const storedVersion=clean(profileState?.cv_source_version)
+  const profileFingerprint=clean(profileState?.profile_fingerprint)
+  const sourceVersionMatches=!currentVersion||!storedVersion||currentVersion===storedVersion
+  const cacheIdentityIsCurrent=Boolean(
+    profileFingerprint&&storedCv&&currentCv&&storedCv===currentCv&&sourceVersionMatches
+  )
+
+  if(cacheIdentityIsCurrent){
+    return getOrCreateExpertiseMatch({
+      supabase,
+      userId,
+      job,
+      cvText:currentCv,
+      profileFingerprint,
+      analyze,
+    })
+  }
+
+  const analysis=await analyze({job,cvText:currentCv})
+  if(!analysis||typeof analysis!=='object') throw new Error('Expertise Match analysis is invalid')
+  return {
+    analysis,
+    matchCacheKey:null,
+    logicalJobKey:logicalExpertiseJobKey(job),
+    cacheHit:false,
+  }
+}
