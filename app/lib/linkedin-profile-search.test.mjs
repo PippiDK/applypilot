@@ -86,15 +86,15 @@ test('7-day profile discovery follows LinkedIn pagination while pages stay full'
       const start=Number(new URL(url).searchParams.get('start'))
       searchStarts.push(start)
       return start<50
-        ?Array.from({length:25},()=>card('7777777777','Software Developer')).join('')
-        :card('7777777777','Software Developer')
+        ?Array.from({length:25},(_,index)=>card(String(7000000000+start+index),'Software Developer')).join('')
+        :card('7000000050','Software Developer')
     }
     return detailHtml({title:'Software Developer',description:'Develop, test and maintain production software and APIs for customer-facing services. '.repeat(8)})
   }
   const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:plan('Software Developer'),fetcher,now:new Date('2026-08-27T12:00:00Z')})
   assert.deepEqual(searchStarts,[0,25,50])
   assert.equal(result.stats.searchRequests,3)
-  assert.equal(result.jobs.length,1)
+  assert.equal(result.jobs.length,51)
 })
 
 
@@ -110,11 +110,7 @@ test('role evaluation uses the full approved Search Profile, not only the discov
         ?card('8888888888','Senior IT Project Manager','Stable Co')
         :''
     }
-    return detailHtml({
-      title:'Senior IT Project Manager',
-      company:'Stable Co',
-      description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies, governance and senior stakeholder delivery outcomes. '.repeat(5),
-    })
+    return detailHtml({title:'Senior IT Project Manager',company:'Stable Co',description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies, governance and senior stakeholder delivery outcomes. '.repeat(5)})
   }
   const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan,fetcher,now:new Date('2026-08-27T12:00:00Z')})
   assert.equal(result.jobs.length,1)
@@ -130,15 +126,9 @@ test('same verified job and Search Profile keep the same role decision and score
   const makeFetcher=visibleQuery=>async url=>{
     if(url.includes('/seeMoreJobPostings/search')){
       const query=new URL(url).searchParams.get('keywords')
-      return query===visibleQuery
-        ?card('9999999999','Senior IT Project Manager','Stable Co')
-        :''
+      return query===visibleQuery?card('9999999999','Senior IT Project Manager','Stable Co'):''
     }
-    return detailHtml({
-      title:'Senior IT Project Manager',
-      company:'Stable Co',
-      description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies, governance and senior stakeholder delivery outcomes. '.repeat(5),
-    })
+    return detailHtml({title:'Senior IT Project Manager',company:'Stable Co',description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies, governance and senior stakeholder delivery outcomes. '.repeat(5)})
   }
   const first=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan,fetcher:makeFetcher('Senior IT Project Manager'),now:new Date('2026-08-27T12:00:00Z')})
   const second=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan,fetcher:makeFetcher('Transformation Project Manager'),now:new Date('2026-08-27T12:00:00Z')})
