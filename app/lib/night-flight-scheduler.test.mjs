@@ -82,6 +82,7 @@ test('Task 7 skips an existing same-date run before doing fresh discovery again'
     now:new Date('2026-07-15T00:00:00.000Z'),
     discover:async()=>{discoveries+=1;return {targetDate:'2026-07-14'}},
     persist:async()=>{persists+=1;return {runId:'new'}},
+    processMatches:async()=>({runId:'run-existing',status:'RUNNING'}),
   })
 
   assert.equal(result.runId,'run-existing')
