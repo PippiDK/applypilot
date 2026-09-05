@@ -42,3 +42,11 @@ test('Task 2 does not silently accept a failed server sync',()=>{
   assert.match(client,/throw new Error\(errorMessage\)/)
   assert.match(client,/console\.error\('\[Night Flight\] profile sync failed'/)
 })
+
+test('Task 2 surfaces background sync failures from hydration and primary CV changes',()=>{
+  const page=readFileSync(pagePath,'utf8')
+  assert.match(page,/nightFlightSyncError/,'page must keep visible Night Flight sync failure state')
+  assert.match(page,/syncNightFlightProfileInBackground/,'background sync must use one failure-reporting helper')
+  assert.match(page,/setNightFlightSyncError/,'background sync failure must update visible state')
+  assert.match(page,/latest profile is saved locally but is not available for overnight processing/i,'UI must explain stale server state')
+})
