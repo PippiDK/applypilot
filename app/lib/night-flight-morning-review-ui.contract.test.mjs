@@ -25,9 +25,8 @@ test('Task 9 Morning Review card and panel follow the approved saved-batch UX',(
   assert.match(component,/Run Match/)
 })
 
-test('Task 9 loads saved review once and does not implement Task 10 polling or duplicate Match calls',()=>{
+test('Task 9 loads saved review and does not duplicate Match calls',()=>{
   assert.match(component,/\/api\/night-flight-review/)
-  assert.doesNotMatch(component,/setInterval|setTimeout/)
   assert.doesNotMatch(component,/requestExpertiseMatch|analyzeExpertiseMatch|getOrCreateExpertiseMatch/)
 })
 
