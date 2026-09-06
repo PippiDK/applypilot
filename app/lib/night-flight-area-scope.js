@@ -1,5 +1,6 @@
 import {classifySearchArea} from './job-list-filters.js'
 
+const OFFICIAL_SOURCES=new Set(['linkedin','jobindex','jobnet'])
 const clean=value=>String(value??'').trim()
 
 function requireBatch(batch){
@@ -8,9 +9,27 @@ function requireBatch(batch){
   return batch
 }
 
+function canonicalSource(value=''){
+  const source=clean(value).toLowerCase()
+  if(OFFICIAL_SOURCES.has(source)) return source
+  if(source.startsWith('linkedin')) return 'linkedin'
+  if(source.startsWith('jobindex')) return 'jobindex'
+  if(source.startsWith('jobnet')) return 'jobnet'
+  return source
+}
+
 function sourceFor(item={}){
   const job=item?.job||item||{}
-  return clean(job.source||item?.nightFlightSources?.[0]||job.sourceRecords?.[0]?.source).toLowerCase()
+  const candidates=[
+    item?.nightFlightSources?.[0],
+    job.sourceRecords?.[0]?.source,
+    job.source,
+  ]
+  for(const candidate of candidates){
+    const source=canonicalSource(candidate)
+    if(OFFICIAL_SOURCES.has(source)) return source
+  }
+  return canonicalSource(job.source||item?.nightFlightSources?.[0]||job.sourceRecords?.[0]?.source)
 }
 
 function jobKeyFor(item={},index=0){
