@@ -16,7 +16,7 @@ export default function NightFlightSettings(){
   const [status,setStatus]=useState({loading:false,saving:false,loaded:false,error:'',notice:''})
 
   useEffect(()=>{
-    setHeaderHost(document.querySelector('.headerActions'))
+    setHeaderHost(document.querySelector('#nightFlightSettingsHost'))
   },[])
 
   useEffect(()=>{
@@ -92,7 +92,7 @@ export default function NightFlightSettings(){
   }
 
   const trigger=headerHost?createPortal(
-    <button type="button" className={styles.trigger} onClick={()=>setOpen(true)}>⚙️ Settings</button>,
+    <button type="button" className={styles.trigger} onClick={()=>setOpen(true)}>NF Settings</button>,
     headerHost
   ):null
 
