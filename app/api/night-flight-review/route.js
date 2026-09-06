@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { requireUser } from '../../lib/auth/require-user.js'
-import { createServerSupabaseClient } from '../../lib/supabase/server.js'
+import { resolveNightFlightRequestContext } from '../../lib/night-flight-preview-context.js'
 import { loadNightFlightMorningReview } from '../../lib/night-flight-review.js'
 import { recoverFailedNightFlightMatch } from '../../lib/night-flight-manual-recovery.js'
 
@@ -8,11 +7,10 @@ export const dynamic='force-dynamic'
 const clean=value=>String(value??'').trim()
 
 export async function GET(){
-  const auth=await requireUser()
+  const {auth,supabase}=await resolveNightFlightRequestContext()
   if(!auth.user) return auth.response
 
   try{
-    const supabase=await createServerSupabaseClient()
     const review=await loadNightFlightMorningReview({supabase,userId:auth.user.id})
     return NextResponse.json({review})
   }catch(error){
@@ -22,7 +20,7 @@ export async function GET(){
 }
 
 export async function POST(request){
-  const auth=await requireUser()
+  const {auth,supabase}=await resolveNightFlightRequestContext()
   if(!auth.user) return auth.response
 
   try{
@@ -33,7 +31,6 @@ export async function POST(request){
       return NextResponse.json({error:'runId and jobKey are required.'},{status:400})
     }
 
-    const supabase=await createServerSupabaseClient()
     await recoverFailedNightFlightMatch({
       supabase,
       userId:auth.user.id,
