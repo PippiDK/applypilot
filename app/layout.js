@@ -7,6 +7,7 @@ import './company-watch.css'
 import SignOutButton from './components/sign-out-button.js'
 import SplashGate from './components/splash-gate.js'
 import NeutralizeLegacyTestLabels from './components/neutralize-legacy-test-labels.js'
+import NightFlightDrawer from './components/night-flight-drawer.js'
 import NightFlightSettings from './components/night-flight-settings.js'
 import NightFlightMorningReview from './components/night-flight-morning-review.js'
 
@@ -19,5 +20,5 @@ export default function RootLayout({children}){
     ? `LIVE 18${shortSha?` · ${shortSha}`:''}`
     : `V18 · PREVIEW${shortSha?` · ${shortSha}`:''}`
 
-  return <html lang="en"><body><SplashGate>{children}<NightFlightMorningReview/><NightFlightSettings/><NeutralizeLegacyTestLabels/><div className="versionBadge">{versionLabel}</div><SignOutButton/></SplashGate></body></html>
+  return <html lang="en"><body><SplashGate>{children}<NightFlightDrawer><NightFlightMorningReview/><NightFlightSettings/></NightFlightDrawer><NeutralizeLegacyTestLabels/><div className="versionBadge">{versionLabel}</div><SignOutButton/></SplashGate></body></html>
 }
