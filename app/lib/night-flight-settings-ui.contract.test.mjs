@@ -3,9 +3,11 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
 const componentPath=new URL('../components/night-flight-settings.js',import.meta.url)
+const stylesPath=new URL('../components/night-flight-settings.module.css',import.meta.url)
 const layoutPath=new URL('../layout.js',import.meta.url)
 const settingsPath=new URL('./night-flight-settings.js',import.meta.url)
 const component=fs.existsSync(componentPath)?fs.readFileSync(componentPath,'utf8'):''
+const stylesSource=fs.readFileSync(stylesPath,'utf8')
 const layout=fs.readFileSync(layoutPath,'utf8')
 const settingsSource=fs.readFileSync(settingsPath,'utf8')
 
@@ -32,6 +34,11 @@ test('Night Flight Settings uses explicit All areas selection with existing SEAR
   assert.match(component,/toggleAllAreas/)
   assert.match(component,/>All areas<\/span>/)
   assert.doesNotMatch(component,/No areas selected = all areas/)
+})
+
+test('All areas control is visually separated from the individual area grid',()=>{
+  assert.match(component,/className={`\$\{styles\.option\} \$\{styles\.allAreasOption\}`}/)
+  assert.match(stylesSource,/\.allAreasOption\{margin-bottom:12px\}/)
 })
 
 test('Night Flight Settings preserves backend all-areas contract while keeping UI explicit',()=>{
