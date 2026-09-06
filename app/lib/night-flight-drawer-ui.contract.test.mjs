@@ -64,3 +64,16 @@ test('Night Flight tab matches APPLIED geometry while keeping purple identity',a
   assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.tab\{[^}]*bottom:58px[^}]*border-radius:999px[^}]*flex-direction:row[^}]*padding:10px 14px/)
   assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.tab span\{[^}]*writing-mode:initial[^}]*transform:none/)
 })
+
+test('Morning Review card keeps Open Night Flight inside the drawer',async()=>{
+  const css=await source('components/night-flight-morning-review.module.css')
+  const card=css.match(/\.card\{([^}]*)\}/)?.[1]||''
+  const open=css.match(/\.open\{([^}]*)\}/)?.[1]||''
+
+  assert.match(card,/display:grid/)
+  assert.match(card,/grid-template-columns:minmax\(0,1fr\) auto/)
+  assert.match(card,/width:100%/)
+  assert.match(card,/white-space:normal/)
+  assert.doesNotMatch(card,/margin-left:auto/)
+  assert.match(open,/white-space:nowrap/)
+})
