@@ -150,7 +150,7 @@ export default function NightFlightSettings(){
 
           <fieldset className={styles.group} disabled={!status.loaded||status.saving}>
             <legend>Match areas</legend>
-            <label className={styles.option}>
+            <label className={`${styles.option} ${styles.allAreasOption}`}>
               <input type="checkbox" checked={allAreasSelected} onChange={toggleAllAreas}/>
               <span>All areas</span>
             </label>
