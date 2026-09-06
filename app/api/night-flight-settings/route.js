@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server'
-import { requireUser } from '../../lib/auth/require-user.js'
-import { createServerSupabaseClient } from '../../lib/supabase/server.js'
+import { resolveNightFlightRequestContext } from '../../lib/night-flight-preview-context.js'
 import { NightFlightSettingsValidationError } from '../../lib/night-flight-settings.js'
 import { loadNightFlightSettings, saveNightFlightSettings } from '../../lib/night-flight-settings-store.js'
 
 export const dynamic='force-dynamic'
 
 export async function GET(){
-  const auth=await requireUser()
+  const {auth,supabase}=await resolveNightFlightRequestContext()
   if(!auth.user) return auth.response
 
   try{
-    const supabase=await createServerSupabaseClient()
     const settings=await loadNightFlightSettings({supabase,userId:auth.user.id})
     return NextResponse.json({settings})
   }catch(error){
@@ -21,12 +19,11 @@ export async function GET(){
 }
 
 export async function PUT(request){
-  const auth=await requireUser()
+  const {auth,supabase}=await resolveNightFlightRequestContext()
   if(!auth.user) return auth.response
 
   try{
     const body=await request.json()
-    const supabase=await createServerSupabaseClient()
     const settings=await saveNightFlightSettings({
       supabase,
       userId:auth.user.id,
