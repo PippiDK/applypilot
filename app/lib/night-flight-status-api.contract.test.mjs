@@ -7,8 +7,8 @@ const source=fs.existsSync(routePath)?fs.readFileSync(routePath,'utf8'):''
 
 test('Task 10 status API is an authenticated lightweight GET',()=>{
   assert.match(source,/export async function GET/)
-  assert.match(source,/await requireUser\(\)/)
-  assert.match(source,/createServerSupabaseClient/)
+  assert.match(source,/resolveNightFlightRequestContext/)
+  assert.match(source,/if\(!auth\.user\) return auth\.response/)
   assert.match(source,/loadNightFlightStatus/)
   assert.match(source,/NextResponse\.json\(\{status\}\)/)
   assert.doesNotMatch(source,/analyzeExpertiseMatch|requestExpertiseMatch|getOrCreateExpertiseMatch|expertise_match_cache/)
