@@ -31,7 +31,13 @@ test('Night Flight settings no longer mount into the global header',async()=>{
   const settings=await source('components/night-flight-settings.js')
   assert.match(settings,/document\.querySelector\(['"]#nightFlightSettingsHost['"]\)/)
   assert.doesNotMatch(settings,/document\.querySelector\(['"]\.headerActions['"]\)/)
-  assert.match(settings,/>NF Settings</)
+  assert.match(settings,/>Settings</)
+  assert.doesNotMatch(settings,/>NF Settings</)
+})
+
+test('Automation settings appear before Morning Review inside Night Flight',async()=>{
+  const drawer=await source('components/night-flight-drawer.js')
+  assert.match(drawer,/>Automation<[\s\S]*id="nightFlightSettingsHost"[\s\S]*>Morning Review<[\s\S]*id="nightFlightReviewHost"/)
 })
 
 test('Night Flight side tab is purple and independent of APPLIED',async()=>{
