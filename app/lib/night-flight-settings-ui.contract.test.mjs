@@ -9,12 +9,12 @@ const component=fs.existsSync(componentPath)?fs.readFileSync(componentPath,'utf8
 const layout=fs.readFileSync(layoutPath,'utf8')
 const settingsSource=fs.readFileSync(settingsPath,'utf8')
 
-test('drawer exposes compact Night Flight Settings entry without changing Manual Search controls',()=>{
+test('drawer exposes compact Settings entry without changing Manual Search controls',()=>{
   assert.match(layout,/import NightFlightSettings from '\.\/components\/night-flight-settings\.js'/)
   assert.match(layout,/<NightFlightSettings\s*\/>/)
   assert.match(component,/document\.querySelector\('#nightFlightSettingsHost'\)/)
   assert.doesNotMatch(component,/document\.querySelector\('\.headerActions'\)/)
-  assert.match(component,/>NF Settings<\/button>/)
+  assert.match(component,/>Settings<\/button>/)
   assert.doesNotMatch(component,/selectedSources|writeSearchSources|freshnessDays|setFreshnessDays/)
 })
 
