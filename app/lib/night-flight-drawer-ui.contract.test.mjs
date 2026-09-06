@@ -83,3 +83,11 @@ test('Morning Review card keeps Open Night Flight inside the drawer',async()=>{
   assert.doesNotMatch(card,/margin-left:auto/)
   assert.match(open,/white-space:nowrap/)
 })
+
+test('Open vacancy uses the same purple selected-state treatment as the chosen job',async()=>{
+  const css=await source('components/night-flight-morning-review.module.css')
+  const vacancy=css.match(/\.matchHeader \.vacancyLink\{([^}]*)\}/)?.[1]||''
+
+  assert.match(vacancy,/border:1px solid rgba\(167,139,250,\.5\)/)
+  assert.match(vacancy,/background:rgba\(109,40,217,\.12\)/)
+})
