@@ -130,6 +130,7 @@ export default function NightFlightMorningReview(){
   const visibleProgress=progress||progressFromReview(review)
   const selected=review?.jobs?.find(item=>item.key===selectedKey)||review?.jobs?.[0]||null
   const analysis=selected?.analysis||null
+  const vacancyUrl=selected?.job?.originalUrl||selected?.job?.detailUrl||selected?.job?.applicationUrl||''
 
   async function recoverNightFlightMatch(){
     if(!review?.run?.id||selected?.status!=='FAILED'||!selected?.key||recoveringKey) return
@@ -187,7 +188,10 @@ export default function NightFlightMorningReview(){
             </button>)}
           </aside>
           <section className={styles.match} aria-label="Profile Match">
-            <h2>Profile Match</h2>
+            <div className={styles.matchHeader}>
+              <h2>Profile Match</h2>
+              {vacancyUrl&&<a className={`secondary openLink ${styles.vacancyLink}`} href={vacancyUrl} target="_blank" rel="noreferrer">Open vacancy</a>}
+            </div>
             {!selected&&<p className={styles.muted}>No review jobs for this run.</p>}
             {selected?.status==='FAILED'&&<>
               <div className={styles.failure}>{selected.lastError||'Automatic Profile Match failed.'}</div>
