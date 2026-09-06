@@ -8,8 +8,8 @@ const source=fs.existsSync(routePath)?fs.readFileSync(routePath,'utf8'):''
 test('Task 11 Morning Review API keeps authenticated GET and adds authenticated POST recovery',()=>{
   assert.match(source,/export async function GET/)
   assert.match(source,/export async function POST/)
-  assert.match(source,/await requireUser\(\)/)
-  assert.match(source,/createServerSupabaseClient/)
+  assert.match(source,/resolveNightFlightRequestContext/)
+  assert.match(source,/if\(!auth\.user\) return auth\.response/)
   assert.match(source,/loadNightFlightMorningReview/)
   assert.match(source,/recoverFailedNightFlightMatch/)
   assert.doesNotMatch(source,/export async function PUT/)
