@@ -6,7 +6,19 @@ import { DEFAULT_NIGHT_FLIGHT_SETTINGS, NIGHT_FLIGHT_SOURCES, normalizeNightFlig
 import { requestNightFlightSettings, saveNightFlightSettings } from '../lib/night-flight-settings-client.js'
 import styles from './night-flight-settings.module.css'
 
-const initialSettings=()=>normalizeNightFlightSettings(DEFAULT_NIGHT_FLIGHT_SETTINGS)
+const allAreaIds=SEARCH_AREAS.map(area=>area.id)
+
+const expandAllAreas=settings=>({
+  ...settings,
+  areas:settings.areas.length===0?[...allAreaIds]:settings.areas,
+})
+
+const collapseAllAreas=settings=>({
+  ...settings,
+  areas:settings.areas.length===allAreaIds.length?[]:settings.areas,
+})
+
+const initialSettings=()=>expandAllAreas(normalizeNightFlightSettings(DEFAULT_NIGHT_FLIGHT_SETTINGS))
 
 export default function NightFlightSettings(){
   const [headerHost,setHeaderHost]=useState(null)
@@ -26,7 +38,7 @@ export default function NightFlightSettings(){
     requestNightFlightSettings()
       .then(settings=>{
         if(!active) return
-        const next=normalizeNightFlightSettings(settings)
+        const next=expandAllAreas(normalizeNightFlightSettings(settings))
         setSaved(next)
         setDraft(next)
         setStatus({loading:false,saving:false,loaded:true,error:'',notice:''})
@@ -51,6 +63,8 @@ export default function NightFlightSettings(){
   },[open,saved])
 
   const sourceError=draft.sources.length===0?'Select at least one source.':''
+  const areaError=draft.areas.length===0?'Select at least one area.':''
+  const allAreasSelected=draft.areas.length===allAreaIds.length
 
   function closeWithoutSaving(){
     setDraft(saved)
@@ -66,6 +80,14 @@ export default function NightFlightSettings(){
     setStatus(current=>({...current,error:'',notice:''}))
   }
 
+  function toggleAllAreas(){
+    setDraft(current=>({
+      ...current,
+      areas:current.areas.length===allAreaIds.length?[]:[...allAreaIds],
+    }))
+    setStatus(current=>({...current,error:'',notice:''}))
+  }
+
   function toggleArea(id){
     setDraft(current=>({
       ...current,
@@ -75,14 +97,15 @@ export default function NightFlightSettings(){
   }
 
   async function persistDraft(){
-    if(sourceError){
-      setStatus(current=>({...current,error:sourceError,notice:''}))
+    const validationError=sourceError||areaError
+    if(validationError){
+      setStatus(current=>({...current,error:validationError,notice:''}))
       return
     }
     setStatus(current=>({...current,saving:true,error:'',notice:''}))
     try{
-      const persisted=await saveNightFlightSettings(draft)
-      const next=normalizeNightFlightSettings(persisted)
+      const persisted=await saveNightFlightSettings(collapseAllAreas(draft))
+      const next=expandAllAreas(normalizeNightFlightSettings(persisted))
       setSaved(next)
       setDraft(next)
       setStatus({loading:false,saving:false,loaded:true,error:'',notice:'Saved'})
@@ -127,13 +150,17 @@ export default function NightFlightSettings(){
 
           <fieldset className={styles.group} disabled={!status.loaded||status.saving}>
             <legend>Match areas</legend>
+            <label className={styles.option}>
+              <input type="checkbox" checked={allAreasSelected} onChange={toggleAllAreas}/>
+              <span>All areas</span>
+            </label>
             <div className={styles.areaGrid}>
               {SEARCH_AREAS.map(area=><label key={area.id} className={styles.option}>
                 <input type="checkbox" checked={draft.areas.includes(area.id)} onChange={()=>toggleArea(area.id)}/>
                 <span>{area.label}</span>
               </label>)}
             </div>
-            <p className={styles.hint}>No areas selected = all areas</p>
+            {areaError&&<p className={styles.validation}>{areaError}</p>}
           </fieldset>
         </>}
 
@@ -142,7 +169,7 @@ export default function NightFlightSettings(){
 
         <div className={styles.actions}>
           <button type="button" className={styles.cancel} onClick={closeWithoutSaving}>Cancel</button>
-          <button type="button" className={styles.save} disabled={!status.loaded||status.saving||Boolean(sourceError)} onClick={persistDraft}>Save</button>
+          <button type="button" className={styles.save} disabled={!status.loaded||status.saving||Boolean(sourceError)||Boolean(areaError)} onClick={persistDraft}>Save</button>
           {status.saving&&<span className={styles.saving} aria-live="polite">Saving…</span>}
         </div>
       </section>
