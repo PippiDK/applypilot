@@ -7,6 +7,7 @@ import {processNightFlightQueue} from '../../../lib/night-flight-match-queue.js'
 import {runNightFlightForUser} from '../../../lib/night-flight-scheduler.js'
 import {getOrCreateExpertiseMatch,resolveManualExpertiseMatch} from '../../../lib/expertise-match-server-cache.js'
 import {recoverFailedNightFlightMatch} from '../../../lib/night-flight-manual-recovery.js'
+import {createNoStoreFetch} from '../../../lib/supabase/no-store-fetch.js'
 
 export const dynamic='force-dynamic'
 export const maxDuration=300
@@ -29,6 +30,7 @@ function allowed(){
 function testSupabase(){
   return createClient(TEST_URL,TEST_KEY,{
     auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},
+    global:{fetch:createNoStoreFetch()},
   })
 }
 
