@@ -75,7 +75,7 @@ async function casUpdateJob({supabase,row,payload}){
     .eq('run_id',row.run_id)
     .eq('job_key',row.job_key)
     .eq('status',row.status)
-    .eq('updated_at',row.updated_at)
+    .eq('attempts',Number(row?.attempts||0))
     .select(SELECT_FIELDS)
     .maybeSingle()
   return assertQueryResult(result,'Night Flight queue update failed')
