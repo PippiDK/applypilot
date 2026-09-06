@@ -8,7 +8,7 @@ export const dynamic='force-dynamic'
 export const maxDuration=300
 
 const TEST_URL='https://tafdswfdblxoehreaalm.supabase.co'
-const TEST_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXAiLCJyZWYiOiJ0YWZkc3dmZGJseG9laHJlYWFsbSIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzg4NjU2Mjg5LCJleHAiOjIxMDQyMzIyODl9.SI-N9Yr6t7N9VkAclQFBH8NkJtBv7aOrNVetpMpIjtA'
+const TEST_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRhZmRzd2ZkYmx4b2VocmVhYWxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2NTYyODksImV4cCI6MjEwNDIzMjI4OX0.SI-N9Yr6t7N9VkAclQFBH8NkJtBv7aOrNVetpMpIjtA'
 const USER_ID='14141414-1414-4141-8141-141414141414'
 const CONFIRM='TASK15_OVERNIGHT'
 const COPENHAGEN_TIME_ZONE='Europe/Copenhagen'
