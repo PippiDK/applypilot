@@ -12,7 +12,7 @@ export const dynamic='force-dynamic'
 export const maxDuration=300
 
 const TEST_URL='https://tafdswfdblxoehreaalm.supabase.co'
-const TEST_KEY='sb_publishable_ZMPE4l7R9vEuJ2dfX3TX3Q_drCByKsJ'
+const TEST_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRhZmRzd2ZkYmx4b2VocmVhYWxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2NTYyODksImV4cCI6MjEwNDIzMjI4OX0.SI-N9Yr6t7N9VkAclQFBH8NkJtBv7aOrNVetpMpIjtA'
 const USER_ID='14141414-1414-4141-8141-141414141414'
 const FORCED_NOW=new Date('2026-09-05T10:00:00.000Z')
 const TARGET_DATE='2026-09-04'
