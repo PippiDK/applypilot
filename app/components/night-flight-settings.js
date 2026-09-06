@@ -92,7 +92,7 @@ export default function NightFlightSettings(){
   }
 
   const trigger=headerHost?createPortal(
-    <button type="button" className={styles.trigger} onClick={()=>setOpen(true)}>NF Settings</button>,
+    <button type="button" className={styles.trigger} onClick={()=>setOpen(true)}>Settings</button>,
     headerHost
   ):null
 
