@@ -25,14 +25,14 @@ export default function NightFlightDrawer({children}){
           <button type="button" className={styles.close} aria-label="Close Night Flight" onClick={()=>setOpen(false)}>×</button>
         </div>
         <section className={styles.section}>
-          <h3>Morning Review</h3>
-          <div id="nightFlightReviewHost" className={styles.reviewHost}/>
-        </section>
-        <section className={styles.section}>
           <div className={styles.sectionHeading}>
             <div><h3>Automation</h3><p>Run Night Flight automatically using your saved Search Profile.</p></div>
             <div id="nightFlightSettingsHost" className={styles.settingsHost}/>
           </div>
+        </section>
+        <section className={styles.section}>
+          <h3>Morning Review</h3>
+          <div id="nightFlightReviewHost" className={styles.reviewHost}/>
         </section>
         {children}
       </aside>
