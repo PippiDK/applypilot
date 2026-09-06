@@ -1,5 +1,5 @@
-.tab{position:fixed;left:0;top:58%;transform:translateY(-50%) rotate(180deg);z-index:60;width:34px;padding:15px 7px;border:1px solid rgba(124,58,237,.42);border-left:0;border-radius:0 12px 12px 0;background:#17112b;color:#a78bfa;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 30px rgba(0,0,0,.24);cursor:pointer;writing-mode:vertical-rl}
-.tab span{font-size:10px;font-weight:900;letter-spacing:.18em;white-space:nowrap}
+.tab{position:fixed;left:0;right:auto;top:60%;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:12px 9px;border:1px solid rgba(124,58,237,.42);border-left:0;border-right:1px solid rgba(124,58,237,.42);border-radius:0 12px 12px 0;background:#17112b;color:#a78bfa;box-shadow:0 10px 35px rgba(0,0,0,.35);cursor:pointer}
+.tab span{font-size:9px;font-weight:900;letter-spacing:.12em;white-space:nowrap;writing-mode:vertical-rl;transform:rotate(180deg)}
 .backdrop{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.56);backdrop-filter:blur(4px);display:flex;justify-content:flex-start;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .16s ease,visibility .16s ease}
 .visible{opacity:1;visibility:visible;pointer-events:auto}
 .drawer{position:relative;width:min(560px,94vw);height:100%;background:#0b1018;border-right:1px solid #34405d;box-shadow:24px 0 70px rgba(0,0,0,.38);padding:24px;overflow:auto;transform:translateX(-100%);transition:transform .18s ease}
@@ -18,8 +18,8 @@
 .settingsHost{flex:0 0 auto;display:flex;align-items:center}
 
 @media(max-width:760px){
-  .tab{top:auto;bottom:58px;left:12px;transform:none;writing-mode:horizontal-tb;width:auto;border-left:1px solid rgba(124,58,237,.42);border-radius:999px;padding:8px 12px}
-  .tab span{font-size:9px}
+  .tab{top:auto;bottom:58px;left:12px;right:auto;border-left:1px solid rgba(124,58,237,.42);border-right:1px solid rgba(124,58,237,.42);border-radius:999px;flex-direction:row;padding:10px 14px}
+  .tab span{font-size:9px;writing-mode:initial;transform:none}
   .drawer{width:min(560px,100vw);padding:18px}
   .sectionHeading{align-items:flex-start;flex-direction:column}
 }
