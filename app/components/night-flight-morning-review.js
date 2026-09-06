@@ -59,7 +59,7 @@ export default function NightFlightMorningReview(){
   const [recoveryError,setRecoveryError]=useState('')
 
   useEffect(()=>{
-    setHost(document.querySelector('.profileStrip'))
+    setHost(document.querySelector('#nightFlightReviewHost'))
   },[])
 
   useEffect(()=>{
