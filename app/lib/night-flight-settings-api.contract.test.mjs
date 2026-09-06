@@ -8,8 +8,8 @@ const source=fs.existsSync(routePath)?fs.readFileSync(routePath,'utf8'):''
 test('Night Flight settings API exposes authenticated GET and PUT only',()=>{
   assert.match(source,/export async function GET/)
   assert.match(source,/export async function PUT/)
-  assert.match(source,/requireUser/)
-  assert.match(source,/createServerSupabaseClient/)
+  assert.match(source,/resolveNightFlightRequestContext/)
+  assert.match(source,/if\(!auth\.user\) return auth\.response/)
   assert.match(source,/loadNightFlightSettings/)
   assert.match(source,/saveNightFlightSettings/)
   assert.doesNotMatch(source,/export async function POST/)
