@@ -41,3 +41,26 @@ test('Night Flight side tab is purple and independent of APPLIED',async()=>{
   assert.match(css,/rgba\(124,58,237|#7c3aed|#a78bfa/)
   assert.match(css,/\.drawer\{[^}]*position:relative|\.drawer\{[^}]*height:100%/)
 })
+
+test('Night Flight tab matches APPLIED geometry while keeping purple identity',async()=>{
+  const css=await source('components/night-flight-drawer.module.css')
+  const desktop=css.match(/\.tab\{([^}]*)\}/)?.[1]||''
+  const label=css.match(/\.tab span\{([^}]*)\}/)?.[1]||''
+
+  assert.match(desktop,/top:60%/)
+  assert.match(desktop,/flex-direction:column/)
+  assert.match(desktop,/align-items:center/)
+  assert.match(desktop,/gap:6px/)
+  assert.match(desktop,/border-radius:0 12px 12px 0/)
+  assert.match(desktop,/padding:12px 9px/)
+  assert.doesNotMatch(desktop,/transform:/)
+  assert.doesNotMatch(desktop,/writing-mode:/)
+
+  assert.match(label,/font-size:9px/)
+  assert.match(label,/letter-spacing:\.12em/)
+  assert.match(label,/writing-mode:vertical-rl/)
+  assert.match(label,/transform:rotate\(180deg\)/)
+
+  assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.tab\{[^}]*bottom:58px[^}]*border-radius:999px[^}]*flex-direction:row[^}]*padding:10px 14px/)
+  assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.tab span\{[^}]*writing-mode:initial[^}]*transform:none/)
+})
