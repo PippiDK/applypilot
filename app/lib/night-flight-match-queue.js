@@ -4,6 +4,7 @@ export const DEFAULT_NIGHT_FLIGHT_PROCESSING_LEASE_MS=15*60*1000
 const SELECT_FIELDS='run_id,job_key,source,job_snapshot,area,status,attempts,last_error,match_cache_key,processed_at,created_at,updated_at'
 const CLAIMABLE_STATUSES=['QUEUED','RETRY','PROCESSING']
 const ACTIVE_STATUSES=new Set(['QUEUED','PROCESSING','RETRY'])
+const TASK14_TRACE_RUN='e1e5c106-7962-43f8-b6f0-8a3970f3922e'
 
 const clean=value=>String(value??'').replace(/\s+/g,' ').trim()
 
@@ -114,9 +115,11 @@ export async function claimNextNightFlightJob({
   const current=resolveNow(now)
   const lease=positiveNumber(leaseMs,DEFAULT_NIGHT_FLIGHT_PROCESSING_LEASE_MS)
   const attemptsLimit=positiveInteger(maxAttempts,DEFAULT_NIGHT_FLIGHT_MAX_ATTEMPTS)
+  const trace=process.env.VERCEL_ENV==='preview'&&id===TASK14_TRACE_RUN
 
   for(let pass=0;pass<3;pass+=1){
     const rows=await loadClaimCandidates({supabase,runId:id})
+    if(trace) console.info('[task14-queue-trace] loaded',JSON.stringify(rows.map(row=>({jobKey:row.job_key,status:row.status,attempts:row.attempts,updatedAt:row.updated_at}))))
     const candidates=[]
 
     for(const row of rows){
@@ -127,6 +130,7 @@ export async function claimNextNightFlightJob({
     }
 
     candidates.sort((a,b)=>claimPriority(a)-claimPriority(b)||String(a?.created_at||'').localeCompare(String(b?.created_at||'')))
+    if(trace) console.info('[task14-queue-trace] candidates',JSON.stringify(candidates.map(row=>({jobKey:row.job_key,status:row.status,attempts:row.attempts}))))
     if(candidates.length===0) return null
 
     for(const row of candidates){
@@ -140,6 +144,7 @@ export async function claimNextNightFlightJob({
           updated_at:stamp,
         },
       })
+      if(trace) console.info('[task14-queue-trace] claim',JSON.stringify({jobKey:row.job_key,status:row.status,attempts:row.attempts,claimed:Boolean(claimed),claimedStatus:claimed?.status||null,claimedAttempts:claimed?.attempts??null}))
       if(claimed) return claimed
     }
   }
