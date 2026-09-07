@@ -25,15 +25,15 @@ function progressFromReview(review){
   return {ready,failed,total:jobs.length,remaining:Math.max(0,jobs.length-ready-failed)}
 }
 
-async function readJson(url,fallback){
-  const response=await fetch(url)
+async function readJson(url,fallback,options){
+  const response=await fetch(url,options)
   const data=await response.json()
   if(!response.ok) throw new Error(data?.error||fallback)
   return data
 }
 
 async function fetchNightFlightReview(){
-  const data=await readJson('/api/night-flight-review','Night Flight review could not be loaded.')
+  const data=await readJson('/api/night-flight-review','Night Flight review could not be loaded.',{cache:'no-store'})
   return data?.review||null
 }
 
@@ -58,6 +58,12 @@ export default function NightFlightMorningReview(){
   const [recoveringKey,setRecoveringKey]=useState('')
   const [recoveryError,setRecoveryError]=useState('')
 
+  function applyReview(next){
+    setReview(next)
+    setProgress(progressFromReview(next))
+    setSelectedKey(current=>next?.jobs?.some(item=>item.key===current)?current:(next?.jobs?.[0]?.key||''))
+  }
+
   useEffect(()=>{
     setHost(document.querySelector('.profileStrip'))
   },[])
@@ -70,9 +76,7 @@ export default function NightFlightMorningReview(){
     fetchNightFlightReview()
       .then(next=>{
         if(!active) return
-        setReview(next)
-        setProgress(progressFromReview(next))
-        setSelectedKey(next?.jobs?.[0]?.key||'')
+        applyReview(next)
         setLoading(false)
       })
       .catch(fetchError=>{
@@ -81,6 +85,34 @@ export default function NightFlightMorningReview(){
         setLoading(false)
       })
     return ()=>{active=false}
+  },[host])
+
+  useEffect(()=>{
+    if(!host) return
+    let active=true
+
+    const refreshSavedReview=async()=>{
+      try{
+        const next=await fetchNightFlightReview()
+        if(!active) return
+        applyReview(next)
+        setError('')
+      }catch(refreshError){
+        if(active) setError(refreshError?.message||'Night Flight review could not be loaded.')
+      }
+    }
+
+    const onVisibilityChange=()=>{
+      if(document.visibilityState==='visible') refreshSavedReview()
+    }
+
+    window.addEventListener('focus',refreshSavedReview)
+    document.addEventListener('visibilitychange',onVisibilityChange)
+    return ()=>{
+      active=false
+      window.removeEventListener('focus',refreshSavedReview)
+      document.removeEventListener('visibilitychange',onVisibilityChange)
+    }
   },[host])
 
   useEffect(()=>{
@@ -105,9 +137,7 @@ export default function NightFlightMorningReview(){
         if(TERMINAL_RUN_STATUSES.has(status.run?.status)){
           const refreshed=await fetchNightFlightReview()
           if(!active) return
-          setReview(refreshed)
-          setProgress(progressFromReview(refreshed))
-          setSelectedKey(current=>refreshed?.jobs?.some(item=>item.key===current)?current:(refreshed?.jobs?.[0]?.key||''))
+          applyReview(refreshed)
           return
         }
         schedule()
@@ -130,6 +160,20 @@ export default function NightFlightMorningReview(){
   const visibleProgress=progress||progressFromReview(review)
   const selected=review?.jobs?.find(item=>item.key===selectedKey)||review?.jobs?.[0]||null
   const analysis=selected?.analysis||null
+
+  async function openNightFlightReview(){
+    setLoading(true)
+    setError('')
+    try{
+      const next=await fetchNightFlightReview()
+      applyReview(next)
+      setOpen(true)
+    }catch(openError){
+      setError(openError?.message||'Night Flight review could not be loaded.')
+    }finally{
+      setLoading(false)
+    }
+  }
 
   async function recoverNightFlightMatch(){
     if(!review?.run?.id||selected?.status!=='FAILED'||!selected?.key||recoveringKey) return
@@ -166,7 +210,7 @@ export default function NightFlightMorningReview(){
           {error&&<span className={styles.error}>{error}</span>}
         </div>
       </div>
-      <button type="button" className={styles.open} disabled={loading||!review} onClick={()=>setOpen(true)}>{loading?'Loading…':'Open Night Flight'}</button>
+      <button type="button" className={styles.open} disabled={loading||!review} onClick={openNightFlightReview}>{loading?'Loading…':'Open Night Flight'}</button>
     </div>,
     host
   )
