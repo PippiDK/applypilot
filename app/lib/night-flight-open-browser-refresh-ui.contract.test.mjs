@@ -38,3 +38,8 @@ test('open-tab refresh remains read-only and never starts scheduler or Match wor
   assert.doesNotMatch(source,/\/api\/cron\/night-flight/)
   assert.doesNotMatch(source,/analyzeExpertiseMatch|requestExpertiseMatch|getOrCreateExpertiseMatch/)
 })
+
+test('Open Night Flight refreshes saved review before opening the dialog',()=>{
+  assert.match(source,/async function openNightFlightReview/)
+  assert.match(source,/const next=await fetchNightFlightReview\(\)[\s\S]*setOpen\(true\)/)
+})
