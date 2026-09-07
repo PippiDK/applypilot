@@ -25,3 +25,16 @@ test('Task 10 polling remains browser-display-only and does not initiate Night F
   assert.doesNotMatch(source,/\/api\/cron\/night-flight/)
   assert.doesNotMatch(source,/analyzeExpertiseMatch|requestExpertiseMatch|getOrCreateExpertiseMatch/)
 })
+
+test('Morning Review refreshes saved Night Flight data when a stale open tab becomes visible or focused',()=>{
+  assert.match(source,/visibilitychange/)
+  assert.match(source,/document\.visibilityState\s*===\s*['"]visible['"]/)
+  assert.match(source,/window\.addEventListener\(['"]focus['"]/)
+  assert.match(source,/fetchNightFlightReview/)
+  assert.match(source,/cache\s*:\s*['"]no-store['"]/)
+})
+
+test('open-tab refresh remains read-only and never starts scheduler or Match work',()=>{
+  assert.doesNotMatch(source,/\/api\/cron\/night-flight/)
+  assert.doesNotMatch(source,/analyzeExpertiseMatch|requestExpertiseMatch|getOrCreateExpertiseMatch/)
+})
