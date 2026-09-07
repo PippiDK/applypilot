@@ -23,12 +23,13 @@ test('manual job statuses are local informational metadata with three explicit s
   assert.match(css,/\.status-ignore/)
 })
 
-test('manual job statuses never enter Search and only filter the post-search list',()=>{
+test('manual job statuses never enter search requests and only filter the post-search list',()=>{
   const searchStart=page.indexOf('async function search(){')
   const searchEnd=page.indexOf('\n  function startProfile()',searchStart)
   assert.ok(searchStart>=0&&searchEnd>searchStart,'search() block must be found')
   const searchBlock=page.slice(searchStart,searchEnd)
-  assert.doesNotMatch(searchBlock,/jobStatuses|JOB_STATUS_FILTERS|selectedStatuses/)
+  const requestBodies=[...searchBlock.matchAll(/body:JSON\.stringify\(([^\n]+|\{[\s\S]*?\})\)/g)].map(match=>match[0]).join('\n')
+  assert.doesNotMatch(requestBodies,/jobStatuses|JOB_STATUS_FILTERS|selectedStatuses/)
   assert.match(page,/filterJobItemsByStatus\(filterJobItems\(/)
 })
 

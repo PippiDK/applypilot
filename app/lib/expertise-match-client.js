@@ -1,5 +1,16 @@
 const text=value=>String(value??'').trim()
 
+function compactIdentity(job={}){
+  return Object.fromEntries(Object.entries({
+    source:text(job.source),
+    sourceJobId:text(job.sourceJobId),
+    jobId:text(job.jobId),
+    publishedAt:text(job.publishedAt),
+    postedDate:text(job.postedDate),
+    datePosted:text(job.datePosted),
+  }).filter(([,value])=>value))
+}
+
 export async function requestExpertiseMatch({job,cvText,fetchImpl=fetch}={}){
   const payload={
     job:{
@@ -8,6 +19,7 @@ export async function requestExpertiseMatch({job,cvText,fetchImpl=fetch}={}){
       location:text(job?.location),
       description:text(job?.description)
     },
+    jobIdentity:compactIdentity(job),
     cvText:text(cvText)
   }
   const res=await fetchImpl('/api/expertise-match',{

@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {detectCvStructure,roleLengthWindow} from './cv-sections.js'
 
-async function loadPipeline(){ return import('./tailoring-pipeline.js').catch(()=>({})) }
+async function loadPipeline(){ return import('./previous-role-overview.js').catch(()=>({})) }
 
 const analysis={
   roleMission:'Deliver a complex enterprise platform initiative from planning through release.',

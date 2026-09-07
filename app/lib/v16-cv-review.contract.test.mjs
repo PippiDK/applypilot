@@ -21,13 +21,14 @@ test('CV Update Review keeps a focused ORIGINAL UPDATED review without the obsol
   assert.doesNotMatch(page,/truthGuard compact/)
 })
 
-test('review cards show Original, Updated, Why changed and independent decisions',()=>{
+test('review cards show Original, editable Updated, Why changed and independent decisions',()=>{
   assert.match(page,/ORIGINAL/)
-  assert.match(page,/UPDATED/)
+  assert.match(page,/UPDATED · EDITABLE/)
   assert.match(page,/WHY CHANGED/)
   assert.match(page,/Keep original/)
   assert.match(page,/Accept change/)
-  assert.match(page,/change\.updated/)
+  assert.match(page,/editedUpdateFor\(change\)/)
+  assert.match(page,/updatedTextEditor/)
   assert.match(page,/change\.why/)
 })
 

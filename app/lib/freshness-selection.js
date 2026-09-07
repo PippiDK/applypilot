@@ -10,7 +10,7 @@ export const FRESHNESS_OPTIONS=[
 
 const optionFor=selection=>FRESHNESS_OPTIONS.find(option=>option.id===selection)||FRESHNESS_OPTIONS[2]
 
-function copenhagenDateKey(value){
+export function copenhagenDateKey(value){
   const date=value instanceof Date?value:new Date(value)
   if(!Number.isFinite(date.getTime())) return null
   const parts=new Intl.DateTimeFormat('en-CA',{
@@ -21,6 +21,12 @@ function copenhagenDateKey(value){
   }).formatToParts(date)
   const part=type=>parts.find(item=>item.type===type)?.value
   return `${part('year')}-${part('month')}-${part('day')}`
+}
+
+export function previousCopenhagenDateKey(now=new Date()){
+  const current=now instanceof Date?now:new Date(now)
+  if(!Number.isFinite(current.getTime())) return null
+  return copenhagenDateKey(new Date(current.getTime()-DAY_MS))
 }
 
 function publishedDate(item){
@@ -58,7 +64,7 @@ export function filterItemsByFreshnessSelection(items=[],selection='5d',now=new 
   }
 
   if(selection==='yesterday'){
-    const target=copenhagenDateKey(new Date(current.getTime()-DAY_MS))
+    const target=previousCopenhagenDateKey(current)
     return (Array.isArray(items)?items:[]).filter(item=>{
       const published=publishedDate(item)
       return published&&copenhagenDateKey(published)===target

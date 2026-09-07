@@ -38,12 +38,13 @@ test('Accept and Keep handlers mutate decision state only, not CV Library or Sou
   assert.doesNotMatch(handlers,/upsertCvSlot/)
 })
 
-test('review UI renders the three-block contract and WHY CHANGED from direct AI review blocks',()=>{
+test('review UI renders the three-block contract and WHY CHANGED from direct editable AI review blocks',()=>{
   assert.match(page,/Professional Summary/)
   assert.match(page,/Latest role overview/)
   assert.match(page,/Previous role overview/)
   assert.match(page,/WHY CHANGED/)
-  assert.match(page,/change\.updated/)
+  assert.match(page,/editedUpdateFor\(change\)/)
+  assert.match(page,/change\?\.updated/)
   assert.match(page,/change\.why/)
   assert.doesNotMatch(page,/buildReviewChanges\(cvData,active\)/)
 })

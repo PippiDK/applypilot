@@ -36,3 +36,11 @@ export function writeJobStatus({storage,statuses={},jobId,status}={}){
   storage?.setItem?.(JOB_STATUS_STORAGE_KEY,JSON.stringify(next))
   return next
 }
+
+export const NIGHT_FLIGHT_STATUS='night-flight'
+
+export function resolveJobStatus({manualStatus='',job={}}={}){
+  const manual=VALID.has(manualStatus)?manualStatus:''
+  if(manual) return manual
+  return job?.nightFlight?.processed===true?NIGHT_FLIGHT_STATUS:''
+}

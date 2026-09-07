@@ -1,0 +1,74 @@
+name: V18 full-suite baseline diagnostic
+
+on:
+  push:
+    branches:
+      - 'v18/night-flight-task2-profile-sync'
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    if: "!contains(github.event.head_commit.message, 'capture full-suite diagnostic results')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current branch
+        uses: actions/checkout@v4
+        with:
+          ref: v18/night-flight-task2-profile-sync
+          fetch-depth: 0
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run current and baseline full suites
+        shell: bash
+        run: |
+          set +e
+          npm install --no-audit --no-fund > /tmp/current-install.log 2>&1
+          npm test > /tmp/current.log 2>&1
+          echo $? > /tmp/current.code
+
+          git worktree add /tmp/applypilot-baseline 57e8ac08 >/tmp/worktree.log 2>&1
+          cd /tmp/applypilot-baseline
+          npm install --no-audit --no-fund > /tmp/baseline-install.log 2>&1
+          npm test > /tmp/baseline.log 2>&1
+          echo $? > /tmp/baseline.code
+          cd "$GITHUB_WORKSPACE"
+
+          python - <<'PY'
+          from pathlib import Path
+
+          def extract(label, log_path, code_path):
+              lines=Path(log_path).read_text(errors='replace').splitlines()
+              code=Path(code_path).read_text().strip()
+              needles=('not ok ', 'AssertionError', 'ERR_ASSERTION', 'failureType:', 'error:', 'code:')
+              hits=[]
+              for i,line in enumerate(lines):
+                  if any(n in line for n in needles): hits.append(i)
+              ranges=[]
+              for i in hits:
+                  a=max(0,i-8); b=min(len(lines),i+30)
+                  if ranges and a <= ranges[-1][1]+1:
+                      ranges[-1]=(ranges[-1][0],max(ranges[-1][1],b))
+                  else:
+                      ranges.append((a,b))
+              if not ranges:
+                  ranges=[(max(0,len(lines)-160),len(lines))]
+              out=[f'=== {label} ===',f'exit_code={code}']
+              for a,b in ranges:
+                  out.append(f'--- lines {a+1}-{b} ---')
+                  out.extend(lines[a:b])
+              return '\n'.join(out)
+
+          report=extract('CURRENT HEAD','/tmp/current.log','/tmp/current.code')+'\n\n'+extract('BASELINE 57e8ac08','/tmp/baseline.log','/tmp/baseline.code')+'\n'
+          Path('full-suite-diagnostic.txt').write_text(report)
+          PY
+      - name: Commit diagnostic report
+        run: |
+          git config user.name "PippiDK"
+          git config user.email "133820767+PippiDK@users.noreply.github.com"
+          git add full-suite-diagnostic.txt
+          git commit -m "chore: capture full-suite diagnostic results"
+          git push origin HEAD:v18/night-flight-task2-profile-sync

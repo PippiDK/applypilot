@@ -79,14 +79,15 @@ test('merged UI restores Search Profile persistence without wiring it into Linke
   assert.match(source,/localStorage\.getItem\('applypilot-profile'\)/)
   assert.match(source,/localStorage\.setItem\('applypilot-profile'/)
   assert.match(source,/BUILD YOUR SEARCH AGENT/)
-  assert.match(source,/Step \{profileStep\} of 5/)
+  assert.match(source,/Step \{profileStep\} of 4/)
   assert.match(source,/Save profile/)
 })
 
 test('merged UI keeps Application Pack and exposes the direct M4 review flow',()=>{
   const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
   assert.match(source,/Application pack/)
-  assert.match(source,/Adapt & review CV/)
+  assert.match(source,/Generate CV update/)
+  assert.match(source,/View CV update/)
   assert.match(source,/CV UPDATE REVIEW/)
   assert.match(source,/Adaptation complete/)
   assert.match(source,/AI UPDATED text is shown directly/)
@@ -113,20 +114,19 @@ test('M4 CV review shows a neutral empty state when AI returns no changed block'
   assert.doesNotMatch(source,/No usable CV evidence was found for this review/)
 })
 
-test('Source CV upload entry points keep the current five-step Search Profile flow',()=>{
+test('Source CV upload entry points keep the current four-step Search Profile flow',()=>{
   const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
   const cvLibraryStep=fs.readFileSync(new URL('../components/cv-library-step.js',import.meta.url),'utf8')
   assert.doesNotMatch(source,/setCvOpen/)
   assert.doesNotMatch(source,/cvOpen&&/)
   assert.match(source,/className="cvButton" onClick=\{startProfile\}/)
-  assert.match(source,/Upload CV<\/button>/)
+  assert.match(cvLibraryStep,/cv\?'Replace':'Upload CV'/)
   assert.match(cvLibraryStep,/Upload your CVs/)
   assert.doesNotMatch(source,/Upload your master CV/i)
   assert.doesNotMatch(source,/onClick=\{\(\)=>setCvOpen\(true\)\}[^>]*>Upload \/ analyse CV/)
   assert.match(cvLibraryStep,/Detected signals from CV 1:/)
-  assert.match(source,/Step \{profileStep\} of 5/)
+  assert.match(source,/Step \{profileStep\} of 4/)
 })
-
 
 test('profile status requires a complete ready Source CV and search uses that Source CV',()=>{
   const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
@@ -228,7 +228,6 @@ test('M4 UI supersedes the legacy Summary-only review with three direct AI block
   assert.match(source,/Previous role overview/)
   assert.doesNotMatch(source,/bullet workflow/i)
 })
-
 
 test('Version 2 Step 1 stops Professional Summary extraction before Core Competences',()=>{
   const preview='YULIA BJØRNBERG\nSenior IT Project / Delivery Manager\nProfessional Summary\nSenior IT Project and Delivery Manager with 18+ years of experience in regulated enterprise environments.\nExperienced in PMO collaboration, governance and stakeholder management.\nCore Competences\nEnd-to-End Project Delivery • Project Governance • Risk & Dependency Management'
