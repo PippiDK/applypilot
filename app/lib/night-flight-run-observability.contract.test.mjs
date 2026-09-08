@@ -34,3 +34,10 @@ test('Night Flight cron route supports temporary hashed diagnostic trigger witho
   assert.match(source,/44ada9ba83677d21d3e91cc4ea5cc50c6d207ffc6264c3008d53a26d22a24ab6/)
   assert.doesNotMatch(source,/QdeLUMf0smv8xHTOIj-sKu1aHq3i5cyrlO_3sXWTDvw/)
 })
+
+test('Preview Night Flight cron pins admin access to TEST Supabase before diagnostic execution',async()=>{
+  const source=await readFile(routeUrl,'utf8')
+  assert.match(source,/VERCEL_ENV\s*===\s*['"]preview['"]/) 
+  assert.match(source,/https:\/\/tafdswfdblxoehreaalm\.supabase\.co/)
+  assert.match(source,/NEXT_PUBLIC_SUPABASE_URL\s*:\s*TEST_SUPABASE_URL/)
+})
