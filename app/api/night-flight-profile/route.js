@@ -1,9 +1,22 @@
 import { NextResponse } from 'next/server'
 import { requireUser } from '../../lib/auth/require-user.js'
+import { createAdminSupabaseClient } from '../../lib/supabase/admin.js'
 import { createServerSupabaseClient } from '../../lib/supabase/server.js'
 import { syncNightFlightProfileSave } from '../../lib/night-flight-profile-sync.js'
 
 export const dynamic = 'force-dynamic'
+
+const TEST_SUPABASE_URL='https://tafdswfdblxoehreaalm.supabase.co'
+
+async function createNightFlightProfileSupabase(){
+  if(process.env.VERCEL_ENV==='preview'){
+    return createAdminSupabaseClient({
+      ...process.env,
+      NEXT_PUBLIC_SUPABASE_URL:TEST_SUPABASE_URL,
+    })
+  }
+  return createServerSupabaseClient()
+}
 
 export async function POST(request) {
   const auth = await requireUser()
@@ -11,7 +24,7 @@ export async function POST(request) {
 
   try {
     const body = await request.json()
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createNightFlightProfileSupabase()
     const persisted = await syncNightFlightProfileSave({
       supabase,
       userId: auth.user.id,
