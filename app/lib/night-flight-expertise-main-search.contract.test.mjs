@@ -3,7 +3,12 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
 const page=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
-const mainSearchBase=fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8')
+
+function sourceFunction(name){
+  const match=page.match(new RegExp(`function ${name}\\(value\\)\\{[\\s\\S]*?\\n\\}`))
+  assert.ok(match,`${name} must exist in page.js`)
+  return Function(`return (${match[0]})`)()
+}
 
 test('Main Search resolves the selected Night Flight cached analysis from the existing Night Flight index',()=>{
   assert.match(page,/resolveNightFlightExpertise/)
@@ -16,10 +21,9 @@ test('Main Search replaces the visible expertiseHero with the cached Night Fligh
   assert.match(page,/cachedNightFlightAnalysis/)
 })
 
-test('Main Search carries the selected vacancy identity explicitly instead of recovering it from React key rewriting',()=>{
-  assert.match(mainSearchBase,/data-night-flight-source-job-id=\{job\.sourceJobId\}/)
-  assert.match(mainSearchBase,/data-night-flight-source=\{/)
-  assert.match(page,/node\.props\?\.\['data-night-flight-source-job-id'\]/)
-  assert.match(page,/node\.props\?\.\['data-night-flight-source'\]/)
-  assert.doesNotMatch(page,/visibleElementKey\(node\.key\)/)
+test('selected vacancy identity survives nested React key rewriting before Night Flight lookup',()=>{
+  const visibleElementKey=sourceFunction('visibleElementKey')
+  assert.equal(visibleElementKey('.0:$4462974280'),'4462974280')
+  assert.equal(visibleElementKey('.1:$h1695756'),'h1695756')
+  assert.equal(visibleElementKey('.$4462974280'),'4462974280')
 })
