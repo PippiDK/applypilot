@@ -39,3 +39,9 @@ test('Task 11 FAILED Run Match invokes authenticated review recovery and replace
   assert.match(component,/setSelectedKey\(selected\.key\)/)
   assert.doesNotMatch(component,/className=\{styles\.retry\}\s+disabled>Run Match<\/button>/)
 })
+
+test('Night Flight job cards show the already-saved Profile Match percentage without recalculating it',()=>{
+  assert.match(component,/item\.analysis\?\.expertiseMatch/)
+  assert.match(component,/styles\.jobScore/)
+  assert.doesNotMatch(component,/requestExpertiseMatch|analyzeExpertiseMatch|getOrCreateExpertiseMatch/)
+})
