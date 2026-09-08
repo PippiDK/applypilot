@@ -181,18 +181,14 @@ export default function NightFlightMorningReview(){
         </div>
         <div className={styles.body}>
           <aside className={styles.list} aria-label="Night Flight jobs">
-            {(review.jobs||[]).map(item=>{
-              const jobScore=Number(item.analysis?.expertiseMatch)
-              const visibleJobScore=Number.isFinite(jobScore)?Math.round(jobScore):null
-              return <button type="button" key={item.key} className={`${styles.job} ${selected?.key===item.key?styles.selected:''}`} onClick={()=>{setSelectedKey(item.key);setRecoveryError('')}}>
-                <span className={styles.jobTopRow}>
-                  <span className={styles.jobTitle}>{item.job?.title||'Untitled role'}</span>
-                  {visibleJobScore!==null&&<span className={styles.jobScore}>{visibleJobScore}%</span>}
-                </span>
-                <span className={styles.jobMeta}>{item.job?.company||'Company unavailable'} · {item.job?.location||item.source||'Location unavailable'}</span>
-                <span className={item.status==='READY'?styles.ready:styles.failed}>{item.status==='READY'?'READY':'FAILED'}</span>
-              </button>
-            })}
+            {(review.jobs||[]).map(item=><button type="button" key={item.key} className={`${styles.job} ${selected?.key===item.key?styles.selected:''}`} onClick={()=>{setSelectedKey(item.key);setRecoveryError('')}}>
+              <span className={styles.jobTopRow}>
+                <span className={styles.jobTitle}>{item.job?.title||'Untitled role'}</span>
+                {item.analysis?.expertiseMatch!=null&&<span className={styles.jobScore}>{item.analysis?.expertiseMatch}%</span>}
+              </span>
+              <span className={styles.jobMeta}>{item.job?.company||'Company unavailable'} · {item.job?.location||item.source||'Location unavailable'}</span>
+              <span className={item.status==='READY'?styles.ready:styles.failed}>{item.status==='READY'?'READY':'FAILED'}</span>
+            </button>)}
           </aside>
           <section className={styles.match} aria-label="Profile Match">
             <div className={styles.matchHeader}>
