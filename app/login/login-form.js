@@ -2,10 +2,11 @@
 
 import {useState} from 'react'
 import {createBrowserSupabaseClient} from '../lib/supabase/client.js'
+import {canonicalAuthRedirectOrigin} from '../lib/canonical-origin.js'
 
 const NOTICE='If this email has access, a sign-in link will arrive shortly.'
 
-export default function LoginForm(){
+export default function LoginForm({environment,branchUrl}){
   const [email,setEmail]=useState('')
   const [loading,setLoading]=useState(false)
   const [notice,setNotice]=useState('')
@@ -18,11 +19,16 @@ export default function LoginForm(){
 
     try{
       const supabase=createBrowserSupabaseClient()
+      const redirectOrigin=canonicalAuthRedirectOrigin({
+        vercelEnv:environment,
+        branchUrl,
+        currentOrigin:window.location.origin,
+      })
       await supabase.auth.signInWithOtp({
         email:email.trim(),
         options:{
           shouldCreateUser:false,
-          emailRedirectTo:`${window.location.origin}/auth/confirm`
+          emailRedirectTo:`${redirectOrigin}/auth/confirm`
         }
       })
     }catch{
