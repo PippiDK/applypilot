@@ -1,11 +1,11 @@
 'use client'
 
 import {useEffect} from 'react'
-import {stablePreviewRedirectUrl} from '../lib/preview-stable-origin.js'
+import {canonicalAppRedirectUrl} from '../lib/canonical-origin.js'
 
 export default function StablePreviewOrigin({environment,branchUrl}){
   useEffect(()=>{
-    const redirectUrl=stablePreviewRedirectUrl({
+    const redirectUrl=canonicalAppRedirectUrl({
       vercelEnv:environment,
       branchUrl,
       requestUrl:window.location.href,
