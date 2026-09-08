@@ -22,7 +22,9 @@ export async function POST(request){
   const auth=await requireUser()
   if(!auth.user) return auth.response
 
+  let stage='request'
   try{
+    stage='parse_request'
     const body=await request.json()
     const rawJob=body?.job&&typeof body.job==='object'?body.job:{}
     const identity=body?.jobIdentity&&typeof body.jobIdentity==='object'?body.jobIdentity:{}
@@ -35,8 +37,11 @@ export async function POST(request){
     }
     const cvText=text(body?.cvText)
     const cvSourceVersion=text(body?.cvSourceVersion)
+    stage='create_supabase_client'
     const supabase=await createServerSupabaseClient()
+    stage='load_profile_state'
     const profileState=await loadLatestNightFlightProfileState({supabase,userId:auth.user.id})
+    stage='resolve_expertise_match'
     const result=await resolveManualExpertiseMatch({
       supabase,
       userId:auth.user.id,
@@ -49,7 +54,12 @@ export async function POST(request){
     return NextResponse.json({analysis:result.analysis})
   }catch(error){
     const safe=safeExpertiseError(error)
-    console.error('expertise-match error',{code:String(error?.code||'AI_UNKNOWN')})
+    console.error('expertise-match error',{
+      stage,
+      code:String(error?.code||'AI_UNKNOWN'),
+      name:String(error?.name||'Error').slice(0,80),
+      message:String(error?.message||'').slice(0,240),
+    })
     return NextResponse.json({error:safe.error},{status:safe.status})
   }
 }
