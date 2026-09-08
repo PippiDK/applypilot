@@ -26,7 +26,6 @@ test('master pool cache safely returns empty for missing or invalid data',()=>{
   assert.deepEqual(readLinkedInMasterPool({storage,fingerprint:'broken'}),[])
 })
 
-
 test('master pool snapshot persists verified jobs together with discovery candidates',()=>{
   const storage=memoryStorage()
   writeLinkedInMasterPool({storage,fingerprint:'profile-cache',candidates:[{jobId:'1'}],verifiedJobs:[{sourceJobId:'1',title:'Cached PM'}]})
@@ -40,4 +39,13 @@ test('fresh-cache helper only allows short local view reuse',()=>{
   const now=new Date('2026-09-02T12:00:00Z')
   assert.equal(isLinkedInMasterPoolFresh({savedAt:'2026-09-02T11:55:00Z'},now),true)
   assert.equal(isLinkedInMasterPoolFresh({savedAt:'2026-09-02T11:30:00Z'},now),false)
+})
+
+test('quota exhaustion does not fail master-pool writes',()=>{
+  const quotaStorage={
+    getItem:()=>null,
+    setItem:()=>{throw new DOMException('quota exceeded','QuotaExceededError')},
+    removeItem:()=>{},
+  }
+  assert.doesNotThrow(()=>writeLinkedInMasterPool({storage:quotaStorage,fingerprint:'quota-profile',candidates:[{jobId:'1'}]}))
 })
