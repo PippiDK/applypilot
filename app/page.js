@@ -24,7 +24,10 @@ function sourceFromJobCard(node){
 }
 
 function visibleElementKey(value){
-  return String(value??'').replace(/^\.\$/,'').replace(/^\$/,'').trim()
+  const key=String(value??'').trim()
+  if(!key) return ''
+  const visible=key.includes('$')?key.slice(key.lastIndexOf('$')+1):key
+  return visible.replace(/=0/g,'=').replace(/=2/g,':').trim()
 }
 
 function enrichStatusSelect(jobWrap,index){
