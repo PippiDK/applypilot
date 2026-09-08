@@ -40,8 +40,10 @@ test('Task 11 FAILED Run Match invokes authenticated review recovery and replace
   assert.doesNotMatch(component,/className=\{styles\.retry\}\s+disabled>Run Match<\/button>/)
 })
 
-test('Night Flight job cards show the already-saved Profile Match percentage without recalculating it',()=>{
-  assert.match(component,/item\.analysis\?\.expertiseMatch/)
+test('Night Flight job cards copy the saved Profile Match percentage directly into the vacancy list',()=>{
+  assert.match(component,/\{item\.analysis\?\.expertiseMatch\}%/)
   assert.match(component,/styles\.jobScore/)
+  assert.doesNotMatch(component,/const jobScore=Number\(item\.analysis\?\.expertiseMatch\)/)
+  assert.doesNotMatch(component,/const visibleJobScore=/)
   assert.doesNotMatch(component,/requestExpertiseMatch|analyzeExpertiseMatch|getOrCreateExpertiseMatch/)
 })
