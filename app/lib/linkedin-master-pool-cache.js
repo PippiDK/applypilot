@@ -39,6 +39,8 @@ export function writeLinkedInMasterPool({storage,fingerprint,candidates=[],verif
   const safeCandidates=Array.isArray(candidates)?candidates.slice(0,500):[]
   const safeVerifiedJobs=Array.isArray(verifiedJobs)?verifiedJobs.slice(0,500):[]
   const savedAt=new Date().toISOString()
-  storage.setItem(key,JSON.stringify({version:2,candidates:safeCandidates,verifiedJobs:safeVerifiedJobs,savedAt}))
+  try{
+    storage.setItem(key,JSON.stringify({version:2,candidates:safeCandidates,verifiedJobs:safeVerifiedJobs,savedAt}))
+  }catch{}
   return {candidates:safeCandidates,verifiedJobs:safeVerifiedJobs,savedAt}
 }
