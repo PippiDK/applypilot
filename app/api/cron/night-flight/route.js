@@ -5,6 +5,7 @@ import {runNightFlightScheduler} from '../../../lib/night-flight-scheduler.js'
 
 export const dynamic='force-dynamic'
 
+const TEST_SUPABASE_URL='https://tafdswfdblxoehreaalm.supabase.co'
 const DIAGNOSTIC_TOKEN_SHA256='44ada9ba83677d21d3e91cc4ea5cc50c6d207ffc6264c3008d53a26d22a24ab6'
 const clean=value=>String(value??'').trim()
 const sha256=value=>createHash('sha256').update(clean(value)).digest('hex')
@@ -12,6 +13,16 @@ const sha256=value=>createHash('sha256').update(clean(value)).digest('hex')
 function diagnosticAuthorized(request){
   const token=clean(new URL(request.url).searchParams.get('diagnostic'))
   return Boolean(token)&&sha256(token)===DIAGNOSTIC_TOKEN_SHA256
+}
+
+function createNightFlightAdminSupabase(){
+  if(process.env.VERCEL_ENV==='preview'){
+    return createAdminSupabaseClient({
+      ...process.env,
+      NEXT_PUBLIC_SUPABASE_URL:TEST_SUPABASE_URL,
+    })
+  }
+  return createAdminSupabaseClient()
 }
 
 async function startExecution(supabase,trigger){
@@ -51,7 +62,7 @@ export async function GET(request){
   let supabase
   let executionId=''
   try{
-    supabase=createAdminSupabaseClient()
+    supabase=createNightFlightAdminSupabase()
     executionId=await startExecution(supabase,isDiagnostic?'diagnostic':'cron')
     const result=await runNightFlightScheduler({supabase})
     const failed=Number(result?.usersFailed||0)>0
