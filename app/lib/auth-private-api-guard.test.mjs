@@ -36,6 +36,12 @@ test('shared guard returns a uniform 401 when no authenticated user exists',asyn
   assert.match(source,/auth\.getUser\(\)/)
 })
 
+test('preview guard uses the UUID-backed TEST user instead of a fake non-UUID id',async()=>{
+  const source=await readFile(new URL('./auth/require-user.js',import.meta.url),'utf8')
+  assert.doesNotMatch(source,/id\s*:\s*['"]vercel-preview['"]/)
+  assert.match(source,/14141414-1414-4141-8141-141414141414/)
+})
+
 test('shared guard exposes normalized role and an admin-only guard',async()=>{
   const source=await readFile(new URL('./auth/require-user.js',import.meta.url),'utf8')
   assert.match(source,/getUserRole/)
