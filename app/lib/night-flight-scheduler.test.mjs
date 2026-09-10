@@ -10,13 +10,25 @@ function fakeSupabase({settings=[],runs={}}={}){
   return {
     from(table){
       const filters={}
+      const lists={}
       const query={
         select(){return query},
         eq(field,value){filters[field]=value;return query},
+        in(field,values){lists[field]=values;return query},
+        order(){return query},
+        limit(){return query},
         async maybeSingle(){
           if(table!=='night_flight_runs') return {data:null,error:null}
-          const key=`${filters.user_id}|${filters.target_date}`
-          return {data:runs[key]||null,error:null}
+          if(filters.target_date){
+            const key=`${filters.user_id}|${filters.target_date}`
+            return {data:runs[key]||null,error:null}
+          }
+          const candidates=Object.entries(runs)
+            .filter(([key])=>!filters.user_id||key.startsWith(`${filters.user_id}|`))
+            .map(([,row])=>row)
+            .filter(row=>!lists.status||lists.status.includes(row.status))
+            .sort((a,b)=>String(a?.target_date||'').localeCompare(String(b?.target_date||'')))
+          return {data:candidates[0]||null,error:null}
         },
         then(resolve,reject){
           if(table==='night_flight_settings'){
@@ -31,7 +43,7 @@ function fakeSupabase({settings=[],runs={}}={}){
   }
 }
 
-test('Task 7 maps the two UTC cron ticks to Copenhagen 02:00 across DST',async()=>{
+test('Task 7 keeps the Copenhagen 02:00 start guard correct across DST',async()=>{
   const mod=await loadScheduler()
   assert.ok(mod,'night-flight-scheduler.js must exist')
 
@@ -145,11 +157,10 @@ test('Task 7 isolates one user failure and continues the remaining enabled users
   assert.match(result.failures[0].error,/source failed/i)
 })
 
-test('Task 7 Vercel config uses only two daily UTC cron ticks for DST-safe Copenhagen scheduling',async()=>{
+test('Task 7 Vercel config uses an hourly UTC resume window with the Copenhagen start guard',async()=>{
   const config=JSON.parse(await readFile(new URL('../../vercel.json',import.meta.url),'utf8'))
   assert.deepEqual(config.crons,[
-    {path:'/api/cron/night-flight',schedule:'0 0 * * *'},
-    {path:'/api/cron/night-flight',schedule:'0 1 * * *'},
+    {path:'/api/cron/night-flight',schedule:'0 0-6 * * *'},
   ])
 })
 
