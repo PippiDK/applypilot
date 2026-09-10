@@ -38,8 +38,9 @@ jobs:
               if m and m.group(1) not in files:
                   files.append(m.group(1))
 
+          # Handle both sync and async filesystem reads of page.js.
           direct=re.compile(
-              r"(?P<fn>(?:fs\.)?readFileSync)\(\s*new URL\(\s*(['\"])\.\./page\.js\2\s*,\s*import\.meta\.url\s*\)\s*,\s*(['\"])utf8\3\s*\)"
+              r"(?P<fn>(?:fs\.)?readFile(?:Sync)?)\(\s*new URL\(\s*(['\"])\.\./page\.js\2\s*,\s*import\.meta\.url\s*\)\s*,\s*(['\"])utf8\3\s*\)"
           )
           path_decl=re.compile(
               r"const\s+(\w+)\s*=\s*new URL\(\s*(['\"])\.\./page\.js\2\s*,\s*import\.meta\.url\s*\)"
@@ -55,22 +56,33 @@ jobs:
                   continue
               original=text
 
+              # Dynamic sourceText helper used by the V18 regression guard.
+              old_helper="const sourceText=relative=>readFile(new URL(relative,import.meta.url),'utf8')"
+              if old_helper in text:
+                  new_helper="const sourceText=async relative=>{const source=await readFile(new URL(relative,import.meta.url),'utf8');if(relative!=='../page.js')return source;const main=await readFile(new URL('../main-search-base.js',import.meta.url),'utf8');return source+'\\n'+main}"
+                  text=text.replace(old_helper,new_helper)
+
               def repl_direct(m):
                   fn=m.group('fn')
                   old=m.group(0)
                   main=f"{fn}(new URL('../main-search-base.js',import.meta.url),'utf8')"
+                  # async readFile expressions must be awaited individually; callers already await the whole expression.
+                  if fn.endswith('readFile'):
+                      return f"Promise.all([{old},{main}]).then(parts=>parts.join('\\n'))"
                   return f"({old}+'\\n'+{main})"
               text=direct.sub(repl_direct,text)
 
               page_vars=[m.group(1) for m in path_decl.finditer(text)]
               for var in page_vars:
                   named=re.compile(
-                      rf"(?P<fn>(?:fs\.)?readFileSync)\(\s*{re.escape(var)}\s*,\s*(['\"])utf8\2\s*\)"
+                      rf"(?P<fn>(?:fs\.)?readFile(?:Sync)?)\(\s*{re.escape(var)}\s*,\s*(['\"])utf8\2\s*\)"
                   )
                   def repl_named(m):
                       fn=m.group('fn')
                       old=m.group(0)
                       main=f"{fn}(new URL('../main-search-base.js',import.meta.url),'utf8')"
+                      if fn.endswith('readFile'):
+                          return f"Promise.all([{old},{main}]).then(parts=>parts.join('\\n'))"
                       return f"({old}+'\\n'+{main})"
                   text=named.sub(repl_named,text)
 
@@ -93,7 +105,7 @@ jobs:
           set -e
           if [ "$code" -ne 0 ]; then
             echo 'Remaining failing tests:'
-            grep '^not ok ' /tmp/after.log || true
+            grep -A 12 '^not ok ' /tmp/after.log || true
             exit "$code"
           fi
           tail -n 20 /tmp/after.log
