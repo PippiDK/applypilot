@@ -16,9 +16,9 @@ test('Main Search replaces the visible expertiseHero with the cached Night Fligh
   assert.match(page,/cachedNightFlightAnalysis/)
 })
 
-test('selected Main Search vacancy receives its saved Night Flight analysis directly from the index',()=>{
-  assert.match(page,/MainSearchBase\(\{nightFlightIndex\}\)/)
-  assert.match(mainSearch,/resolveNightFlightExpertise/)
-  assert.match(mainSearch,/resolveNightFlightExpertise\(\{job:active\.job,index:nightFlightIndex\}\)/)
-  assert.match(mainSearch,/analysis:nightFlightAnalysis\?\?cached/)
+test('selected Main Search vacancy strips React child-key prefixes before the Night Flight lookup',()=>{
+  assert.match(page,/function visibleElementKey\(value\)/)
+  assert.match(page,/lastIndexOf\('\$'\)/)
+  assert.match(page,/slice\(marker\+1\)/)
+  assert.doesNotMatch(page,/replace\(\/\^\\\.\\\$\//)
 })
