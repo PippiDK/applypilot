@@ -55,7 +55,6 @@ jobs:
                   continue
               original=text
 
-              # Replace each direct page.js read exactly once. Preserve optional fs. prefix.
               def repl_direct(m):
                   fn=m.group('fn')
                   old=m.group(0)
@@ -63,7 +62,6 @@ jobs:
                   return f"({old}+'\\n'+{main})"
               text=direct.sub(repl_direct,text)
 
-              # Replace reads through named page-path variables exactly once.
               page_vars=[m.group(1) for m in path_decl.finditer(text)]
               for var in page_vars:
                   named=re.compile(
@@ -94,18 +92,8 @@ jobs:
           code=$?
           set -e
           if [ "$code" -ne 0 ]; then
-            python - <<'PY'
-            from pathlib import Path
-            lines=Path('/tmp/after.log').read_text(errors='replace').splitlines()
-            print('Remaining failing tests:')
-            for i,line in enumerate(lines):
-                if line.startswith('not ok '):
-                    print(line)
-                    for extra in lines[i+1:i+14]:
-                        s=extra.strip()
-                        if s.startswith('location:') or s.startswith('error:'):
-                            print('  '+s)
-            PY
+            echo 'Remaining failing tests:'
+            grep '^not ok ' /tmp/after.log || true
             exit "$code"
           fi
           tail -n 20 /tmp/after.log
