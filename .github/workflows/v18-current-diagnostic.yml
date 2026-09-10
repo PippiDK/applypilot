@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   diagnose:
-    if: "!contains(github.event.head_commit.message, 'capture current test diagnostic')"
+    if: "!contains(github.event.head_commit.message, 'capture compact test diagnostic')"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run tests and capture failures
+      - name: Run tests and capture compact failures
         shell: bash
         run: |
           set +e
@@ -28,22 +28,23 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           lines=Path('/tmp/test.log').read_text(errors='replace').splitlines()
-          hits=[i for i,line in enumerate(lines) if 'not ok ' in line]
-          ranges=[]
-          for i in hits:
-              a=max(0,i-8); b=min(len(lines),i+60)
-              if ranges and a<=ranges[-1][1]+1:ranges[-1]=(ranges[-1][0],max(ranges[-1][1],b))
-              else:ranges.append((a,b))
-          if not ranges:ranges=[(max(0,len(lines)-250),len(lines))]
           out=[]
-          for a,b in ranges:
-              out.append(f'--- lines {a+1}-{b} ---'); out.extend(lines[a:b])
+          for i,line in enumerate(lines):
+              if line.startswith('not ok '):
+                  out.append(line)
+                  for extra in lines[i+1:i+14]:
+                      stripped=extra.strip()
+                      if stripped.startswith('location:') or stripped.startswith('error:'):
+                          out.append('  '+stripped)
+                  out.append('')
+          out.append('--- summary ---')
+          out.extend(lines[-25:])
           Path('current-test-diagnostic.txt').write_text('\n'.join(out)+'\n')
           PY
-      - name: Commit diagnostic
+      - name: Commit compact diagnostic
         run: |
           git config user.name "PippiDK"
           git config user.email "133820767+PippiDK@users.noreply.github.com"
           git add current-test-diagnostic.txt
-          git commit -m "chore: capture current test diagnostic"
+          git commit -m "chore: capture compact test diagnostic"
           git push origin HEAD:v18/diag2-night-flight-right-panel
