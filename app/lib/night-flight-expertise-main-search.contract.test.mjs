@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
 const page=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+const mainSearch=fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8')
 
 test('Main Search resolves the selected Night Flight cached analysis from the existing Night Flight index',()=>{
   assert.match(page,/resolveNightFlightExpertise/)
@@ -13,4 +14,11 @@ test('Main Search replaces the visible expertiseHero with the cached Night Fligh
   assert.match(page,/nightFlightExpertiseHero/)
   assert.match(page,/expertiseHero/)
   assert.match(page,/cachedNightFlightAnalysis/)
+})
+
+test('selected Main Search vacancy receives its saved Night Flight analysis directly from the index',()=>{
+  assert.match(page,/MainSearchBase\(\{nightFlightIndex\}\)/)
+  assert.match(mainSearch,/resolveNightFlightExpertise/)
+  assert.match(mainSearch,/resolveNightFlightExpertise\(\{job:active\.job,index:nightFlightIndex\}\)/)
+  assert.match(mainSearch,/analysis:nightFlightAnalysis\?\?cached/)
 })
