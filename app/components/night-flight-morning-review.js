@@ -25,6 +25,17 @@ function progressFromReview(review){
   return {ready,failed,total:jobs.length,remaining:Math.max(0,jobs.length-ready-failed)}
 }
 
+function jobStatusLabel(value){
+  return String(value??'').trim().toUpperCase()||'UNKNOWN'
+}
+
+function jobStatusClass(value){
+  const status=jobStatusLabel(value)
+  if(status==='READY') return styles.ready
+  if(status==='FAILED') return styles.failed
+  return styles.muted
+}
+
 async function readJson(url,fallback){
   const response=await fetch(url)
   const data=await response.json()
@@ -127,6 +138,7 @@ export default function NightFlightMorningReview(){
 
   const counts=review?.counts||{ready:0,failed:0}
   const activeRun=ACTIVE_RUN_STATUSES.has(review?.run?.status)
+  const dayLabel=activeRun?'In progress':'Last completed day'
   const visibleProgress=progress||progressFromReview(review)
   const selected=review?.jobs?.find(item=>item.key===selectedKey)||review?.jobs?.[0]||null
   const analysis=selected?.analysis||null
@@ -162,7 +174,7 @@ export default function NightFlightMorningReview(){
       <div>
         <div className={styles.eyebrow}>NIGHT FLIGHT</div>
         <div className={styles.meta}>
-          <span>Last completed day · {formatDay(review?.run?.targetDate)}</span>
+          <span>{dayLabel} · {formatDay(review?.run?.targetDate)}</span>
           <span className={styles.counts}>{activeRun?`${visibleProgress.ready} / ${visibleProgress.total} ready`:`${counts.ready} READY · ${counts.failed} FAILED`}</span>
           {error&&<span className={styles.error}>{error}</span>}
         </div>
@@ -176,7 +188,7 @@ export default function NightFlightMorningReview(){
     <div className={styles.backdrop} onMouseDown={event=>{if(event.target===event.currentTarget)setOpen(false)}}>
       <section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="night-flight-review-title">
         <div className={styles.heading}>
-          <div><div className={styles.eyebrow}>NIGHT FLIGHT</div><h2 id="night-flight-review-title">Last completed day · {formatDay(review.run?.targetDate)}</h2></div>
+          <div><div className={styles.eyebrow}>NIGHT FLIGHT</div><h2 id="night-flight-review-title">{dayLabel} · {formatDay(review.run?.targetDate)}</h2></div>
           <button type="button" className={styles.close} aria-label="Close Night Flight review" onClick={()=>setOpen(false)}>×</button>
         </div>
         <div className={styles.body}>
@@ -187,7 +199,7 @@ export default function NightFlightMorningReview(){
                 {item.analysis?.expertiseMatch!=null&&<span className={styles.jobScore}>{item.analysis?.expertiseMatch}%</span>}
               </span>
               <span className={styles.jobMeta}>{item.job?.company||'Company unavailable'} · {item.job?.location||item.source||'Location unavailable'}</span>
-              <span className={item.status==='READY'?styles.ready:styles.failed}>{item.status==='READY'?'READY':'FAILED'}</span>
+              <span className={jobStatusClass(item.status)}>{jobStatusLabel(item.status)}</span>
             </button>)}
           </aside>
           <section className={styles.match} aria-label="Profile Match">
@@ -196,6 +208,7 @@ export default function NightFlightMorningReview(){
               {vacancyUrl&&<a className={`secondary openLink ${styles.vacancyLink}`} href={vacancyUrl} target="_blank" rel="noreferrer">Open vacancy</a>}
             </div>
             {!selected&&<p className={styles.muted}>No review jobs for this run.</p>}
+            {selected&&selected.status!=='READY'&&selected.status!=='FAILED'&&<p className={styles.muted}>Profile Match status: {jobStatusLabel(selected.status)}</p>}
             {selected?.status==='FAILED'&&<>
               <div className={styles.failure}>{selected.lastError||'Automatic Profile Match failed.'}</div>
               {recoveryError&&<div className={styles.failure}>{recoveryError}</div>}
