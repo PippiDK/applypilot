@@ -1,0 +1,56 @@
+name: V18 current full-suite diagnostic
+
+on:
+  push:
+    branches:
+      - 'v18/diag-night-flight-right-panel'
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    if: "!contains(github.event.head_commit.message, 'capture current test diagnostic')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run tests and capture failures
+        shell: bash
+        run: |
+          set +e
+          npm install --no-audit --no-fund > /tmp/install.log 2>&1
+          npm test > /tmp/test.log 2>&1
+          code=$?
+          python - <<'PY'
+          from pathlib import Path
+          lines=Path('/tmp/test.log').read_text(errors='replace').splitlines()
+          needles=('not ok ', 'AssertionError', 'ERR_ASSERTION', 'failureType:', 'error:', 'code:')
+          hits=[i for i,line in enumerate(lines) if any(n in line for n in needles)]
+          ranges=[]
+          for i in hits:
+              a=max(0,i-10); b=min(len(lines),i+45)
+              if ranges and a<=ranges[-1][1]+1:
+                  ranges[-1]=(ranges[-1][0],max(ranges[-1][1],b))
+              else:
+                  ranges.append((a,b))
+          if not ranges:
+              ranges=[(max(0,len(lines)-220),len(lines))]
+          out=[]
+          for a,b in ranges:
+              out.append(f'--- lines {a+1}-{b} ---')
+              out.extend(lines[a:b])
+          Path('current-test-diagnostic.txt').write_text('\n'.join(out)+'\n')
+          PY
+          echo "exit_code=$code" >> current-test-diagnostic.txt
+      - name: Commit diagnostic
+        run: |
+          git config user.name "PippiDK"
+          git config user.email "133820767+PippiDK@users.noreply.github.com"
+          git add current-test-diagnostic.txt
+          git commit -m "chore: capture current test diagnostic"
+          git push origin HEAD:v18/diag-night-flight-right-panel
