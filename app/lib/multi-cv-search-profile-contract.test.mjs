@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
-const page=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+const page=(fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
 const rolesStep=fs.readFileSync(new URL('../components/search-profile-roles-step.js',import.meta.url),'utf8')
 
 test('Search Profile role step is library-aware rather than CV1-only',()=>{

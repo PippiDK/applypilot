@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
-const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+const source=(fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
 
 test('Expertise Match is not auto-requested from a useEffect',()=>{
   const effects=[...source.matchAll(/useEffect\(\(\)=>\{([\s\S]*?)\n  \},\[[^\]]*\]\)/g)].map(match=>match[1])

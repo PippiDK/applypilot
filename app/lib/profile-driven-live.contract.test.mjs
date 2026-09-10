@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
-const page=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+const page=(fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
 const routePath=new URL('../api/linkedin-profile-search/route.js',import.meta.url)
 
 test('LIVE Search uses the profile-driven endpoint when a saved Union Search Plan exists',()=>{

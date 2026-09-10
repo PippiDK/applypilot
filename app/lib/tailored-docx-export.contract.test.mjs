@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 
-const page=readFileSync(new URL('../page.js',import.meta.url),'utf8')
+const page=(readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\n'+readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
 const upload=readFileSync(new URL('../components/cv-library-step.js',import.meta.url),'utf8')
 const route=readFileSync(new URL('../api/export-tailored-cv/route.js',import.meta.url),'utf8')
 const pkg=readFileSync(new URL('../../package.json',import.meta.url),'utf8')

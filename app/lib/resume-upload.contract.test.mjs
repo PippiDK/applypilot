@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const route = readFileSync(new URL('../api/parse-cv/route.js', import.meta.url), 'utf8')
-const page = readFileSync(new URL('../page.js', import.meta.url), 'utf8')
+const page = (readFileSync(new URL('../page.js', import.meta.url), 'utf8')+'\n'+readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
 const cvLibraryStep = readFileSync(new URL('../components/cv-library-step.js', import.meta.url), 'utf8')
 const sourceCv = readFileSync(new URL('./source-cv.js', import.meta.url), 'utf8')
 

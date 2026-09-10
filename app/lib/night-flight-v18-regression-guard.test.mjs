@@ -29,7 +29,7 @@ import {
 import {FRESHNESS_OPTIONS} from './freshness-selection.js'
 
 const clone=value=>value==null?value:JSON.parse(JSON.stringify(value))
-const sourceText=relative=>readFile(new URL(relative,import.meta.url),'utf8')
+const sourceText=async relative=>{const source=await readFile(new URL(relative,import.meta.url),'utf8');if(relative!=='../page.js')return source;const main=await readFile(new URL('../main-search-base.js',import.meta.url),'utf8');return source+'\n'+main}
 
 function profileRow(fingerprint='profile-fp-1'){
   return {

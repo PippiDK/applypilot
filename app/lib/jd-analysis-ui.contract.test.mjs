@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
-const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+const source=(fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
 
 test('Adapt & review CV runs direct selected-CV adaptation only on explicit user action',()=>{
   assert.match(source,/requestCvAdaptation/)

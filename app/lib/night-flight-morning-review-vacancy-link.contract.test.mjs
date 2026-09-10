@@ -6,7 +6,7 @@ const reviewPath=new URL('../components/night-flight-morning-review.js',import.m
 const pagePath=new URL('../page.js',import.meta.url)
 
 const review=fs.readFileSync(reviewPath,'utf8')
-const page=fs.readFileSync(pagePath,'utf8')
+const page=(fs.readFileSync(pagePath,'utf8')+'\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
 
 test('Night Flight Morning Review reuses the ordinary search vacancy URL contract',()=>{
   assert.match(page,/href=\{job\.originalUrl\|\|job\.detailUrl\|\|job\.applicationUrl\}/)

@@ -40,7 +40,7 @@ test('Task 2E clears stale state after the next successful Night Flight sync', a
 })
 
 test('Task 2E Search Profile save commits locally after the guarded sync attempt and renders a stale-backend warning', () => {
-  const page = readFileSync(pageUrl, 'utf8')
+  const page = (readFileSync(pageUrl, 'utf8')+'\n'+readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
   const attemptIndex = page.indexOf('await attemptNightFlightProfileSync(')
   const localSaveIndex = page.indexOf("localStorage.setItem('applypilot-profile',JSON.stringify(saved))")
 

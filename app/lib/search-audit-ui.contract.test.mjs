@@ -7,7 +7,7 @@ const componentPath=new URL('../components/search-audit.js',import.meta.url)
 
 test('page wires aggregated API audit rows into a closed-by-default Search Audit component',async()=>{
   const [page,component]=await Promise.all([
-    readFile(pagePath,'utf8'),
+    Promise.all([readFile(pagePath,'utf8'),readFile(new URL('../main-search-base.js',import.meta.url),'utf8')]).then(parts=>parts.join('\n')),
     readFile(componentPath,'utf8'),
   ])
   assert.match(page,/import SearchAudit from '\.\/components\/search-audit\.js'/)

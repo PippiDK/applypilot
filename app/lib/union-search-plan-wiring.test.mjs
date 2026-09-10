@@ -5,7 +5,7 @@ import {readFile} from 'node:fs/promises'
 const pageUrl=new URL('../page.js',import.meta.url)
 
 test('page wires the edited draft into a saved Union Search Plan preview',async()=>{
-  const source=await readFile(pageUrl,'utf8')
+  const source=await Promise.all([readFile(pageUrl,'utf8'),readFile(new URL('../main-search-base.js',import.meta.url),'utf8')]).then(parts=>parts.join('\n'))
   assert.match(source,/import \{buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION\} from '\.\/lib\/union-search-plan\.js'/)
   assert.match(source,/import SearchPlanPreview from '\.\/components\/search-plan-preview\.js'/)
   assert.match(source,/const draftUnionSearchPlan=useMemo\(\(\)=>buildUnionSearchPlan\(\{/)
@@ -20,7 +20,7 @@ test('page wires the edited draft into a saved Union Search Plan preview',async(
 })
 
 test('saved Union Search Plan drives profile LIVE while legacy fallback stays isolated',async()=>{
-  const source=await readFile(pageUrl,'utf8')
+  const source=await Promise.all([readFile(pageUrl,'utf8'),readFile(new URL('../main-search-base.js',import.meta.url),'utf8')]).then(parts=>parts.join('\n'))
   const searchStart=source.indexOf('async function search(){')
   const searchEnd=source.indexOf('\n  function startProfile()',searchStart)
   assert.ok(searchStart>=0&&searchEnd>searchStart,'search() block must be found')

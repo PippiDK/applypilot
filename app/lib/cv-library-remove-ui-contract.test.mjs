@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
 test('CV remove uses ApplyPilot confirmation, keeps Search Profile open and preserves fixed slots',()=>{
-  const page=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+  const page=(fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
   const component=fs.readFileSync(new URL('../components/cv-library-step.js',import.meta.url),'utf8')
   const css=fs.readFileSync(new URL('../components/cv-library-step.module.css',import.meta.url),'utf8')
 

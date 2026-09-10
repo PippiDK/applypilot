@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 
 const engine = readFileSync(new URL('./linkedin-search.js', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../api/linkedin-search/route.js', import.meta.url), 'utf8')
-const page = readFileSync(new URL('../page.js', import.meta.url), 'utf8')
+const page = (readFileSync(new URL('../page.js', import.meta.url), 'utf8')+'\n'+readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
 
 test('search engine has no hard-coded candidate CV fallback', () => {
   assert.equal(engine.includes('MASTER_CV_TEXT'), false)
