@@ -3,11 +3,13 @@ import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 
 const page=readFileSync(new URL('../page.js',import.meta.url),'utf8')
+const mainSearch=readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8')
 const component=readFileSync(new URL('../components/best-cv-panel.js',import.meta.url),'utf8')
 const css=readFileSync(new URL('../ux-polish.css',import.meta.url),'utf8')
 
 test('right panel mounts Best CV flow while UX polish orders Expertise Match first',()=>{
-  assert.match(page,/import BestCvPanel/)
+  assert.match(page,/import MainSearchBase/)
+  assert.match(mainSearch,/import BestCvPanel/)
   assert.match(css,/\.expertiseHero\{[^}]*order:2/)
   assert.match(css,/\.cvWorkflowBest\{[^}]*order:3/)
 })

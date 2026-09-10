@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
 test('Search Profile wizard has four steps and no salary screen or salary scoring label',()=>{
-  const page=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+  const page=(fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
   assert.match(page,/profileStep\/4\*100/)
   assert.match(page,/Step \{profileStep\} of 4/)
   assert.doesNotMatch(page,/Minimum acceptable monthly salary/)

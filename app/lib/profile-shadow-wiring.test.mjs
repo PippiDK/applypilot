@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {readFile} from 'node:fs/promises'
 
 test('page promotes the saved Union Search Plan to LIVE while preserving legacy fallback payload',async()=>{
-  const source=await readFile(new URL('../page.js',import.meta.url),'utf8')
+  const source=await Promise.all([readFile(new URL('../page.js',import.meta.url),'utf8'),readFile(new URL('../main-search-base.js',import.meta.url),'utf8')]).then(parts=>parts.join('\n'))
   const searchStart=source.indexOf('async function search(){')
   const searchEnd=source.indexOf('\n  function startProfile()',searchStart)
   assert.ok(searchStart>=0&&searchEnd>searchStart,'search() block must be found')

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
 test('Search Profile four-step flow keeps location and work-model normalization outside the current Step 3 exclusions screen',()=>{
-  const page=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+  const page=(fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
 
   assert.match(page,/normalizeSearchPreferences/)
   assert.match(page,/legacyGeographyFromPreferences/)

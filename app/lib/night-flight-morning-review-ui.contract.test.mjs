@@ -4,15 +4,18 @@ import fs from 'node:fs'
 
 const componentPath=new URL('../components/night-flight-morning-review.js',import.meta.url)
 const pagePath=new URL('../page.js',import.meta.url)
+const mainSearchPath=new URL('../main-search-base.js',import.meta.url)
 const layoutPath=new URL('../layout.js',import.meta.url)
 const component=fs.existsSync(componentPath)?fs.readFileSync(componentPath,'utf8'):''
 const page=fs.readFileSync(pagePath,'utf8')
+const mainSearch=fs.readFileSync(mainSearchPath,'utf8')
 const layout=fs.readFileSync(layoutPath,'utf8')
 
 test('Task 11 keeps Morning Review isolated without replacing Manual Search',()=>{
   assert.match(layout,/import NightFlightMorningReview from '\.\/components\/night-flight-morning-review\.js'/)
   assert.match(layout,/<NightFlightMorningReview\s*\/>/)
-  assert.match(page,/async function search\(\)/,'Manual Search flow must remain present')
+  assert.match(page,/import MainSearchBase from '\.\/main-search-base\.js'/,'Main Search wrapper must remain present')
+  assert.match(mainSearch,/async function search\(\)/,'Manual Search flow must remain present')
 })
 
 test('Task 11 Morning Review card and panel preserve saved-batch UX',()=>{

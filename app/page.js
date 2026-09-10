@@ -4,6 +4,7 @@ import MainSearchBase from './main-search-base.js'
 import {NIGHT_FLIGHT_STATUS,resolveJobStatus} from './lib/job-statuses.js'
 import {enrichSearchJobsWithNightFlight} from './lib/night-flight-main-search-bridge.js'
 import {resolveNightFlightExpertise} from './lib/night-flight-expertise-reuse.js'
+import {visibleElementKey} from './lib/night-flight-react-key.js'
 
 const NIGHT_FLIGHT_STATUS_STYLE={borderColor:'rgba(167,139,250,.72)',color:'#ddd6fe',background:'rgba(109,40,217,.22)'}
 
@@ -21,10 +22,6 @@ function sourceFromJobCard(node){
   if(text.includes('jobindex')) return 'jobindex'
   if(text.includes('jobnet')) return 'jobnet'
   return ''
-}
-
-function visibleElementKey(value){
-  return String(value??'').replace(/^\.\$/,'').replace(/^\$/,'').trim()
 }
 
 function enrichStatusSelect(jobWrap,index){

@@ -60,7 +60,7 @@ test('application pack becomes reviewable only when verified fact-bank evidence 
 })
 
 test('live LinkedIn request uses freshness plus the active Source CV text, but not Search Profile data',()=>{
-  const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+  const source=(fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
   assert.match(source,/body:JSON\.stringify\(\{freshnessDays,cvText:cvData\.cvText\}\)/)
   assert.doesNotMatch(source,/JSON\.stringify\(\{freshnessDays\s*,\s*profile/)
 })
@@ -75,7 +75,7 @@ test('review helpers accept current live LinkedIn result shape',()=>{
 })
 
 test('merged UI restores Search Profile persistence without wiring it into LinkedIn search',()=>{
-  const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+  const source=(fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
   assert.match(source,/localStorage\.getItem\('applypilot-profile'\)/)
   assert.match(source,/localStorage\.setItem\('applypilot-profile'/)
   assert.match(source,/BUILD YOUR SEARCH AGENT/)
@@ -84,7 +84,7 @@ test('merged UI restores Search Profile persistence without wiring it into Linke
 })
 
 test('merged UI keeps Application Pack and exposes the direct M4 review flow',()=>{
-  const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+  const source=(fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
   assert.match(source,/Application pack/)
   assert.match(source,/Generate CV update/)
   assert.match(source,/View CV update/)
@@ -108,14 +108,14 @@ test('buildReviewChanges omits CV evidence when normalized original and updated 
 })
 
 test('M4 CV review shows a neutral empty state when AI returns no changed block',()=>{
-  const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+  const source=(fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
   assert.match(source,/No changes to review\./)
   assert.match(source,/The selected Source CV remains unchanged\./)
   assert.doesNotMatch(source,/No usable CV evidence was found for this review/)
 })
 
 test('Source CV upload entry points keep the current four-step Search Profile flow',()=>{
-  const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+  const source=(fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
   const cvLibraryStep=fs.readFileSync(new URL('../components/cv-library-step.js',import.meta.url),'utf8')
   assert.doesNotMatch(source,/setCvOpen/)
   assert.doesNotMatch(source,/cvOpen&&/)
@@ -129,7 +129,7 @@ test('Source CV upload entry points keep the current four-step Search Profile fl
 })
 
 test('profile status requires a complete ready Source CV and search uses that Source CV',()=>{
-  const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+  const source=(fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
   assert.match(source,/const resumeLoaded=isSourceCvReady\(cvData\)/)
   assert.match(source,/resumeLoaded\?'Profile ready':'Profile empty'/)
   assert.doesNotMatch(source,/profileReady\?'✓ Search profile saved':'Profile loaded'/)
@@ -220,7 +220,7 @@ test('Version 2 Step 1 can read the Master CV summary from a complete saved prev
 })
 
 test('M4 UI supersedes the legacy Summary-only review with three direct AI blocks',()=>{
-  const source=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+  const source=(fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
   assert.doesNotMatch(source,/buildReviewChanges\(cvData,active\)/)
   assert.match(source,/adaptationReviewBlocks/)
   assert.match(source,/Professional Summary/)

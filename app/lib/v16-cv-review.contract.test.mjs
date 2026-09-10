@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
-const page=fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')
+const page=(fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
 
 test('CV Update Review is driven by explicit selected-CV adaptation rather than a standalone JD cache pretest',()=>{
   assert.match(page,/requestCvAdaptation/)

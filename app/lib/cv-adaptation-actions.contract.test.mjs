@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 
-const page=readFileSync(new URL('../page.js',import.meta.url),'utf8')
+const page=(readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\n'+readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
 const best=readFileSync(new URL('../components/best-cv-panel.js',import.meta.url),'utf8')
 const chooser=readFileSync(new URL('../components/cv-adaptation-chooser.js',import.meta.url),'utf8')
 
