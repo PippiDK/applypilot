@@ -1,0 +1,104 @@
+name: V18 repair stale contract paths
+
+on:
+  push:
+    branches:
+      - 'v18/repair-stale-contract-paths'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/night-flight-right-panel-source-job-id
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install
+        run: npm install --no-audit --no-fund
+      - name: Detect stale contract files from current failures
+        shell: bash
+        run: |
+          set +e
+          npm test > /tmp/before.log 2>&1
+          set -e
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          log=Path('/tmp/before.log').read_text(errors='replace').splitlines()
+          files=[]
+          for line in log:
+              m=re.search(r"location: '.*?/app/lib/([^']+?):\d+:\d+'",line)
+              if m and m.group(1) not in files:
+                  files.append(m.group(1))
+
+          changed=[]
+          for name in files:
+              path=Path('app/lib')/name
+              if not path.exists():
+                  continue
+              text=path.read_text()
+              if "../page.js" not in text:
+                  continue
+              original=text
+
+              # Direct readFileSync(new URL('../page.js', ...)) forms.
+              text=text.replace(
+                  "readFileSync(new URL('../page.js',import.meta.url),'utf8')",
+                  "(readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\\n'+readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))"
+              )
+              text=text.replace(
+                  "fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')",
+                  "(fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))"
+              )
+
+              # Named *page*Path forms. Preserve wrapper source and append extracted Main Search source.
+              path_vars=re.findall(r"const\s+(\w*[Pp]age\w*Path)\s*=\s*new URL\('../page\\.js',import\\.meta\\.url\)",text)
+              for var in path_vars:
+                  text=text.replace(
+                      f"readFileSync({var},'utf8')",
+                      f"(readFileSync({var},'utf8')+'\\n'+readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))"
+                  )
+                  text=text.replace(
+                      f"fs.readFileSync({var},'utf8')",
+                      f"(fs.readFileSync({var},'utf8')+'\\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))"
+                  )
+
+              if text!=original:
+                  path.write_text(text)
+                  changed.append(str(path))
+
+          print('Changed stale contract files:')
+          for path in changed:
+              print(path)
+          if not changed:
+              raise SystemExit('No stale page.js contract references were updated')
+          PY
+      - name: Verify full test suite
+        shell: bash
+        run: |
+          set +e
+          npm test > /tmp/after.log 2>&1
+          code=$?
+          set -e
+          if [ "$code" -ne 0 ]; then
+            echo 'Remaining failing tests:'
+            grep '^not ok ' /tmp/after.log || true
+            exit "$code"
+          fi
+          tail -n 20 /tmp/after.log
+      - name: Verify build
+        run: npm run build
+      - name: Commit repaired contracts to PR branch
+        run: |
+          git config user.name "PippiDK"
+          git config user.email "133820767+PippiDK@users.noreply.github.com"
+          git add app/lib
+          git commit -m "test: follow extracted Main Search source in UI contracts"
+          git push origin HEAD:fix/night-flight-right-panel-source-job-id
