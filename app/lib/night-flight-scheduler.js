@@ -3,6 +3,8 @@ import {persistNightFlightAreaScope} from './night-flight-area-scope.js'
 import {processNightFlightRunMatches} from './night-flight-match-processor.js'
 
 const COPENHAGEN_TIME_ZONE='Europe/Copenhagen'
+const ACTIVE_RUN_STATUSES=['PENDING','RUNNING']
+export const NIGHT_FLIGHT_JOBS_PER_TICK=2
 
 const clean=value=>String(value??'').trim()
 
@@ -30,6 +32,19 @@ export function shouldRunNightFlightTick(now=new Date()){
   return Number.isFinite(hour)&&hour>=2
 }
 
+async function loadOldestActiveRun({supabase,userId}){
+  const {data,error}=await supabase
+    .from('night_flight_runs')
+    .select('id,status,target_date')
+    .eq('user_id',userId)
+    .in('status',ACTIVE_RUN_STATUSES)
+    .order('target_date',{ascending:true})
+    .limit(1)
+    .maybeSingle()
+  if(error) throw new Error(`Night Flight active run lookup failed: ${error.message||'unknown Supabase error'}`)
+  return data||null
+}
+
 export async function runNightFlightForUser({
   supabase,
   userId,
@@ -44,6 +59,17 @@ export async function runNightFlightForUser({
   const current=resolveNow(now)
   const targetDate=lastCompletedCopenhagenDate(current)
 
+  const activeRun=await loadOldestActiveRun({supabase,userId:id})
+  if(activeRun?.id){
+    const processed=await processMatches({supabase,userId:id,runId:activeRun.id,maxJobs:NIGHT_FLIGHT_JOBS_PER_TICK})
+    return {
+      ...processed,
+      runId:activeRun.id,
+      targetDate:clean(activeRun.target_date)||targetDate,
+      resumed:true,
+    }
+  }
+
   const {data:existing,error:existingError}=await supabase
     .from('night_flight_runs')
     .select('id,status,target_date')
@@ -53,7 +79,7 @@ export async function runNightFlightForUser({
 
   if(existingError) throw new Error(`Night Flight run lookup failed: ${existingError.message||'unknown Supabase error'}`)
   if(existing?.id){
-    const processed=await processMatches({supabase,userId:id,runId:existing.id})
+    const processed=await processMatches({supabase,userId:id,runId:existing.id,maxJobs:NIGHT_FLIGHT_JOBS_PER_TICK})
     return {
       ...processed,
       runId:existing.id,
@@ -66,7 +92,7 @@ export async function runNightFlightForUser({
   if(clean(batch?.targetDate)!==targetDate) throw new Error('Night Flight discovery target date mismatch')
   const persisted=await persist({supabase,userId:id,batch})
   if(!clean(persisted?.runId)) throw new Error('Night Flight persisted run is unavailable')
-  const processed=await processMatches({supabase,userId:id,runId:persisted.runId})
+  const processed=await processMatches({supabase,userId:id,runId:persisted.runId,maxJobs:NIGHT_FLIGHT_JOBS_PER_TICK})
 
   return {
     ...persisted,
