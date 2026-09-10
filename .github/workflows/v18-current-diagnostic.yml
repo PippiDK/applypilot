@@ -25,7 +25,6 @@ jobs:
           set +e
           npm install --no-audit --no-fund > /tmp/install.log 2>&1
           npm test > /tmp/test.log 2>&1
-          code=$?
           python - <<'PY'
           from pathlib import Path
           lines=Path('/tmp/test.log').read_text(errors='replace').splitlines()
@@ -39,7 +38,6 @@ jobs:
           out=[]
           for a,b in ranges:
               out.append(f'--- lines {a+1}-{b} ---'); out.extend(lines[a:b])
-          out.append(f'exit_code={code}')
           Path('current-test-diagnostic.txt').write_text('\n'.join(out)+'\n')
           PY
       - name: Commit diagnostic
