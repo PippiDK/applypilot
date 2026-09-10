@@ -12,6 +12,7 @@ export async function processNightFlightRunMatches({
   supabase,
   userId,
   runId,
+  maxJobs,
   processQueue=processNightFlightQueue,
   matchService=getOrCreateExpertiseMatch,
 }={}){
@@ -37,6 +38,7 @@ export async function processNightFlightRunMatches({
   return processQueue({
     supabase,
     runId:id,
+    maxJobs,
     processJob:async claimedJob=>{
       const snapshot=claimedJob?.job_snapshot&&typeof claimedJob.job_snapshot==='object'?claimedJob.job_snapshot:{}
       const job={
