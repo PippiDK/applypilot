@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {existsSync,readFileSync} from 'node:fs'
 
 const pagePath=new URL('../page.js',import.meta.url)
+const mainSearchPath=new URL('../main-search-base.js',import.meta.url)
 const layoutPath=new URL('../layout.js',import.meta.url)
 const companyRoutePath=new URL('../api/company-profile-search/route.js',import.meta.url)
 const consultantRoutePath=new URL('../api/consultant-profile-search/route.js',import.meta.url)
@@ -10,20 +11,22 @@ const companyConfigPath=new URL('./company-watch.js',import.meta.url)
 const consultantConfigPath=new URL('./consultant-portals.js',import.meta.url)
 
 const page=readFileSync(pagePath,'utf8')
+const mainSearch=readFileSync(mainSearchPath,'utf8')
 const layout=readFileSync(layoutPath,'utf8')
 
 test('TEST restores the inline company watch and consultant portal controls from 3716233',()=>{
-  assert.match(page,/DIRECT COMPANY WATCH/)
-  assert.match(page,/Company career sites/)
-  assert.match(page,/CONSULTANT PORTALS/)
-  assert.match(page,/Freelance & consulting assignments/)
+  assert.match(page,/import MainSearchBase/)
+  assert.match(mainSearch,/DIRECT COMPANY WATCH/)
+  assert.match(mainSearch,/Company career sites/)
+  assert.match(mainSearch,/CONSULTANT PORTALS/)
+  assert.match(mainSearch,/Freelance & consulting assignments/)
 })
 
 test('company and consultant sources participate in the main Search workflow',()=>{
-  assert.match(page,/\/api\/company-profile-search/)
-  assert.match(page,/\/api\/consultant-profile-search/)
-  assert.match(page,/company-sites/)
-  assert.match(page,/consultant-portals/)
+  assert.match(mainSearch,/\/api\/company-profile-search/)
+  assert.match(mainSearch,/\/api\/consultant-profile-search/)
+  assert.match(mainSearch,/company-sites/)
+  assert.match(mainSearch,/consultant-portals/)
   assert.equal(existsSync(companyRoutePath),true)
   assert.equal(existsSync(consultantRoutePath),true)
   assert.equal(existsSync(companyConfigPath),true)
