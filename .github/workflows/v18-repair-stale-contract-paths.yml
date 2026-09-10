@@ -38,6 +38,13 @@ jobs:
               if m and m.group(1) not in files:
                   files.append(m.group(1))
 
+          direct=re.compile(
+              r"(?P<fn>(?:fs\.)?readFileSync)\(\s*new URL\(\s*(['\"])\.\./page\.js\2\s*,\s*import\.meta\.url\s*\)\s*,\s*(['\"])utf8\3\s*\)"
+          )
+          path_decl=re.compile(
+              r"const\s+(\w+)\s*=\s*new URL\(\s*(['\"])\.\./page\.js\2\s*,\s*import\.meta\.url\s*\)"
+          )
+
           changed=[]
           for name in files:
               path=Path('app/lib')/name
@@ -48,35 +55,34 @@ jobs:
                   continue
               original=text
 
-              # Direct readFileSync(new URL('../page.js', ...)) forms.
-              text=text.replace(
-                  "readFileSync(new URL('../page.js',import.meta.url),'utf8')",
-                  "(readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\\n'+readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))"
-              )
-              text=text.replace(
-                  "fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')",
-                  "(fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))"
-              )
+              # Replace each direct page.js read exactly once. Preserve optional fs. prefix.
+              def repl_direct(m):
+                  fn=m.group('fn')
+                  old=m.group(0)
+                  main=f"{fn}(new URL('../main-search-base.js',import.meta.url),'utf8')"
+                  return f"({old}+'\\n'+{main})"
+              text=direct.sub(repl_direct,text)
 
-              # Named *page*Path forms. Preserve wrapper source and append extracted Main Search source.
-              path_vars=re.findall(r"const\s+(\w*[Pp]age\w*Path)\s*=\s*new URL\('../page\\.js',import\\.meta\\.url\)",text)
-              for var in path_vars:
-                  text=text.replace(
-                      f"readFileSync({var},'utf8')",
-                      f"(readFileSync({var},'utf8')+'\\n'+readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))"
+              # Replace reads through named page-path variables exactly once.
+              page_vars=[m.group(1) for m in path_decl.finditer(text)]
+              for var in page_vars:
+                  named=re.compile(
+                      rf"(?P<fn>(?:fs\.)?readFileSync)\(\s*{re.escape(var)}\s*,\s*(['\"])utf8\2\s*\)"
                   )
-                  text=text.replace(
-                      f"fs.readFileSync({var},'utf8')",
-                      f"(fs.readFileSync({var},'utf8')+'\\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))"
-                  )
+                  def repl_named(m):
+                      fn=m.group('fn')
+                      old=m.group(0)
+                      main=f"{fn}(new URL('../main-search-base.js',import.meta.url),'utf8')"
+                      return f"({old}+'\\n'+{main})"
+                  text=named.sub(repl_named,text)
 
               if text!=original:
                   path.write_text(text)
                   changed.append(str(path))
 
           print('Changed stale contract files:')
-          for path in changed:
-              print(path)
+          for item in changed:
+              print(item)
           if not changed:
               raise SystemExit('No stale page.js contract references were updated')
           PY
@@ -88,8 +94,18 @@ jobs:
           code=$?
           set -e
           if [ "$code" -ne 0 ]; then
-            echo 'Remaining failing tests:'
-            grep '^not ok ' /tmp/after.log || true
+            python - <<'PY'
+            from pathlib import Path
+            lines=Path('/tmp/after.log').read_text(errors='replace').splitlines()
+            print('Remaining failing tests:')
+            for i,line in enumerate(lines):
+                if line.startswith('not ok '):
+                    print(line)
+                    for extra in lines[i+1:i+14]:
+                        s=extra.strip()
+                        if s.startswith('location:') or s.startswith('error:'):
+                            print('  '+s)
+            PY
             exit "$code"
           fi
           tail -n 20 /tmp/after.log
