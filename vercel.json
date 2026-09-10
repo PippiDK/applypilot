@@ -8,11 +8,7 @@
   "crons": [
     {
       "path": "/api/cron/night-flight",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/night-flight",
-      "schedule": "0 1 * * *"
+      "schedule": "0 0-6 * * *"
     }
   ]
 }
