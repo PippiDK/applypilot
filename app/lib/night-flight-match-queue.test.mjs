@@ -170,7 +170,27 @@ test('Task 6 bounds automatic retries and exhausts them into FAILED',async()=>{
   assert.equal(await mod.claimNextNightFlightJob({supabase,runId:'run-6',now:new Date('2026-09-05T02:03:00.000Z'),maxAttempts:3}),null)
 })
 
-test('Task 6 isolates one failing vacancy, resumes without READY repeats, and finalizes READY_WITH_ERRORS',async()=>{
+test('Night Flight persists safe AI classification with sanitized failure text',async()=>{
+  const mod=await loadModule()
+  assert.ok(mod,'night-flight-match-queue.js must exist')
+  const supabase=fakeSupabase({jobs:[job('rate-limited','QUEUED')],runs:[run()]})
+  const providerError=new Error('expertise_match_one_pass AI stage failed.')
+  providerError.code='AI_PROVIDER_HTTP_429'
+
+  await mod.processNightFlightQueue({
+    supabase,
+    runId:'run-6',
+    maxJobs:1,
+    now:()=>new Date('2026-09-05T02:00:00.000Z'),
+    processJob:async()=>{throw providerError},
+  })
+
+  const saved=supabase.state.jobs[0]
+  assert.equal(saved.status,'RETRY')
+  assert.equal(saved.last_error,'AI_PROVIDER_HTTP_429 · expertise_match_one_pass AI stage failed.')
+})
+
+test('Night Flight does not reclaim the same RETRY job in one queue invocation',async()=>{
   const mod=await loadModule()
   assert.ok(mod,'night-flight-match-queue.js must exist')
   const supabase=fakeSupabase({jobs:[
@@ -187,6 +207,7 @@ test('Task 6 isolates one failing vacancy, resumes without READY repeats, and fi
     supabase,
     runId:'run-6',
     maxAttempts:2,
+    maxJobs:10,
     leaseMs:15*60*1000,
     now,
     processJob:async claimed=>{
@@ -196,17 +217,96 @@ test('Task 6 isolates one failing vacancy, resumes without READY repeats, and fi
     },
   })
 
-  assert.deepEqual(calls,['bad','good','bad'],'READY work is skipped and QUEUED work gets a turn before RETRY')
+  assert.deepEqual(calls,['bad','good'],'each vacancy gets at most one attempt per queue invocation')
   assert.equal(supabase.state.jobs.find(row=>row.job_key==='already-ready').attempts,0)
   assert.equal(supabase.state.jobs.find(row=>row.job_key==='good').status,'READY')
-  assert.equal(supabase.state.jobs.find(row=>row.job_key==='bad').status,'FAILED')
+  assert.equal(supabase.state.jobs.find(row=>row.job_key==='bad').status,'RETRY')
   assert.equal(supabase.state.jobs.find(row=>row.job_key==='outside').status,'SKIPPED_AREA')
-  assert.equal(result.status,'READY_WITH_ERRORS')
+  assert.equal(result.status,'RUNNING')
   assert.equal(result.jobsReady,2)
-  assert.equal(result.jobsFailed,1)
+  assert.equal(result.jobsFailed,0)
   assert.equal(result.jobsSkipped,1)
-  assert.equal(supabase.state.runs[0].status,'READY_WITH_ERRORS')
-  assert.ok(supabase.state.runs[0].completed_at)
+  assert.equal(supabase.state.runs[0].status,'RUNNING')
+  assert.equal(supabase.state.runs[0].completed_at,null)
+})
+
+test('Night Flight reclaims a retryable job on a later queue invocation',async()=>{
+  const mod=await loadModule()
+  assert.ok(mod,'night-flight-match-queue.js must exist')
+  const supabase=fakeSupabase({jobs:[job('bad','QUEUED')],runs:[run()]})
+  const calls=[]
+
+  const first=await mod.processNightFlightQueue({
+    supabase,
+    runId:'run-6',
+    maxJobs:10,
+    now:()=>new Date('2026-09-05T02:00:00.000Z'),
+    processJob:async claimed=>{calls.push(claimed.job_key);throw new Error('temporary failure')},
+  })
+  assert.deepEqual(calls,['bad'])
+  assert.equal(supabase.state.jobs[0].status,'RETRY')
+  assert.equal(first.status,'RUNNING')
+
+  const second=await mod.processNightFlightQueue({
+    supabase,
+    runId:'run-6',
+    maxJobs:10,
+    now:()=>new Date('2026-09-05T03:00:00.000Z'),
+    processJob:async claimed=>{calls.push(claimed.job_key);return {matchCacheKey:'cache:bad'}},
+  })
+
+  assert.deepEqual(calls,['bad','bad'])
+  assert.equal(supabase.state.jobs[0].status,'READY')
+  assert.equal(supabase.state.jobs[0].attempts,2)
+  assert.equal(second.status,'READY')
+})
+
+test('Night Flight sends deterministic AI failures directly to FAILED without persisting source details',async()=>{
+  const mod=await loadModule()
+  assert.ok(mod,'night-flight-match-queue.js must exist')
+  const supabase=fakeSupabase({jobs:[job('invalid','QUEUED')],runs:[run()]})
+  const validationError=new Error('PRIVATE-JD-ID')
+  validationError.code='AI_EXPERTISE_VALIDATION'
+
+  const result=await mod.processNightFlightQueue({
+    supabase,
+    runId:'run-6',
+    maxJobs:10,
+    now:()=>new Date('2026-09-05T02:00:00.000Z'),
+    processJob:async()=>{throw validationError},
+  })
+
+  const failed=supabase.state.jobs[0]
+  assert.equal(failed.status,'FAILED')
+  assert.equal(failed.attempts,1)
+  assert.match(failed.last_error,/^AI_EXPERTISE_VALIDATION ·/)
+  assert.doesNotMatch(failed.last_error,/PRIVATE-JD-ID/)
+  assert.equal(result.status,'READY_WITH_ERRORS')
+})
+
+test('Night Flight default invocation budget processes three jobs and leaves existing READY work untouched',async()=>{
+  const mod=await loadModule()
+  assert.ok(mod,'night-flight-match-queue.js must exist')
+  const supabase=fakeSupabase({jobs:[
+    job('already-ready','READY'),
+    job('one','QUEUED'),
+    job('two','QUEUED'),
+    job('three','QUEUED'),
+    job('four','QUEUED'),
+  ],runs:[run()]})
+  const calls=[]
+
+  const result=await mod.processNightFlightQueue({
+    supabase,
+    runId:'run-6',
+    now:()=>new Date('2026-09-05T02:00:00.000Z'),
+    processJob:async claimed=>{calls.push(claimed.job_key);return {matchCacheKey:`cache:${claimed.job_key}`}},
+  })
+
+  assert.deepEqual(calls,['one','two','three'])
+  assert.equal(supabase.state.jobs.find(row=>row.job_key==='already-ready').attempts,0)
+  assert.equal(supabase.state.jobs.find(row=>row.job_key==='four').status,'QUEUED')
+  assert.equal(result.status,'RUNNING')
 })
 
 test('Task 6 finalizes READY when all in-scope persisted jobs are complete',async()=>{

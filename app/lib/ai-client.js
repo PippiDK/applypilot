@@ -43,6 +43,21 @@ async function productionModelCall({stage,instructions,input,schema,maxOutputTok
   return JSON.parse(raw)
 }
 
+function safeAiFailureCode(error){
+  const code=String(error?.code||'').trim()
+  if(/^AI_[A-Z0-9_]+$/.test(code)) return code
+
+  const causeCode=String(error?.cause?.code||'').trim()
+  const name=String(error?.name||'').trim()
+  if(name==='AbortError'||name==='TimeoutError'||/TIMEOUT/.test(code)||/TIMEOUT/.test(causeCode)){
+    return 'AI_PROVIDER_TIMEOUT'
+  }
+  if(error instanceof TypeError||/^(ECONN|ENET|EAI_AGAIN|ENOTFOUND|UND_ERR_)/.test(code||causeCode)){
+    return 'AI_PROVIDER_NETWORK'
+  }
+  return ''
+}
+
 export async function callStructuredAi({stage,instructions,input,schema,modelCall,maxOutputTokens=2400}){
   const safeStage=String(stage??'ai_stage').replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,64)||'ai_stage'
   try{
@@ -52,7 +67,8 @@ export async function callStructuredAi({stage,instructions,input,schema,modelCal
     return result
   }catch(error){
     const safeError=new Error(`${safeStage} AI stage failed.`)
-    if(typeof error?.code==='string'&&/^AI_[A-Z0-9_]+$/.test(error.code)) safeError.code=error.code
+    const code=safeAiFailureCode(error)
+    if(code) safeError.code=code
     throw safeError
   }
 }

@@ -126,3 +126,47 @@ test('production AI path classifies max-output-token incomplete responses safely
     else process.env.OPENAI_API_KEY=previousKey
   }
 })
+
+test('callStructuredAi classifies provider timeouts safely',async()=>{
+  const {callStructuredAi}=await load()
+  assert.equal(typeof callStructuredAi,'function')
+  const timeout=new Error('PRIVATE PROVIDER TIMEOUT DETAIL')
+  timeout.name='TimeoutError'
+
+  await assert.rejects(
+    ()=>callStructuredAi({
+      stage:'expertise_match_one_pass',
+      instructions:'Analyze.',
+      input:{jd:'PRIVATE JD'},
+      schema,
+      modelCall:async()=>{throw timeout},
+    }),
+    error=>{
+      assert.equal(error.code,'AI_PROVIDER_TIMEOUT')
+      assert.equal(error.message,'expertise_match_one_pass AI stage failed.')
+      assert.doesNotMatch(error.message,/PRIVATE/)
+      return true
+    }
+  )
+})
+
+test('callStructuredAi classifies provider network failures safely',async()=>{
+  const {callStructuredAi}=await load()
+  assert.equal(typeof callStructuredAi,'function')
+
+  await assert.rejects(
+    ()=>callStructuredAi({
+      stage:'expertise_match_one_pass',
+      instructions:'Analyze.',
+      input:{jd:'PRIVATE JD'},
+      schema,
+      modelCall:async()=>{throw new TypeError('PRIVATE NETWORK DETAIL')},
+    }),
+    error=>{
+      assert.equal(error.code,'AI_PROVIDER_NETWORK')
+      assert.equal(error.message,'expertise_match_one_pass AI stage failed.')
+      assert.doesNotMatch(error.message,/PRIVATE/)
+      return true
+    }
+  )
+})
