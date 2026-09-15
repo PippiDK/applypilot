@@ -88,6 +88,53 @@ test('production AI path classifies provider HTTP status without exposing respon
   }
 })
 
+test('production AI path safely classifies network failures without leaking their details',async()=>{
+  const {callStructuredAi}=await load()
+  const previousKey=process.env.OPENAI_API_KEY
+  const previousFetch=globalThis.fetch
+  process.env.OPENAI_API_KEY='sk-test-not-real'
+  globalThis.fetch=async()=>{throw new TypeError('fetch failed PRIVATE NETWORK DETAIL')}
+  try{
+    await assert.rejects(
+      ()=>callStructuredAi({stage:'expertise_match_one_pass',instructions:'Analyze.',input:{jd:'PRIVATE-JD-CONTENT'},schema}),
+      error=>{
+        assert.equal(error.code,'AI_PROVIDER_NETWORK')
+        assert.equal(error.message,'expertise_match_one_pass AI stage failed.')
+        return true
+      }
+    )
+  }finally{
+    globalThis.fetch=previousFetch
+    if(previousKey===undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY=previousKey
+  }
+})
+
+test('production AI path safely classifies TimeoutError failures',async()=>{
+  const {callStructuredAi}=await load()
+  const previousKey=process.env.OPENAI_API_KEY
+  const previousFetch=globalThis.fetch
+  process.env.OPENAI_API_KEY='sk-test-not-real'
+  const timeout=new Error('PRIVATE PROVIDER TIMEOUT DETAIL')
+  timeout.name='TimeoutError'
+  globalThis.fetch=async()=>{throw timeout}
+  try{
+    await assert.rejects(
+      ()=>callStructuredAi({stage:'expertise_match_one_pass',instructions:'Analyze.',input:{jd:'PRIVATE-JD-CONTENT'},schema}),
+      error=>{
+        assert.equal(error.code,'AI_PROVIDER_TIMEOUT')
+        assert.equal(error.message,'expertise_match_one_pass AI stage failed.')
+        assert.doesNotMatch(error.message,/PRIVATE/)
+        return true
+      }
+    )
+  }finally{
+    globalThis.fetch=previousFetch
+    if(previousKey===undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY=previousKey
+  }
+})
+
 test('production AI path uses the caller-specific output-token budget',async()=>{
   const {callStructuredAi}=await load()
   const previousKey=process.env.OPENAI_API_KEY
@@ -125,48 +172,4 @@ test('production AI path classifies max-output-token incomplete responses safely
     if(previousKey===undefined) delete process.env.OPENAI_API_KEY
     else process.env.OPENAI_API_KEY=previousKey
   }
-})
-
-test('callStructuredAi classifies provider timeouts safely',async()=>{
-  const {callStructuredAi}=await load()
-  assert.equal(typeof callStructuredAi,'function')
-  const timeout=new Error('PRIVATE PROVIDER TIMEOUT DETAIL')
-  timeout.name='TimeoutError'
-
-  await assert.rejects(
-    ()=>callStructuredAi({
-      stage:'expertise_match_one_pass',
-      instructions:'Analyze.',
-      input:{jd:'PRIVATE JD'},
-      schema,
-      modelCall:async()=>{throw timeout},
-    }),
-    error=>{
-      assert.equal(error.code,'AI_PROVIDER_TIMEOUT')
-      assert.equal(error.message,'expertise_match_one_pass AI stage failed.')
-      assert.doesNotMatch(error.message,/PRIVATE/)
-      return true
-    }
-  )
-})
-
-test('callStructuredAi classifies provider network failures safely',async()=>{
-  const {callStructuredAi}=await load()
-  assert.equal(typeof callStructuredAi,'function')
-
-  await assert.rejects(
-    ()=>callStructuredAi({
-      stage:'expertise_match_one_pass',
-      instructions:'Analyze.',
-      input:{jd:'PRIVATE JD'},
-      schema,
-      modelCall:async()=>{throw new TypeError('PRIVATE NETWORK DETAIL')},
-    }),
-    error=>{
-      assert.equal(error.code,'AI_PROVIDER_NETWORK')
-      assert.equal(error.message,'expertise_match_one_pass AI stage failed.')
-      assert.doesNotMatch(error.message,/PRIVATE/)
-      return true
-    }
-  )
 })

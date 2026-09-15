@@ -15,18 +15,28 @@ async function productionModelCall({stage,instructions,input,schema,maxOutputTok
     error.code='AI_CONFIG_MISSING'
     throw error
   }
-  const response=await fetch('https://api.openai.com/v1/responses',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
-    body:JSON.stringify({
-      model:process.env.APPLYPILOT_AI_MODEL||'gpt-5.6-sol',
-      instructions,
-      input:JSON.stringify(input),
-      text:{format:{type:'json_schema',name:stage,schema,strict:true}},
-      max_output_tokens:maxOutputTokens,
-      store:false
+  let response
+  try{
+    response=await fetch('https://api.openai.com/v1/responses',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
+      body:JSON.stringify({
+        model:process.env.APPLYPILOT_AI_MODEL||'gpt-5.6-sol',
+        instructions,
+        input:JSON.stringify(input),
+        text:{format:{type:'json_schema',name:stage,schema,strict:true}},
+        max_output_tokens:maxOutputTokens,
+        store:false
+      })
     })
-  })
+  }catch(error){
+    const networkError=new Error('OpenAI request could not be completed.')
+    const name=String(error?.name||'')
+    const transportCode=String(error?.code||error?.cause?.code||'')
+    const timedOut=name==='AbortError'||name==='TimeoutError'||/TIMEOUT|TIMEDOUT/.test(transportCode)
+    networkError.code=timedOut?'AI_PROVIDER_TIMEOUT':'AI_PROVIDER_NETWORK'
+    throw networkError
+  }
   if(!response.ok){
     const error=new Error(`OpenAI request failed with status ${response.status}.`)
     error.code=`AI_PROVIDER_HTTP_${response.status}`
@@ -43,21 +53,6 @@ async function productionModelCall({stage,instructions,input,schema,maxOutputTok
   return JSON.parse(raw)
 }
 
-function safeAiFailureCode(error){
-  const code=String(error?.code||'').trim()
-  if(/^AI_[A-Z0-9_]+$/.test(code)) return code
-
-  const causeCode=String(error?.cause?.code||'').trim()
-  const name=String(error?.name||'').trim()
-  if(name==='AbortError'||name==='TimeoutError'||/TIMEOUT/.test(code)||/TIMEOUT/.test(causeCode)){
-    return 'AI_PROVIDER_TIMEOUT'
-  }
-  if(error instanceof TypeError||/^(ECONN|ENET|EAI_AGAIN|ENOTFOUND|UND_ERR_)/.test(code||causeCode)){
-    return 'AI_PROVIDER_NETWORK'
-  }
-  return ''
-}
-
 export async function callStructuredAi({stage,instructions,input,schema,modelCall,maxOutputTokens=2400}){
   const safeStage=String(stage??'ai_stage').replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,64)||'ai_stage'
   try{
@@ -67,8 +62,7 @@ export async function callStructuredAi({stage,instructions,input,schema,modelCal
     return result
   }catch(error){
     const safeError=new Error(`${safeStage} AI stage failed.`)
-    const code=safeAiFailureCode(error)
-    if(code) safeError.code=code
+    if(typeof error?.code==='string'&&/^AI_[A-Z0-9_]+$/.test(error.code)) safeError.code=error.code
     throw safeError
   }
 }

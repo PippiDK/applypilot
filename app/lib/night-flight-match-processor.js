@@ -1,4 +1,4 @@
-import {DEFAULT_NIGHT_FLIGHT_MAX_JOBS_PER_INVOCATION,processNightFlightQueue} from './night-flight-match-queue.js'
+import {DEFAULT_NIGHT_FLIGHT_JOBS_PER_INVOCATION,processNightFlightQueue} from './night-flight-match-queue.js'
 import {getOrCreateExpertiseMatch,logicalExpertiseJobKey} from './expertise-match-server-cache.js'
 
 const RUN_FIELDS='id,user_id,profile_fingerprint,cv_text_snapshot,cv_source_version'
@@ -14,7 +14,6 @@ export async function processNightFlightRunMatches({
   runId,
   processQueue=processNightFlightQueue,
   matchService=getOrCreateExpertiseMatch,
-  maxJobs=DEFAULT_NIGHT_FLIGHT_MAX_JOBS_PER_INVOCATION,
 }={}){
   requireSupabase(supabase)
   const user=clean(userId)
@@ -38,7 +37,7 @@ export async function processNightFlightRunMatches({
   return processQueue({
     supabase,
     runId:id,
-    maxJobs,
+    maxJobs:DEFAULT_NIGHT_FLIGHT_JOBS_PER_INVOCATION,
     processJob:async claimedJob=>{
       const snapshot=claimedJob?.job_snapshot&&typeof claimedJob.job_snapshot==='object'?claimedJob.job_snapshot:{}
       const job={
