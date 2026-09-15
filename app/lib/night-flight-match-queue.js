@@ -1,5 +1,6 @@
 export const DEFAULT_NIGHT_FLIGHT_MAX_ATTEMPTS=3
 export const DEFAULT_NIGHT_FLIGHT_PROCESSING_LEASE_MS=15*60*1000
+export const DEFAULT_NIGHT_FLIGHT_JOBS_PER_INVOCATION=3
 
 const SELECT_FIELDS='run_id,job_key,source,job_snapshot,area,status,attempts,last_error,match_cache_key,processed_at,created_at,updated_at'
 const CLAIMABLE_STATUSES=['QUEUED','RETRY','PROCESSING']
@@ -36,7 +37,17 @@ function positiveNumber(value,fallback){
 
 function safeErrorMessage(error){
   const text=clean(error?.message||error||'Night Flight Match failed')
-  return (text||'Night Flight Match failed').slice(0,500)
+  const code=clean(error?.code)
+  const prefix=/^AI_[A-Z0-9_]{1,76}$/.test(code)?`${code} · `:''
+  return `${prefix}${text||'Night Flight Match failed'}`.slice(0,500)
+}
+
+function isNonRetryableError(error){
+  const code=clean(error?.code)
+  if(code==='AI_CONFIG_MISSING'||code==='AI_PROVIDER_INCOMPLETE_MAX_OUTPUT_TOKENS') return true
+  if(/^AI_.*VALIDATION$/.test(code)) return true
+  const status=Number(code.match(/^AI_PROVIDER_HTTP_(\d{3})$/)?.[1])
+  return status>=400&&status<500&&status!==408&&status!==429
 }
 
 function assertQueryResult(result,label){
@@ -108,18 +119,21 @@ export async function claimNextNightFlightJob({
   now=new Date(),
   leaseMs=DEFAULT_NIGHT_FLIGHT_PROCESSING_LEASE_MS,
   maxAttempts=DEFAULT_NIGHT_FLIGHT_MAX_ATTEMPTS,
+  excludeJobKeys=[],
 }={}){
   requireSupabase(supabase)
   const id=requireRunId(runId)
   const current=resolveNow(now)
   const lease=positiveNumber(leaseMs,DEFAULT_NIGHT_FLIGHT_PROCESSING_LEASE_MS)
   const attemptsLimit=positiveInteger(maxAttempts,DEFAULT_NIGHT_FLIGHT_MAX_ATTEMPTS)
+  const excluded=new Set(Array.from(excludeJobKeys||[],clean).filter(Boolean))
 
   for(let pass=0;pass<3;pass+=1){
     const rows=await loadClaimCandidates({supabase,runId:id})
     const candidates=[]
 
     for(const row of rows){
+      if(excluded.has(clean(row?.job_key))) continue
       if(await expireExhaustedCandidate({supabase,row,now:current,maxAttempts:attemptsLimit,leaseMs:lease})) continue
       if(Number(row?.attempts||0)>=attemptsLimit) continue
       if(row?.status==='PROCESSING'&&!isStaleProcessing(row,current,lease)) continue
@@ -182,7 +196,7 @@ export async function failNightFlightJob({
   requireSupabase(supabase)
   requireCurrentClaim(claimedJob)
   const attemptsLimit=positiveInteger(maxAttempts,DEFAULT_NIGHT_FLIGHT_MAX_ATTEMPTS)
-  const final=Number(claimedJob.attempts||0)>=attemptsLimit
+  const final=isNonRetryableError(error)||Number(claimedJob.attempts||0)>=attemptsLimit
   const stamp=resolveNow(now).toISOString()
   const failed=await casUpdateJob({
     supabase,
@@ -262,10 +276,12 @@ export async function processNightFlightQueue({
   const lease=positiveNumber(leaseMs,DEFAULT_NIGHT_FLIGHT_PROCESSING_LEASE_MS)
   const limit=Number.isFinite(Number(maxJobs))?Math.max(0,Number(maxJobs)):Infinity
   let processed=0
+  const attemptedJobKeys=new Set()
 
   while(processed<limit){
-    const claimed=await claimNextNightFlightJob({supabase,runId:id,now,leaseMs:lease,maxAttempts:attemptsLimit})
+    const claimed=await claimNextNightFlightJob({supabase,runId:id,now,leaseMs:lease,maxAttempts:attemptsLimit,excludeJobKeys:attemptedJobKeys})
     if(!claimed) break
+    attemptedJobKeys.add(clean(claimed.job_key))
 
     try{
       const result=await processJob(claimed)

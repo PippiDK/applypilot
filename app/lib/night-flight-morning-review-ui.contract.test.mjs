@@ -50,3 +50,8 @@ test('Night Flight job cards copy the saved Profile Match percentage directly in
   assert.doesNotMatch(component,/const visibleJobScore=/)
   assert.doesNotMatch(component,/requestExpertiseMatch|analyzeExpertiseMatch|getOrCreateExpertiseMatch/)
 })
+
+test('Morning Review uses the distinct recovery error before rendering a second failure',()=>{
+  assert.match(component,/distinctRecoveryError\(selected\?\.lastError,recoveryError\)/)
+  assert.match(component,/visibleRecoveryError&&<div className=\{styles\.failure\}>\{visibleRecoveryError\}<\/div>/)
+})

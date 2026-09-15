@@ -52,6 +52,7 @@ test('Task 8 Night Flight processor uses the frozen run CV/profile context and r
   assert.equal(serviceInput.cvText,run.cv_text_snapshot.trim())
   assert.equal(serviceInput.logicalJobKey,'linkedin:123')
   assert.equal(queueInput.runId,'run-1')
+  assert.equal(queueInput.maxJobs,3)
   assert.equal(result.status,'READY')
 })
 

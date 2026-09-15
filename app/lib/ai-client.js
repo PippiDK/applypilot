@@ -15,18 +15,25 @@ async function productionModelCall({stage,instructions,input,schema,maxOutputTok
     error.code='AI_CONFIG_MISSING'
     throw error
   }
-  const response=await fetch('https://api.openai.com/v1/responses',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
-    body:JSON.stringify({
-      model:process.env.APPLYPILOT_AI_MODEL||'gpt-5.6-sol',
-      instructions,
-      input:JSON.stringify(input),
-      text:{format:{type:'json_schema',name:stage,schema,strict:true}},
-      max_output_tokens:maxOutputTokens,
-      store:false
+  let response
+  try{
+    response=await fetch('https://api.openai.com/v1/responses',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
+      body:JSON.stringify({
+        model:process.env.APPLYPILOT_AI_MODEL||'gpt-5.6-sol',
+        instructions,
+        input:JSON.stringify(input),
+        text:{format:{type:'json_schema',name:stage,schema,strict:true}},
+        max_output_tokens:maxOutputTokens,
+        store:false
+      })
     })
-  })
+  }catch(error){
+    const networkError=new Error('OpenAI request could not be completed.')
+    networkError.code=error?.name==='AbortError'?'AI_PROVIDER_TIMEOUT':'AI_PROVIDER_NETWORK'
+    throw networkError
+  }
   if(!response.ok){
     const error=new Error(`OpenAI request failed with status ${response.status}.`)
     error.code=`AI_PROVIDER_HTTP_${response.status}`

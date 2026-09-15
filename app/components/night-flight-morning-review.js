@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import {distinctRecoveryError} from '../lib/night-flight-review-errors.js'
 import styles from './night-flight-morning-review.module.css'
 
 const POLL_INTERVAL_MS=45000
@@ -131,6 +132,7 @@ export default function NightFlightMorningReview(){
   const selected=review?.jobs?.find(item=>item.key===selectedKey)||review?.jobs?.[0]||null
   const analysis=selected?.analysis||null
   const vacancyUrl=selected?.job?.originalUrl||selected?.job?.detailUrl||selected?.job?.applicationUrl||''
+  const visibleRecoveryError=distinctRecoveryError(selected?.lastError,recoveryError)
 
   async function recoverNightFlightMatch(){
     if(!review?.run?.id||selected?.status!=='FAILED'||!selected?.key||recoveringKey) return
@@ -198,7 +200,7 @@ export default function NightFlightMorningReview(){
             {!selected&&<p className={styles.muted}>No review jobs for this run.</p>}
             {selected?.status==='FAILED'&&<>
               <div className={styles.failure}>{selected.lastError||'Automatic Profile Match failed.'}</div>
-              {recoveryError&&<div className={styles.failure}>{recoveryError}</div>}
+              {visibleRecoveryError&&<div className={styles.failure}>{visibleRecoveryError}</div>}
               <button type="button" className={styles.retry} onClick={recoverNightFlightMatch} disabled={recoveringKey===selected.key}>{recoveringKey===selected.key?'Running…':'Run Match'}</button>
             </>}
             {selected?.status==='READY'&&analysis&&<>
