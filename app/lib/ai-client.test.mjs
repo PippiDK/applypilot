@@ -88,6 +88,28 @@ test('production AI path classifies provider HTTP status without exposing respon
   }
 })
 
+test('production AI path safely classifies network failures without leaking their details',async()=>{
+  const {callStructuredAi}=await load()
+  const previousKey=process.env.OPENAI_API_KEY
+  const previousFetch=globalThis.fetch
+  process.env.OPENAI_API_KEY='sk-test-not-real'
+  globalThis.fetch=async()=>{throw new TypeError('fetch failed PRIVATE NETWORK DETAIL')}
+  try{
+    await assert.rejects(
+      ()=>callStructuredAi({stage:'expertise_match_one_pass',instructions:'Analyze.',input:{jd:'PRIVATE-JD-CONTENT'},schema}),
+      error=>{
+        assert.equal(error.code,'AI_PROVIDER_NETWORK')
+        assert.equal(error.message,'expertise_match_one_pass AI stage failed.')
+        return true
+      }
+    )
+  }finally{
+    globalThis.fetch=previousFetch
+    if(previousKey===undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY=previousKey
+  }
+})
+
 test('production AI path uses the caller-specific output-token budget',async()=>{
   const {callStructuredAi}=await load()
   const previousKey=process.env.OPENAI_API_KEY
