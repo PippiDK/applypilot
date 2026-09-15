@@ -186,13 +186,15 @@ test('Night Flight sends deterministic AI failures directly to FAILED',async()=>
   const mod=await loadModule()
   const supabase=fakeSupabase({jobs:[job('deterministic','QUEUED')],runs:[run()]})
   const claimed=await mod.claimNextNightFlightJob({supabase,runId:'run-6',now:new Date('2026-09-05T02:00:00.000Z')})
-  const validationError=new Error('expertise_match_one_pass AI stage failed.')
+  const validationError=new Error('PRIVATE-JD-ID')
   validationError.code='AI_EXPERTISE_VALIDATION'
 
   const failed=await mod.failNightFlightJob({supabase,claimedJob:claimed,error:validationError,now:new Date('2026-09-05T02:00:05.000Z')})
 
   assert.equal(failed.status,'FAILED')
   assert.equal(failed.attempts,1)
+  assert.equal(failed.last_error,'AI_EXPERTISE_VALIDATION · Night Flight Match failed safely.')
+  assert.doesNotMatch(failed.last_error,/PRIVATE-JD-ID/)
 })
 
 test('Night Flight defers a retryable failure until a later queue invocation',async()=>{

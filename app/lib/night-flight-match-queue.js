@@ -38,8 +38,10 @@ function positiveNumber(value,fallback){
 function safeErrorMessage(error){
   const text=clean(error?.message||error||'Night Flight Match failed')
   const code=clean(error?.code)
-  const prefix=/^AI_[A-Z0-9_]{1,76}$/.test(code)?`${code} · `:''
-  return `${prefix}${text||'Night Flight Match failed'}`.slice(0,500)
+  const safeCode=/^AI_[A-Z0-9_]{1,76}$/.test(code)
+  const safeStage=/^[a-zA-Z0-9_-]{1,64} AI stage failed\.$/.test(text)
+  const message=safeCode&&!safeStage?'Night Flight Match failed safely.':(text||'Night Flight Match failed')
+  return `${safeCode?`${code} · `:''}${message}`.slice(0,500)
 }
 
 function isNonRetryableError(error){

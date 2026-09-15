@@ -31,7 +31,10 @@ async function productionModelCall({stage,instructions,input,schema,maxOutputTok
     })
   }catch(error){
     const networkError=new Error('OpenAI request could not be completed.')
-    networkError.code=error?.name==='AbortError'?'AI_PROVIDER_TIMEOUT':'AI_PROVIDER_NETWORK'
+    const name=String(error?.name||'')
+    const transportCode=String(error?.code||error?.cause?.code||'')
+    const timedOut=name==='AbortError'||name==='TimeoutError'||/TIMEOUT|TIMEDOUT/.test(transportCode)
+    networkError.code=timedOut?'AI_PROVIDER_TIMEOUT':'AI_PROVIDER_NETWORK'
     throw networkError
   }
   if(!response.ok){
