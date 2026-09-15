@@ -8,6 +8,25 @@ function outputTextFromResponse(data){
   return ''
 }
 
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))
+
+function retryAfterMs(response,attempt){
+  const raw=String(response?.headers?.get?.('retry-after')??'').trim()
+  const seconds=Number(raw)
+  if(Number.isFinite(seconds)&&seconds>=0) return Math.min(seconds*1000,30000)
+  return Math.min(1000*(2**attempt),30000)
+}
+
+async function safeProviderError(response){
+  try{ return await response.json() }catch{ return null }
+}
+
+function isQuota429(data){
+  const type=String(data?.error?.type??'').toLowerCase()
+  const code=String(data?.error?.code??'').toLowerCase()
+  return type==='insufficient_quota'||code==='insufficient_quota'||code.includes('spend_limit')||code.includes('credit_balance')
+}
+
 async function productionModelCall({stage,instructions,input,schema,maxOutputTokens=2400}){
   const apiKey=String(process.env.OPENAI_API_KEY??'').trim()
   if(!apiKey){
@@ -15,32 +34,48 @@ async function productionModelCall({stage,instructions,input,schema,maxOutputTok
     error.code='AI_CONFIG_MISSING'
     throw error
   }
-  let response
-  try{
-    response=await fetch('https://api.openai.com/v1/responses',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
-      body:JSON.stringify({
-        model:process.env.APPLYPILOT_AI_MODEL||'gpt-5.6-sol',
-        instructions,
-        input:JSON.stringify(input),
-        text:{format:{type:'json_schema',name:stage,schema,strict:true}},
-        max_output_tokens:maxOutputTokens,
-        store:false
-      })
+  const requestOptions={
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
+    body:JSON.stringify({
+      model:process.env.APPLYPILOT_AI_MODEL||'gpt-5.6-sol',
+      instructions,
+      input:JSON.stringify(input),
+      text:{format:{type:'json_schema',name:stage,schema,strict:true}},
+      max_output_tokens:maxOutputTokens,
+      store:false
     })
-  }catch(error){
-    const networkError=new Error('OpenAI request could not be completed.')
-    const name=String(error?.name||'')
-    const transportCode=String(error?.code||error?.cause?.code||'')
-    const timedOut=name==='AbortError'||name==='TimeoutError'||/TIMEOUT|TIMEDOUT/.test(transportCode)
-    networkError.code=timedOut?'AI_PROVIDER_TIMEOUT':'AI_PROVIDER_NETWORK'
-    throw networkError
   }
-  if(!response.ok){
-    const error=new Error(`OpenAI request failed with status ${response.status}.`)
-    error.code=`AI_PROVIDER_HTTP_${response.status}`
-    throw error
+  let response
+  for(let attempt=0;attempt<3;attempt+=1){
+    try{
+      response=await fetch('https://api.openai.com/v1/responses',requestOptions)
+    }catch(error){
+      const networkError=new Error('OpenAI request could not be completed.')
+      const name=String(error?.name||'')
+      const transportCode=String(error?.code||error?.cause?.code||'')
+      const timedOut=name==='AbortError'||name==='TimeoutError'||/TIMEOUT|TIMEDOUT/.test(transportCode)
+      networkError.code=timedOut?'AI_PROVIDER_TIMEOUT':'AI_PROVIDER_NETWORK'
+      throw networkError
+    }
+    if(response.ok) break
+    if(response.status!==429){
+      const error=new Error(`OpenAI request failed with status ${response.status}.`)
+      error.code=`AI_PROVIDER_HTTP_${response.status}`
+      throw error
+    }
+    const providerError=await safeProviderError(response)
+    if(isQuota429(providerError)){
+      const error=new Error('OpenAI quota or spend limit is unavailable.')
+      error.code='AI_PROVIDER_QUOTA_EXHAUSTED'
+      throw error
+    }
+    if(attempt===2){
+      const error=new Error('OpenAI request failed with status 429.')
+      error.code='AI_PROVIDER_HTTP_429'
+      throw error
+    }
+    await sleep(retryAfterMs(response,attempt))
   }
   const data=await response.json()
   if(data?.status==='incomplete'&&data?.incomplete_details?.reason==='max_output_tokens'){
