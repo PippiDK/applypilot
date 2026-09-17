@@ -1,0 +1,103 @@
+name: CV Storage Quota Fix
+
+on:
+  push:
+    branches:
+      - fix/cv-storage-quota-test
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/cv-storage-quota-test
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Apply minimal single-copy CV persistence fix
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/main-search-base.js')
+          text = path.read_text()
+
+          old_hydration = """      if(primaryCv){
+                setCvData(primaryCv)
+                localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(primaryCv))
+                localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
+              }"""
+          new_hydration = """      if(primaryCv){
+                setCvData(primaryCv)
+                localStorage.removeItem(SOURCE_CV_STORAGE_KEY)
+                localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
+              }"""
+          if old_hydration not in text:
+              raise SystemExit('Hydration persistence block not found')
+          text = text.replace(old_hydration, new_hydration, 1)
+
+          old_parse = """      setSourceDocxFiles(current=>({...current,[saved.sourceVersion]:file}))
+              localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(nextLibrary))"""
+          new_parse = """      setSourceDocxFiles(current=>({...current,[saved.sourceVersion]:file}))
+              localStorage.removeItem(SOURCE_CV_STORAGE_KEY)
+              localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
+              localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(nextLibrary))"""
+          if old_parse not in text:
+              raise SystemExit('CV library persistence block not found')
+          text = text.replace(old_parse, new_parse, 1)
+
+          old_primary = """        localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(primaryCv))
+                  localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
+                  setCvData(primaryCv)"""
+          new_primary = """        setCvData(primaryCv)"""
+          if old_primary not in text:
+              raise SystemExit('Primary CV duplicate persistence block not found')
+          text = text.replace(old_primary, new_primary, 1)
+
+          path.write_text(text)
+          PY
+
+      - name: Add regression contract
+        run: |
+          cat > app/lib/cv-storage-single-copy.contract.test.mjs <<'EOF'
+          import test from 'node:test'
+          import assert from 'node:assert/strict'
+          import fs from 'node:fs'
+
+          const source=fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8')
+
+          test('CV library is the only persisted full CV copy',()=>{
+            assert.equal(source.includes('localStorage.setItem(SOURCE_CV_STORAGE_KEY'),false)
+            assert.match(source,/localStorage\.removeItem\(SOURCE_CV_STORAGE_KEY\)[\s\S]*localStorage\.removeItem\(LEGACY_CV_STORAGE_KEY\)[\s\S]*localStorage\.setItem\(CV_LIBRARY_STORAGE_KEY,JSON\.stringify\(nextLibrary\)\)/)
+          })
+
+          test('hydration removes obsolete Source CV persistence after canonical library migration',()=>{
+            assert.match(source,/if\(readyCvCount\(library\)>0\) localStorage\.setItem\(CV_LIBRARY_STORAGE_KEY,JSON\.stringify\(library\)\)[\s\S]*if\(primaryCv\)\{[\s\S]*setCvData\(primaryCv\)[\s\S]*localStorage\.removeItem\(SOURCE_CV_STORAGE_KEY\)[\s\S]*localStorage\.removeItem\(LEGACY_CV_STORAGE_KEY\)/)
+          })
+          EOF
+
+      - name: Verify focused CV storage tests
+        run: node --test app/lib/cv-library.test.mjs app/lib/source-cv.test.mjs app/lib/cv-storage-single-copy.contract.test.mjs
+
+      - name: Verify production build
+        run: npm run build
+
+      - name: Commit verified fix
+        run: |
+          rm .github/workflows/cv-storage-quota-fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/main-search-base.js app/lib/cv-storage-single-copy.contract.test.mjs .github/workflows/cv-storage-quota-fix.yml
+          git commit -m "fix: persist CVs only in canonical library"
+          git push origin HEAD:fix/cv-storage-quota-test
