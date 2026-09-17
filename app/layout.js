@@ -14,23 +14,24 @@ import NightFlightMorningReview from './components/night-flight-morning-review.j
 import {createServerSupabaseClient} from './lib/supabase/server.js'
 import {loadAppliedJobsFromSupabase} from './lib/applied-jobs-supabase-store.js'
 import {APPLIED_JOBS_STORAGE_KEY} from './lib/applied-jobs.js'
-import {APPLIED_JOBS_PREVIEW_USER_ID} from './lib/applied-jobs-preview.js'
+import {APPLIED_JOBS_PREVIEW_USER_ID,createPreviewAppliedJobsSupabaseClient} from './lib/applied-jobs-preview.js'
 
 export const metadata={title:'ApplyPilot',description:'Job search autopilot for senior IT professionals'}
 
 async function appliedJobsForHydration(){
   try{
-    const supabase=await createServerSupabaseClient()
-    let userId=APPLIED_JOBS_PREVIEW_USER_ID
-
-    if(process.env.VERCEL_ENV!=='preview'){
-      const {data,error}=await supabase.auth.getUser()
-      const user=data?.user??null
-      if(error||!user) return []
-      userId=user.id
+    if(process.env.VERCEL_ENV==='preview'){
+      return await loadAppliedJobsFromSupabase({
+        supabase:createPreviewAppliedJobsSupabaseClient(),
+        userId:APPLIED_JOBS_PREVIEW_USER_ID,
+      })
     }
 
-    return await loadAppliedJobsFromSupabase({supabase,userId})
+    const supabase=await createServerSupabaseClient()
+    const {data,error}=await supabase.auth.getUser()
+    const user=data?.user??null
+    if(error||!user) return []
+    return await loadAppliedJobsFromSupabase({supabase,userId:user.id})
   }catch{return []}
 }
 
