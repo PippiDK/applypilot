@@ -7,7 +7,6 @@ import {loadAppliedJobsFromSupabase,upsertAppliedJobsToSupabase} from '../../lib
 export const dynamic='force-dynamic'
 
 export async function GET(){
-  if(process.env.VERCEL_ENV==='preview') return NextResponse.json({jobs:[]})
   const auth=await requireUser()
   if(!auth.user) return auth.response
   try{
@@ -25,7 +24,6 @@ export async function POST(request){
   try{jobs=normalizeAppliedJobs((await request.json())?.jobs)}
   catch{return NextResponse.json({error:'Invalid applied jobs payload'},{status:400})}
 
-  if(process.env.VERCEL_ENV==='preview') return NextResponse.json({jobs})
   const auth=await requireUser()
   if(!auth.user) return auth.response
   try{
