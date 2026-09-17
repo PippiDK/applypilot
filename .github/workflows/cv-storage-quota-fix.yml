@@ -32,37 +32,16 @@ jobs:
           path = Path('app/main-search-base.js')
           text = path.read_text()
 
-          old_hydration = """      if(primaryCv){
-                setCvData(primaryCv)
-                localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(primaryCv))
-                localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
-              }"""
-          new_hydration = """      if(primaryCv){
-                setCvData(primaryCv)
-                localStorage.removeItem(SOURCE_CV_STORAGE_KEY)
-                localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
-              }"""
-          if old_hydration not in text:
-              raise SystemExit('Hydration persistence block not found')
-          text = text.replace(old_hydration, new_hydration, 1)
+          duplicate_write = 'localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(primaryCv))'
+          if text.count(duplicate_write) != 2:
+              raise SystemExit(f'Expected 2 Source CV duplicate writes, found {text.count(duplicate_write)}')
+          text = text.replace(duplicate_write, 'localStorage.removeItem(SOURCE_CV_STORAGE_KEY)')
 
-          old_parse = """      setSourceDocxFiles(current=>({...current,[saved.sourceVersion]:file}))
-              localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(nextLibrary))"""
-          new_parse = """      setSourceDocxFiles(current=>({...current,[saved.sourceVersion]:file}))
-              localStorage.removeItem(SOURCE_CV_STORAGE_KEY)
-              localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
-              localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(nextLibrary))"""
-          if old_parse not in text:
-              raise SystemExit('CV library persistence block not found')
-          text = text.replace(old_parse, new_parse, 1)
-
-          old_primary = """        localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(primaryCv))
-                  localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
-                  setCvData(primaryCv)"""
-          new_primary = """        setCvData(primaryCv)"""
-          if old_primary not in text:
-              raise SystemExit('Primary CV duplicate persistence block not found')
-          text = text.replace(old_primary, new_primary, 1)
+          canonical_write = 'localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(nextLibrary))'
+          if text.count(canonical_write) != 2:
+              raise SystemExit(f'Expected 2 CV library writes, found {text.count(canonical_write)}')
+          replacement_write = "localStorage.removeItem(SOURCE_CV_STORAGE_KEY)\n      localStorage.removeItem(LEGACY_CV_STORAGE_KEY)\n      " + canonical_write
+          text = text.replace(canonical_write, replacement_write, 1)
 
           path.write_text(text)
           PY
@@ -78,11 +57,26 @@ jobs:
 
           test('CV library is the only persisted full CV copy',()=>{
             assert.equal(source.includes('localStorage.setItem(SOURCE_CV_STORAGE_KEY'),false)
-            assert.match(source,/localStorage\.removeItem\(SOURCE_CV_STORAGE_KEY\)[\s\S]*localStorage\.removeItem\(LEGACY_CV_STORAGE_KEY\)[\s\S]*localStorage\.setItem\(CV_LIBRARY_STORAGE_KEY,JSON\.stringify\(nextLibrary\)\)/)
           })
 
-          test('hydration removes obsolete Source CV persistence after canonical library migration',()=>{
-            assert.match(source,/if\(readyCvCount\(library\)>0\) localStorage\.setItem\(CV_LIBRARY_STORAGE_KEY,JSON\.stringify\(library\)\)[\s\S]*if\(primaryCv\)\{[\s\S]*setCvData\(primaryCv\)[\s\S]*localStorage\.removeItem\(SOURCE_CV_STORAGE_KEY\)[\s\S]*localStorage\.removeItem\(LEGACY_CV_STORAGE_KEY\)/)
+          test('old duplicate CV storage is cleared before replacement library write',()=>{
+            const clearSource=source.indexOf('localStorage.removeItem(SOURCE_CV_STORAGE_KEY)',source.indexOf('async function parseCv'))
+            const clearLegacy=source.indexOf('localStorage.removeItem(LEGACY_CV_STORAGE_KEY)',clearSource)
+            const writeLibrary=source.indexOf('localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(nextLibrary))',clearLegacy)
+            assert.ok(clearSource>=0)
+            assert.ok(clearLegacy>clearSource)
+            assert.ok(writeLibrary>clearLegacy)
+          })
+
+          test('hydration migrates canonical library before removing obsolete duplicate keys',()=>{
+            const canonical=source.indexOf('if(readyCvCount(library)>0) localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(library))')
+            const primary=source.indexOf('if(primaryCv){',canonical)
+            const clearSource=source.indexOf('localStorage.removeItem(SOURCE_CV_STORAGE_KEY)',primary)
+            const clearLegacy=source.indexOf('localStorage.removeItem(LEGACY_CV_STORAGE_KEY)',clearSource)
+            assert.ok(canonical>=0)
+            assert.ok(primary>canonical)
+            assert.ok(clearSource>primary)
+            assert.ok(clearLegacy>clearSource)
           })
           EOF
 
