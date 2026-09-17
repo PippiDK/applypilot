@@ -22,7 +22,7 @@ import {fitLabel} from './lib/fit-label.js'
 import {compareShadowToLegacy} from './lib/shadow-search-compare.js'
 import {JOB_STATUS_OPTIONS,readJobStatuses,writeJobStatus} from './lib/job-statuses.js'
 import {archiveAppliedJob,syncAppliedArchive} from './lib/applied-jobs.js'
-import {loadAppliedJobs,persistAppliedJobs} from './lib/applied-jobs-client.js'
+import {fetchAppliedJobs,loadAppliedJobs,persistAppliedJobs} from './lib/applied-jobs-client.js'
 import AppliedJobsArchive from './components/applied-jobs-archive.js'
 import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
 import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
@@ -69,6 +69,7 @@ export default function Home(){
   const [selected,setSelected]=useState(null)
   const [jobStatuses,setJobStatuses]=useState({})
   const [appliedJobs,setAppliedJobs]=useState([])
+  const [appliedSaveError,setAppliedSaveError]=useState('')
   const [appliedArchiveOpen,setAppliedArchiveOpen]=useState(false)
   const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
   const [shadowState,setShadowState]=useState({status:'idle',error:'',stats:null,coverage:null,comparison:null})
@@ -134,8 +135,13 @@ export default function Home(){
           storage:localStorage,
           bootstrapJobs:Array.isArray(window.__APPLYPILOT_APPLIED_JOBS__)?window.__APPLYPILOT_APPLIED_JOBS__:undefined,
         })
-        if(active) setAppliedJobs(jobs)
-      }catch{}
+        if(active){
+          setAppliedJobs(jobs)
+          setAppliedSaveError('')
+        }
+      }catch{
+        if(active) setAppliedSaveError('Applied History could not be loaded from durable storage.')
+      }
     })()
     return()=>{active=false}
   },[])
@@ -254,9 +260,19 @@ export default function Home(){
 
   function persistAppliedArchive(next){
     setAppliedJobs(next)
+    setAppliedSaveError('')
     void persistAppliedJobs(next)
-      .then(stored=>setAppliedJobs(stored))
-      .catch(()=>{})
+      .then(stored=>{
+        setAppliedJobs(stored)
+        setAppliedSaveError('')
+      })
+      .catch(async()=>{
+        setAppliedSaveError('Applied History could not be saved. Your durable archive was not updated.')
+        try{
+          const stored=await fetchAppliedJobs()
+          setAppliedJobs(stored)
+        }catch{}
+      })
   }
 
   function changeJobStatus(jobId,status){
@@ -819,7 +835,7 @@ export default function Home(){
       <ShadowSearchAudit shadowState={shadowState}/>
     </section>}
 
-    <AppliedJobsArchive jobs={appliedJobs} open={appliedArchiveOpen} onOpen={()=>setAppliedArchiveOpen(true)} onClose={()=>setAppliedArchiveOpen(false)}/>
+    <AppliedJobsArchive jobs={appliedJobs} error={appliedSaveError} open={appliedArchiveOpen} onOpen={()=>setAppliedArchiveOpen(true)} onClose={()=>setAppliedArchiveOpen(false)}/>
 
     <footer>TEST · LinkedIn + Jobindex + Jobnet multi-source search</footer>
 
