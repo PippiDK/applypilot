@@ -6,7 +6,7 @@ import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsert
 import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'
 import {requestNightFlightProfileSync} from './lib/night-flight-profile-client.js'
 import {attemptNightFlightProfileSync} from './lib/night-flight-profile-failure.js'
-import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'
+import {SEARCH_PROFILE_BUILDER_VERSION,readSearchProfileCache,writeSearchProfileCache,clearSearchProfileCache,resolveSearchProfileExclusions} from './lib/search-profile-cache.js'
 import {buildCvRoleProfile,combineCvRoleProfiles,searchProfileLibraryFingerprint} from './lib/search-profile-library.js'
 import {buildUnionSearchPlan,UNION_SEARCH_PLAN_VERSION} from './lib/union-search-plan.js'
 import {normalizeSearchPreferences,legacyGeographyFromPreferences} from './lib/search-profile-preferences.js'
@@ -188,6 +188,7 @@ export default function Home(){
       localStorage.removeItem(SOURCE_CV_STORAGE_KEY)
       localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
       localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(nextLibrary))
+      clearSearchProfileCache({storage:localStorage,sourceVersion:saved.sourceVersion})
       setCvLibrary(nextLibrary)
       setProfileRoleState(EMPTY_ROLE_STATE)
 
