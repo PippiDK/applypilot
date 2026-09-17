@@ -439,7 +439,7 @@ export default function Home(){
     const mergedJobs=mergeSourceItems(successful.map(result=>Array.isArray(result.data.jobs)?result.data.jobs:[]))
     setJobs(mergedJobs)
     const nextAppliedJobs=syncAppliedArchive({archive:appliedJobs,items:mergedJobs,statuses:jobStatuses})
-    if(nextAppliedJobs.length!==appliedJobs.length) persistAppliedArchive(nextAppliedJobs)
+    if(JSON.stringify(nextAppliedJobs)!==JSON.stringify(appliedJobs)) persistAppliedArchive(nextAppliedJobs)
     else setAppliedJobs(nextAppliedJobs)
 
     const stats={
