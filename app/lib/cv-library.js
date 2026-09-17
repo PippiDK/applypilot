@@ -1,4 +1,4 @@
-import {isSourceCvReady,normalizeStoredSourceCv} from './source-cv.js'
+import {isSourceCvReady,normalizeStoredSourceCv,SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY} from './source-cv.js'
 
 export const CV_LIBRARY_STORAGE_KEY='applypilot-cv-library'
 export const MAX_CVS=3
@@ -40,6 +40,35 @@ export function normalizeCvLibrary(value,legacyCv=null){
   }
 
   return library
+}
+
+export function persistCvLibrary(storage,library){
+  const normalized=normalizeCvLibrary(library)
+  if(!storage?.setItem) return normalized
+
+  const serialized=JSON.stringify(normalized)
+  const hadLibrary=storage.getItem?.(CV_LIBRARY_STORAGE_KEY)!=null
+  const duplicateSource=storage.getItem?.(SOURCE_CV_STORAGE_KEY)
+  const legacySource=storage.getItem?.(LEGACY_CV_STORAGE_KEY)
+
+  if(hadLibrary){
+    storage.removeItem?.(SOURCE_CV_STORAGE_KEY)
+    storage.removeItem?.(LEGACY_CV_STORAGE_KEY)
+  }
+
+  try{
+    storage.setItem(CV_LIBRARY_STORAGE_KEY,serialized)
+  }catch(error){
+    if(hadLibrary){
+      if(duplicateSource!=null){try{storage.setItem(SOURCE_CV_STORAGE_KEY,duplicateSource)}catch{}}
+      if(legacySource!=null){try{storage.setItem(LEGACY_CV_STORAGE_KEY,legacySource)}catch{}}
+    }
+    throw error
+  }
+
+  storage.removeItem?.(SOURCE_CV_STORAGE_KEY)
+  storage.removeItem?.(LEGACY_CV_STORAGE_KEY)
+  return normalized
 }
 
 export function getCvSlot(library,slot){
