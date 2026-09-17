@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,applicationPackState} from './lib/profile-review.js'
 import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'
-import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'
+import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,persistCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'
 import {requestSearchProfileRoles,requestSearchProfileExclusions} from './lib/search-profile-client.js'
 import {requestNightFlightProfileSync} from './lib/night-flight-profile-client.js'
 import {attemptNightFlightProfileSync} from './lib/night-flight-profile-failure.js'
@@ -111,11 +111,9 @@ export default function Home(){
       setCompanyWatch(readCompanyWatch(localStorage))
       setConsultantPortals(readConsultantPortals(localStorage))
       setCvLibrary(library)
-      if(readyCvCount(library)>0) localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(library))
+      if(readyCvCount(library)>0) persistCvLibrary(localStorage,library)
       if(primaryCv){
         setCvData(primaryCv)
-        localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(primaryCv))
-        localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
       }
       setProfile(hydrated)
       setDraft(hydrated)
@@ -185,14 +183,12 @@ export default function Home(){
       const saved=buildSourceCvRecord(data,new Date().toISOString())
       const nextLibrary=upsertCvSlot(cvLibrary,slot,saved)
       setSourceDocxFiles(current=>({...current,[saved.sourceVersion]:file}))
-      localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(nextLibrary))
+      persistCvLibrary(localStorage,nextLibrary)
       setCvLibrary(nextLibrary)
       setProfileRoleState(EMPTY_ROLE_STATE)
 
       if(slot===1){
         const primaryCv=getPrimaryCv(nextLibrary)
-        localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(primaryCv))
-        localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
         setCvData(primaryCv)
         setDecisions({})
         setReviewOpen(false)
@@ -211,7 +207,7 @@ export default function Home(){
 
   function removeCv(slot){
     const nextLibrary=removeCvSlot(cvLibrary,slot)
-    localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(nextLibrary))
+    persistCvLibrary(localStorage,nextLibrary)
     setCvLibrary(nextLibrary)
     setCvState({loadingSlot:null,error:''})
     setProfileRoleState(EMPTY_ROLE_STATE)
