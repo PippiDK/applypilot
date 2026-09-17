@@ -31,7 +31,7 @@ test('keeps sibling CV role caches independent when one sourceVersion changes',(
 
   writeSearchProfileCache({storage:store,sourceVersion:'cv1-a',roles:cv1})
   writeSearchProfileCache({storage:store,sourceVersion:'cv2-a',roles:cv2})
-  writeSearchProfileCache({storage:store,sourceVersion:'cv3-a',roles:cv3)
+  writeSearchProfileCache({storage:store,sourceVersion:'cv3-a',roles:cv3})
 
   assert.deepEqual(readSearchProfileCache({storage:store,sourceVersion:'cv1-a'}),cv1)
   assert.deepEqual(readSearchProfileCache({storage:store,sourceVersion:'cv3-a'}),cv3)
