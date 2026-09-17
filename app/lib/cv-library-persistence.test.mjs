@@ -58,3 +58,5 @@ test('Main Search persists CV data only through the CV library',()=>{
   assert.match(source,/persistCvLibrary\(localStorage,\s*nextLibrary\)/)
   assert.doesNotMatch(source,/localStorage\.setItem\(SOURCE_CV_STORAGE_KEY/)
 })
+
+// Final TEST verification trigger after the one-shot patch commit.
