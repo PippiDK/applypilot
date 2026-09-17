@@ -14,22 +14,28 @@ import NightFlightMorningReview from './components/night-flight-morning-review.j
 import {createServerSupabaseClient} from './lib/supabase/server.js'
 import {loadAppliedJobsFromSupabase} from './lib/applied-jobs-supabase-store.js'
 import {APPLIED_JOBS_STORAGE_KEY} from './lib/applied-jobs.js'
+import {APPLIED_JOBS_PREVIEW_USER_ID} from './lib/applied-jobs-preview.js'
 
 export const metadata={title:'ApplyPilot',description:'Job search autopilot for senior IT professionals'}
 
 async function appliedJobsForHydration(){
-  if(process.env.VERCEL_ENV==='preview') return []
   try{
     const supabase=await createServerSupabaseClient()
-    const {data,error}=await supabase.auth.getUser()
-    const user=data?.user??null
-    if(error||!user) return []
-    return await loadAppliedJobsFromSupabase({supabase,userId:user.id})
+    let userId=APPLIED_JOBS_PREVIEW_USER_ID
+
+    if(process.env.VERCEL_ENV!=='preview'){
+      const {data,error}=await supabase.auth.getUser()
+      const user=data?.user??null
+      if(error||!user) return []
+      userId=user.id
+    }
+
+    return await loadAppliedJobsFromSupabase({supabase,userId})
   }catch{return []}
 }
 
 function appliedJobsHydrationScript(remoteJobs){
-  const remoteJson=JSON.stringify(Array.isArray(remoteJobs)?remoteJobs:[]).replace(/</g,'\\u003c')
+  const remoteJson=JSON.stringify(Array.isArray(remoteJobs)?remoteJobs:[]).replace(/</g,'\u003c')
   const keyJson=JSON.stringify(APPLIED_JOBS_STORAGE_KEY)
   return `(()=>{try{const key=${keyJson};const remote=${remoteJson};let local=[];try{const parsed=JSON.parse(localStorage.getItem(key)||'[]');local=Array.isArray(parsed)?parsed:[]}catch{}const merged=[];const seen=new Set();for(const item of [...local,...remote]){const jobId=String(item?.jobId||item?.sourceJobId||'').trim();if(!jobId||seen.has(jobId))continue;seen.add(jobId);merged.push(item)}if(merged.length)localStorage.setItem(key,JSON.stringify(merged))}catch{}})();`
 }
