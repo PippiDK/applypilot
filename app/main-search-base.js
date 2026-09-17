@@ -114,7 +114,7 @@ export default function Home(){
       if(readyCvCount(library)>0) localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(library))
       if(primaryCv){
         setCvData(primaryCv)
-        localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(primaryCv))
+        localStorage.removeItem(SOURCE_CV_STORAGE_KEY)
         localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
       }
       setProfile(hydrated)
@@ -185,13 +185,15 @@ export default function Home(){
       const saved=buildSourceCvRecord(data,new Date().toISOString())
       const nextLibrary=upsertCvSlot(cvLibrary,slot,saved)
       setSourceDocxFiles(current=>({...current,[saved.sourceVersion]:file}))
+      localStorage.removeItem(SOURCE_CV_STORAGE_KEY)
+      localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
       localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(nextLibrary))
       setCvLibrary(nextLibrary)
       setProfileRoleState(EMPTY_ROLE_STATE)
 
       if(slot===1){
         const primaryCv=getPrimaryCv(nextLibrary)
-        localStorage.setItem(SOURCE_CV_STORAGE_KEY,JSON.stringify(primaryCv))
+        localStorage.removeItem(SOURCE_CV_STORAGE_KEY)
         localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
         setCvData(primaryCv)
         setDecisions({})
