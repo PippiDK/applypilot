@@ -2,6 +2,15 @@ export const APPLIED_JOBS_STORAGE_KEY='applypilot-applied-jobs-v1'
 
 const text=value=>String(value??'').trim()
 
+function persistAppliedJobsRemote(jobs){
+  if(typeof window==='undefined'||typeof fetch!=='function'||!Array.isArray(jobs)||!jobs.length) return
+  void fetch('/api/applied-jobs',{
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({jobs}),
+  }).catch(()=>{})
+}
+
 function normalizeEntry(value){
   if(!value||typeof value!=='object'||Array.isArray(value)) return null
   const jobId=text(value.jobId||value.sourceJobId)
@@ -33,7 +42,11 @@ export function normalizeAppliedJobs(value){
 }
 
 export function readAppliedJobs(storage){
-  try{return normalizeAppliedJobs(JSON.parse(storage?.getItem?.(APPLIED_JOBS_STORAGE_KEY)||'[]'))}
+  try{
+    const jobs=normalizeAppliedJobs(JSON.parse(storage?.getItem?.(APPLIED_JOBS_STORAGE_KEY)||'[]'))
+    persistAppliedJobsRemote(jobs)
+    return jobs
+  }
   catch{return []}
 }
 
@@ -55,6 +68,7 @@ export function archiveAppliedJob({storage,archive=[],job,evaluation,appliedAt}=
   })
   const next=normalizeAppliedJobs([entry,...previous.filter(item=>item.jobId!==jobId)])
   storage?.setItem?.(APPLIED_JOBS_STORAGE_KEY,JSON.stringify(next))
+  persistAppliedJobsRemote(next)
   return next
 }
 
