@@ -33,6 +33,15 @@ export function writeSearchProfileCache({storage,sourceVersion,roles}={}){
   }catch{return false}
 }
 
+export function clearSearchProfileCache({storage,sourceVersion}={}){
+  const key=searchProfileCacheKey(sourceVersion)
+  if(!storage||!key) return false
+  try{
+    storage.removeItem(key)
+    return true
+  }catch{return false}
+}
+
 export function normalizeExclusionsText(value=''){
   return String(value??'').replace(/\s+/g,' ').trim()
 }
