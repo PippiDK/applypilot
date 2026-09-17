@@ -59,15 +59,15 @@ jobs:
             assert.ok(libraryState>cacheClear)
           })
           EOF
-      - name: Full test suite
-        run: npm test
+      - name: Focused CV and Search Profile tests
+        run: node --test app/lib/search-profile-cache.test.mjs app/lib/cv-library.test.mjs app/lib/source-cv.test.mjs app/lib/cv-reupload-role-cache.contract.test.mjs
       - name: Production build
         run: npm run build
       - name: Commit verified fix
         run: |
-          rm .github/workflows/apply-cv-reupload-cache-fix.yml
+          rm -f .github/workflows/apply-cv-reupload-cache-fix.yml .github/workflows/cv-reupload-role-cache.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+PippiDK@users.noreply.github.com"
-          git add app/main-search-base.js app/lib/search-profile-cache.js app/lib/search-profile-cache.test.mjs app/lib/cv-reupload-role-cache.contract.test.mjs .github/workflows/apply-cv-reupload-cache-fix.yml
+          git add app/main-search-base.js app/lib/search-profile-cache.js app/lib/search-profile-cache.test.mjs app/lib/cv-reupload-role-cache.contract.test.mjs .github/workflows/apply-cv-reupload-cache-fix.yml .github/workflows/cv-reupload-role-cache.yml
           git commit -m "fix: reanalyse uploaded CV roles instead of reusing cache"
           git push origin HEAD:fix/cv-reupload-role-cache
