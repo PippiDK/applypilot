@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import {readFileSync} from 'node:fs'
 import * as cvLibrary from './cv-library.js'
 import {buildSourceCvRecord,SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY} from './source-cv.js'
 
@@ -49,4 +50,11 @@ test('CV library persistence keeps CV1 only once and replaces the old slot versi
   assert.equal(persisted.cvs.some(item=>item?.sourceVersion==='cv1-old'),false)
   assert.equal(storage.getItem(SOURCE_CV_STORAGE_KEY),null)
   assert.equal(storage.getItem(LEGACY_CV_STORAGE_KEY),null)
+})
+
+test('Main Search persists CV data only through the CV library',()=>{
+  const source=readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8')
+  assert.match(source,/persistCvLibrary\(localStorage,\s*library\)/)
+  assert.match(source,/persistCvLibrary\(localStorage,\s*nextLibrary\)/)
+  assert.doesNotMatch(source,/localStorage\.setItem\(SOURCE_CV_STORAGE_KEY/)
 })
