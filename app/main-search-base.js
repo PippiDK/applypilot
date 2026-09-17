@@ -190,6 +190,7 @@ export default function Home(){
       localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(nextLibrary))
       clearSearchProfileCache({storage:localStorage,sourceVersion:saved.sourceVersion})
       setCvLibrary(nextLibrary)
+      setDraft(current=>({...current,primaryRoles:[],adjacentRoles:[],roles:'',cvRoleProfiles:[],roleSources:[],rolesLibraryFingerprint:'',rolesSourceVersion:'',rolesBuilderVersion:''}))
       setProfileRoleState(EMPTY_ROLE_STATE)
 
       if(slot===1){
