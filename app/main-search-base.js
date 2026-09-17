@@ -21,7 +21,8 @@ import {evaluateJobConditions} from './lib/job-conditions.js'
 import {fitLabel} from './lib/fit-label.js'
 import {compareShadowToLegacy} from './lib/shadow-search-compare.js'
 import {JOB_STATUS_OPTIONS,readJobStatuses,writeJobStatus} from './lib/job-statuses.js'
-import {readAppliedJobs,archiveAppliedJob,syncAppliedArchive} from './lib/applied-jobs.js'
+import {archiveAppliedJob,syncAppliedArchive} from './lib/applied-jobs.js'
+import {fetchAppliedJobs,loadAppliedJobs,persistAppliedJobs} from './lib/applied-jobs-client.js'
 import AppliedJobsArchive from './components/applied-jobs-archive.js'
 import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
 import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
@@ -68,6 +69,7 @@ export default function Home(){
   const [selected,setSelected]=useState(null)
   const [jobStatuses,setJobStatuses]=useState({})
   const [appliedJobs,setAppliedJobs]=useState([])
+  const [appliedSaveError,setAppliedSaveError]=useState('')
   const [appliedArchiveOpen,setAppliedArchiveOpen]=useState(false)
   const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
   const [shadowState,setShadowState]=useState({status:'idle',error:'',stats:null,coverage:null,comparison:null})
@@ -125,8 +127,23 @@ export default function Home(){
   },[])
 
   useEffect(()=>{
+    let active=true
     setJobStatuses(readJobStatuses(localStorage))
-    setAppliedJobs(readAppliedJobs(localStorage))
+    ;(async()=>{
+      try{
+        const jobs=await loadAppliedJobs({
+          storage:localStorage,
+          bootstrapJobs:Array.isArray(window.__APPLYPILOT_APPLIED_JOBS__)?window.__APPLYPILOT_APPLIED_JOBS__:undefined,
+        })
+        if(active){
+          setAppliedJobs(jobs)
+          setAppliedSaveError('')
+        }
+      }catch{
+        if(active) setAppliedSaveError('Applied History could not be loaded from durable storage.')
+      }
+    })()
+    return()=>{active=false}
   },[])
 
   const profileReady=Boolean(profile.savedAt)
@@ -241,11 +258,28 @@ export default function Home(){
     setDraft(current=>({...current,cvName:'',factBank:[],skills:[],cvParsedAt:''}))
   }
 
+  function persistAppliedArchive(next){
+    setAppliedJobs(next)
+    setAppliedSaveError('')
+    void persistAppliedJobs(next)
+      .then(stored=>{
+        setAppliedJobs(stored)
+        setAppliedSaveError('')
+      })
+      .catch(async()=>{
+        setAppliedSaveError('Applied History could not be saved. Your durable archive was not updated.')
+        try{
+          const stored=await fetchAppliedJobs()
+          setAppliedJobs(stored)
+        }catch{}
+      })
+  }
+
   function changeJobStatus(jobId,status){
     const item=jobs.find(candidate=>candidate?.job?.sourceJobId===jobId)
     setJobStatuses(current=>writeJobStatus({storage:localStorage,statuses:current,jobId,status}))
     if(status==='applied'&&item){
-      setAppliedJobs(current=>archiveAppliedJob({storage:localStorage,archive:current,job:item.job,evaluation:item.evaluation}))
+      persistAppliedArchive(archiveAppliedJob({archive:appliedJobs,job:item.job,evaluation:item.evaluation}))
     }
   }
 
@@ -420,7 +454,9 @@ export default function Home(){
 
     const mergedJobs=mergeSourceItems(successful.map(result=>Array.isArray(result.data.jobs)?result.data.jobs:[]))
     setJobs(mergedJobs)
-    setAppliedJobs(current=>syncAppliedArchive({storage:localStorage,archive:current,items:mergedJobs,statuses:jobStatuses}))
+    const nextAppliedJobs=syncAppliedArchive({archive:appliedJobs,items:mergedJobs,statuses:jobStatuses})
+    if(JSON.stringify(nextAppliedJobs)!==JSON.stringify(appliedJobs)) persistAppliedArchive(nextAppliedJobs)
+    else setAppliedJobs(nextAppliedJobs)
 
     const stats={
       masterPoolSize:successful.reduce((sum,result)=>sum+Number(result.data.stats?.masterPoolSize??result.data.stats?.discovered??0),0),
@@ -799,7 +835,7 @@ export default function Home(){
       <ShadowSearchAudit shadowState={shadowState}/>
     </section>}
 
-    <AppliedJobsArchive jobs={appliedJobs} open={appliedArchiveOpen} onOpen={()=>setAppliedArchiveOpen(true)} onClose={()=>setAppliedArchiveOpen(false)}/>
+    <AppliedJobsArchive jobs={appliedJobs} error={appliedSaveError} open={appliedArchiveOpen} onOpen={()=>setAppliedArchiveOpen(true)} onClose={()=>setAppliedArchiveOpen(false)}/>
 
     <footer>TEST · LinkedIn + Jobindex + Jobnet multi-source search</footer>
 

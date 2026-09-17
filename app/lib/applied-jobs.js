@@ -33,11 +33,13 @@ export function normalizeAppliedJobs(value){
 }
 
 export function readAppliedJobs(storage){
-  try{return normalizeAppliedJobs(JSON.parse(storage?.getItem?.(APPLIED_JOBS_STORAGE_KEY)||'[]'))}
+  try{
+    return normalizeAppliedJobs(JSON.parse(storage?.getItem?.(APPLIED_JOBS_STORAGE_KEY)||'[]'))
+  }
   catch{return []}
 }
 
-export function archiveAppliedJob({storage,archive=[],job,evaluation,appliedAt}={}){
+export function archiveAppliedJob({archive=[],job,evaluation,appliedAt}={}){
   const jobId=text(job?.sourceJobId||job?.jobId)
   if(!jobId) return normalizeAppliedJobs(archive)
   const previous=normalizeAppliedJobs(archive)
@@ -53,17 +55,15 @@ export function archiveAppliedJob({storage,archive=[],job,evaluation,appliedAt}=
     appliedAt:existing?.appliedAt||appliedAt||new Date().toISOString(),
     relevanceScore:evaluation?.score??existing?.relevanceScore,
   })
-  const next=normalizeAppliedJobs([entry,...previous.filter(item=>item.jobId!==jobId)])
-  storage?.setItem?.(APPLIED_JOBS_STORAGE_KEY,JSON.stringify(next))
-  return next
+  return normalizeAppliedJobs([entry,...previous.filter(item=>item.jobId!==jobId)])
 }
 
-export function syncAppliedArchive({storage,archive=[],items=[],statuses={}}={}){
+export function syncAppliedArchive({archive=[],items=[],statuses={}}={}){
   let next=normalizeAppliedJobs(archive)
   for(const item of Array.isArray(items)?items:[]){
     const jobId=text(item?.job?.sourceJobId)
     if(jobId&&statuses?.[jobId]==='applied'){
-      next=archiveAppliedJob({storage,archive:next,job:item.job,evaluation:item.evaluation})
+      next=archiveAppliedJob({archive:next,job:item.job,evaluation:item.evaluation})
     }
   }
   return next

@@ -34,7 +34,9 @@ test('Feature 2 UI persists the complete active Source CV and supports legacy mi
   assert.match(page, /isSourceCvReady/)
   assert.match(page, /localStorage\.getItem\(SOURCE_CV_STORAGE_KEY\)/)
   assert.match(page, /localStorage\.getItem\(LEGACY_CV_STORAGE_KEY\)/)
-  assert.match(page, /localStorage\.setItem\(SOURCE_CV_STORAGE_KEY/)
+  assert.match(page, /CV_LIBRARY_STORAGE_KEY/)
+  assert.match(page, /localStorage\.setItem\(CV_LIBRARY_STORAGE_KEY,JSON\.stringify\(nextLibrary\)\)/)
+  assert.match(page, /localStorage\.removeItem\(SOURCE_CV_STORAGE_KEY\)/)
   assert.match(page, /localStorage\.removeItem\(LEGACY_CV_STORAGE_KEY\)/)
 })
 

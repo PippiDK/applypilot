@@ -6,11 +6,12 @@ function appliedDate(value){
   return Number.isFinite(date.getTime())?date.toLocaleDateString('en-DK'):'Date unavailable'
 }
 
-export default function AppliedJobsArchive({jobs=[],open,onOpen,onClose}){
+export default function AppliedJobsArchive({jobs=[],error='',open,onOpen,onClose}){
   return <>
     <button className="appliedArchiveTab" onClick={onOpen} aria-label="Open applied jobs archive">
       <span>APPLIED</span><b>{jobs.length}</b>
     </button>
+    {error&&<div className="errorBox appliedArchiveSaveError" role="alert"><b>Applied History save failed</b><span>{error}</span></div>}
     {open&&<div className="appliedArchiveBackdrop" onMouseDown={event=>{if(event.target===event.currentTarget)onClose()}}>
       <aside className="appliedArchiveDrawer" aria-label="Applied jobs archive">
         <div className="appliedArchiveHead">
