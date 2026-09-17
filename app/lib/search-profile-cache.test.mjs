@@ -1,10 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {searchProfileCacheKey,readSearchProfileCache,writeSearchProfileCache} from './search-profile-cache.js'
+import {searchProfileCacheKey,readSearchProfileCache,writeSearchProfileCache,clearSearchProfileCache} from './search-profile-cache.js'
 
 function storage(){
   const map=new Map()
-  return {getItem:key=>map.has(key)?map.get(key):null,setItem:(key,value)=>map.set(key,value)}
+  return {
+    getItem:key=>map.has(key)?map.get(key):null,
+    setItem:(key,value)=>map.set(key,value),
+    removeItem:key=>map.delete(key)
+  }
 }
 
 test('cache key changes when CV sourceVersion changes',()=>{
@@ -27,10 +31,23 @@ test('keeps sibling CV role caches independent when one sourceVersion changes',(
 
   writeSearchProfileCache({storage:store,sourceVersion:'cv1-a',roles:cv1})
   writeSearchProfileCache({storage:store,sourceVersion:'cv2-a',roles:cv2})
-  writeSearchProfileCache({storage:store,sourceVersion:'cv3-a',roles:cv3})
+  writeSearchProfileCache({storage:store,sourceVersion:'cv3-a',roles:cv3)
 
   assert.deepEqual(readSearchProfileCache({storage:store,sourceVersion:'cv1-a'}),cv1)
   assert.deepEqual(readSearchProfileCache({storage:store,sourceVersion:'cv3-a'}),cv3)
   assert.equal(readSearchProfileCache({storage:store,sourceVersion:'cv2-b'}),null)
   assert.deepEqual(readSearchProfileCache({storage:store,sourceVersion:'cv2-a'}),cv2)
+})
+
+test('clears only the uploaded CV role cache so upload forces fresh analysis',()=>{
+  const store=storage()
+  const cv1={primaryRoles:['Old Project Manager'],adjacentRoles:['Old Delivery Lead']}
+  const cv2={primaryRoles:['Financial IT Project Manager'],adjacentRoles:['Transformation Manager']}
+
+  writeSearchProfileCache({storage:store,sourceVersion:'cv1-new',roles:cv1})
+  writeSearchProfileCache({storage:store,sourceVersion:'cv2-current',roles:cv2})
+
+  assert.equal(clearSearchProfileCache({storage:store,sourceVersion:'cv1-new'}),true)
+  assert.equal(readSearchProfileCache({storage:store,sourceVersion:'cv1-new'}),null)
+  assert.deepEqual(readSearchProfileCache({storage:store,sourceVersion:'cv2-current'}),cv2)
 })
