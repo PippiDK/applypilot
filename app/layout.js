@@ -31,7 +31,7 @@ async function appliedJobsForHydration(){
 function appliedJobsHydrationScript(remoteJobs){
   const remoteJson=JSON.stringify(Array.isArray(remoteJobs)?remoteJobs:[]).replace(/</g,'\\u003c')
   const keyJson=JSON.stringify(APPLIED_JOBS_STORAGE_KEY)
-  return `(()=>{try{const key=${keyJson};const remote=${remoteJson};let local=[];try{const parsed=JSON.parse(localStorage.getItem(key)||'[]');local=Array.isArray(parsed)?parsed:[]}catch{}const merged=[];const seen=new Set();for(const item of [...remote,...local]){const jobId=String(item?.jobId||item?.sourceJobId||'').trim();if(!jobId||seen.has(jobId))continue;seen.add(jobId);merged.push(item)}if(merged.length)localStorage.setItem(key,JSON.stringify(merged))}catch{}})();`
+  return `(()=>{try{const key=${keyJson};const remote=${remoteJson};let local=[];try{const parsed=JSON.parse(localStorage.getItem(key)||'[]');local=Array.isArray(parsed)?parsed:[]}catch{}const merged=[];const seen=new Set();for(const item of [...local,...remote]){const jobId=String(item?.jobId||item?.sourceJobId||'').trim();if(!jobId||seen.has(jobId))continue;seen.add(jobId);merged.push(item)}if(merged.length)localStorage.setItem(key,JSON.stringify(merged))}catch{}})();`
 }
 
 export default async function RootLayout({children}){
