@@ -18,6 +18,7 @@ import {APPLIED_JOBS_STORAGE_KEY} from './lib/applied-jobs.js'
 export const metadata={title:'ApplyPilot',description:'Job search autopilot for senior IT professionals'}
 
 async function appliedJobsForHydration(){
+  if(process.env.VERCEL_ENV==='preview') return []
   try{
     const supabase=await createServerSupabaseClient()
     const {data,error}=await supabase.auth.getUser()
