@@ -46,6 +46,7 @@ function acceptedWorkModels(geography=[]){ const joined=(geography||[]).join(' '
 function roleList(value){return Array.isArray(value)?value.map(item=>String(item??'').trim()).filter(Boolean):[]}
 function legacyRoles(value=''){return String(value??'').split(',').map(item=>item.trim()).filter(Boolean)}
 function combinedRoles(primary=[],adjacent=[]){return [...roleList(primary),...roleList(adjacent)].join(', ')}
+function resetRoleDraft(value={}){return {...value,primaryRoles:[],adjacentRoles:[],roles:'',cvRoleProfiles:[],roleSources:[],rolesLibraryFingerprint:'',rolesSourceVersion:'',rolesBuilderVersion:''}}
 function workModelText(values=[]){return values.map(value=>value==='onsite'?'On-site':value==='hybrid'?'Hybrid':'Remote').join(' · ')}
 function jobSourceLabel(job={}){const source=String(job?.source||job?.sourceRecords?.[0]?.source||'').toLowerCase();if(source==='consultant_portal')return `Consultant portal · ${job?.consultantPortal?.name||job?.company||'Consultant'}`;if(source==='company_site')return `Company site · ${job?.company||'Official'}`;if(source==='jobindex')return 'Jobindex';if(source==='jobnet')return 'Jobnet';if(source==='linkedin')return 'LinkedIn';const url=String(job?.originalUrl||'');if(url.includes('jobnet.dk'))return 'Jobnet';if(url.includes('linkedin.com'))return 'LinkedIn';return 'Source'}
 function sourceDedupeKey(job={}){const company=String(job.company||'').toLowerCase().replace(/\b(a\/s|as)\b/g,'as').replace(/[.,]/g,'').trim();const title=String(job.title||'').toLowerCase().replace(/\s+/g,' ').trim();const location=String(job.location||'').toLowerCase().replace(/\s+/g,' ').trim();return company&&title?company+'|'+title+'|'+location:''}
@@ -78,6 +79,7 @@ export default function Home(){
   const [profileOpen,setProfileOpen]=useState(false)
   const [profileStep,setProfileStep]=useState(1)
   const [profileRoleState,setProfileRoleState]=useState(EMPTY_ROLE_STATE)
+  const [pendingRoleReanalysisCvIds,setPendingRoleReanalysisCvIds]=useState([])
   const [profileSaveState,setProfileSaveState]=useState({loading:false,error:''})
   const [nightFlightSyncWarning,setNightFlightSyncWarning]=useState('')
   const [reviewOpen,setReviewOpen]=useState(false)
@@ -184,13 +186,15 @@ export default function Home(){
       if(!res.ok) throw new Error(data.error||'CV parsing failed.')
       const saved=buildSourceCvRecord(data,new Date().toISOString())
       const nextLibrary=upsertCvSlot(cvLibrary,slot,saved)
+      const uploadedCv=nextLibrary.cvs[slot-1]
       setSourceDocxFiles(current=>({...current,[saved.sourceVersion]:file}))
       localStorage.removeItem(SOURCE_CV_STORAGE_KEY)
       localStorage.removeItem(LEGACY_CV_STORAGE_KEY)
       localStorage.setItem(CV_LIBRARY_STORAGE_KEY,JSON.stringify(nextLibrary))
       clearSearchProfileCache({storage:localStorage,sourceVersion:saved.sourceVersion})
       setCvLibrary(nextLibrary)
-      setDraft(current=>({...current,primaryRoles:[],adjacentRoles:[],roles:'',cvRoleProfiles:[],roleSources:[],rolesLibraryFingerprint:'',rolesSourceVersion:'',rolesBuilderVersion:''}))
+      setPendingRoleReanalysisCvIds(current=>Array.from(new Set([...current,uploadedCv.id])))
+      if(slot!==1) setDraft(current=>resetRoleDraft(current))
       setProfileRoleState(EMPTY_ROLE_STATE)
 
       if(slot===1){
@@ -205,7 +209,7 @@ export default function Home(){
           if(current.savedAt) localStorage.setItem('applypilot-profile',JSON.stringify(next))
           return next
         })
-        setDraft(current=>resumeToProfile(current,primaryCv))
+        setDraft(current=>resetRoleDraft(resumeToProfile(current,primaryCv)))
       }
       setCvState({loadingSlot:null,error:''})
     }catch(error){
@@ -220,6 +224,7 @@ export default function Home(){
     setCvState({loadingSlot:null,error:''})
     setProfileRoleState(EMPTY_ROLE_STATE)
     const removed=cvLibrary?.cvs?.[slot-1]||null
+    if(removed?.id) setPendingRoleReanalysisCvIds(current=>current.filter(id=>id!==removed.id))
     if(removed?.sourceVersion) setSourceDocxFiles(current=>{const next={...current};delete next[removed.sourceVersion];return next})
     if(slot!==1) return
 
@@ -499,6 +504,10 @@ export default function Home(){
     const combined=combineCvRoleProfiles(profiles)
     const source=aiCount&&cacheCount?'mixed':aiCount?'ai':'cache'
     applyProfileRoleLibrary({profiles,combined,source,failedCvs})
+    if(forceSet.size){
+      const refreshedIds=new Set(profiles.filter(roleProfile=>forceSet.has(roleProfile.cvId)).map(roleProfile=>roleProfile.cvId))
+      if(refreshedIds.size) setPendingRoleReanalysisCvIds(current=>current.filter(id=>!refreshedIds.has(id)))
+    }
   }
 
   function updateDraftRoles(field,roles){
@@ -511,8 +520,9 @@ export default function Home(){
 
   function nextProfileStep(){
     if(profileStep===1){
+      if(pendingRoleReanalysisCvIds.length) setDraft(current=>resetRoleDraft(current))
       setProfileStep(2)
-      void buildProfileRoles()
+      void buildProfileRoles({forceCvIds:pendingRoleReanalysisCvIds})
       return
     }
     setProfileStep(step=>step+1)
