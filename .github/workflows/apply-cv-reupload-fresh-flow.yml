@@ -1,0 +1,98 @@
+name: Apply CV Reupload Fresh Flow
+
+on:
+  push:
+    branches:
+      - v18/fix-cv-reupload-clear-draft
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v18/fix-cv-reupload-clear-draft
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install
+      - name: Confirm regression is RED before patch
+        run: |
+          if node --test app/lib/cv-reupload-fresh-flow.contract.test.mjs; then
+            echo "Expected the new regression contract to fail before the fix."
+            exit 1
+          else
+            echo "RED confirmed: current code does not implement the required fresh-analysis flow."
+          fi
+      - name: Apply targeted fresh-analysis fix
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/main-search-base.js')
+          text = path.read_text()
+
+          replacements = [
+            (
+              "function combinedRoles(primary=[],adjacent=[]){return [...roleList(primary),...roleList(adjacent)].join(', ')}\n",
+              "function combinedRoles(primary=[],adjacent=[]){return [...roleList(primary),...roleList(adjacent)].join(', ')}\nfunction resetRoleDraft(value={}){return {...value,primaryRoles:[],adjacentRoles:[],roles:'',cvRoleProfiles:[],roleSources:[],rolesLibraryFingerprint:'',rolesSourceVersion:'',rolesBuilderVersion:''}}\n",
+            ),
+            (
+              "  const [profileRoleState,setProfileRoleState]=useState(EMPTY_ROLE_STATE)\n",
+              "  const [profileRoleState,setProfileRoleState]=useState(EMPTY_ROLE_STATE)\n  const [pendingRoleReanalysisCvIds,setPendingRoleReanalysisCvIds]=useState([])\n",
+            ),
+            (
+              "      const saved=buildSourceCvRecord(data,new Date().toISOString())\n      const nextLibrary=upsertCvSlot(cvLibrary,slot,saved)\n",
+              "      const saved=buildSourceCvRecord(data,new Date().toISOString())\n      const nextLibrary=upsertCvSlot(cvLibrary,slot,saved)\n      const uploadedCv=nextLibrary.cvs[slot-1]\n",
+            ),
+            (
+              "      setCvLibrary(nextLibrary)\n      setDraft(current=>({...current,primaryRoles:[],adjacentRoles:[],roles:'',cvRoleProfiles:[],roleSources:[],rolesLibraryFingerprint:'',rolesSourceVersion:'',rolesBuilderVersion:''}))\n      setProfileRoleState(EMPTY_ROLE_STATE)\n",
+              "      setCvLibrary(nextLibrary)\n      setPendingRoleReanalysisCvIds(current=>Array.from(new Set([...current,uploadedCv.id])))\n      if(slot!==1) setDraft(current=>resetRoleDraft(current))\n      setProfileRoleState(EMPTY_ROLE_STATE)\n",
+            ),
+            (
+              "        setDraft(current=>resumeToProfile(current,primaryCv))\n",
+              "        setDraft(current=>resetRoleDraft(resumeToProfile(current,primaryCv)))\n",
+            ),
+            (
+              "    const removed=cvLibrary?.cvs?.[slot-1]||null\n    if(removed?.sourceVersion) setSourceDocxFiles(current=>{const next={...current};delete next[removed.sourceVersion];return next})\n",
+              "    const removed=cvLibrary?.cvs?.[slot-1]||null\n    if(removed?.id) setPendingRoleReanalysisCvIds(current=>current.filter(id=>id!==removed.id))\n    if(removed?.sourceVersion) setSourceDocxFiles(current=>{const next={...current};delete next[removed.sourceVersion];return next})\n",
+            ),
+            (
+              "    const source=aiCount&&cacheCount?'mixed':aiCount?'ai':'cache'\n    applyProfileRoleLibrary({profiles,combined,source,failedCvs})\n",
+              "    const source=aiCount&&cacheCount?'mixed':aiCount?'ai':'cache'\n    applyProfileRoleLibrary({profiles,combined,source,failedCvs})\n    if(forceSet.size){\n      const refreshedIds=new Set(profiles.filter(roleProfile=>forceSet.has(roleProfile.cvId)).map(roleProfile=>roleProfile.cvId))\n      if(refreshedIds.size) setPendingRoleReanalysisCvIds(current=>current.filter(id=>!refreshedIds.has(id)))\n    }\n",
+            ),
+            (
+              "    if(profileStep===1){\n      setProfileStep(2)\n      void buildProfileRoles()\n      return\n    }\n",
+              "    if(profileStep===1){\n      if(pendingRoleReanalysisCvIds.length) setDraft(current=>resetRoleDraft(current))\n      setProfileStep(2)\n      void buildProfileRoles({forceCvIds:pendingRoleReanalysisCvIds})\n      return\n    }\n",
+            ),
+          ]
+
+          for old, new in replacements:
+            count = text.count(old)
+            if count != 1:
+              raise SystemExit(f'Expected exactly one occurrence, found {count}: {old[:100]!r}')
+            text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          PY
+      - name: Focused regression tests
+        run: node --test app/lib/cv-reupload-fresh-flow.contract.test.mjs app/lib/search-profile-cache.test.mjs app/lib/cv-library.test.mjs app/lib/source-cv.test.mjs
+      - name: Production build
+        run: npm run build
+      - name: Commit verified TEST fix
+        run: |
+          rm -f .github/workflows/apply-cv-reupload-fresh-flow.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/main-search-base.js app/lib/cv-reupload-fresh-flow.contract.test.mjs .github/workflows/apply-cv-reupload-fresh-flow.yml
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 1
+          fi
+          git commit -m "fix: force fresh Search Profile roles after CV replace"
+          git push origin HEAD:v18/fix-cv-reupload-clear-draft
