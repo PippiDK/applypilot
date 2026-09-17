@@ -14,3 +14,14 @@ test('successful CV upload invalidates only that CV role cache after library per
   assert.ok(cacheClear>libraryWrite)
   assert.ok(libraryState>cacheClear)
 })
+
+test('successful CV replace clears stale role draft before the next analysis',()=>{
+  const parseStart=source.indexOf('async function parseCv')
+  const libraryState=source.indexOf('setCvLibrary(nextLibrary)',parseStart)
+  const draftClear=source.indexOf("setDraft(current=>({...current,primaryRoles:[],adjacentRoles:[],roles:'',cvRoleProfiles:[],roleSources:[],rolesLibraryFingerprint:'',rolesSourceVersion:'',rolesBuilderVersion:''}))",libraryState)
+  const roleStateReset=source.indexOf('setProfileRoleState(EMPTY_ROLE_STATE)',libraryState)
+  assert.ok(parseStart>=0)
+  assert.ok(libraryState>parseStart)
+  assert.ok(draftClear>libraryState)
+  assert.ok(roleStateReset>draftClear)
+})
