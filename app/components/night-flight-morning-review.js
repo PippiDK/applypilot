@@ -189,7 +189,10 @@ export default function NightFlightMorningReview(){
                 {item.analysis?.expertiseMatch!=null&&<span className={styles.jobScore}>{item.analysis?.expertiseMatch}%</span>}
               </span>
               <span className={styles.jobMeta}>{item.job?.company||'Company unavailable'} · {item.job?.location||item.source||'Location unavailable'}</span>
-              <span className={item.status==='READY'?styles.ready:styles.failed}>{item.status==='READY'?'READY':'FAILED'}</span>
+              <span className={styles.jobBadges}>
+                <span className={item.status==='READY'?styles.ready:styles.failed}>{item.status==='READY'?'READY':'FAILED'}</span>
+                {item.alreadyApplied&&<span className={styles.alreadyApplied}>APPLIED</span>}
+              </span>
             </button>)}
           </aside>
           <section className={styles.match} aria-label="Profile Match">

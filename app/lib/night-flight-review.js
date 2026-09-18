@@ -21,7 +21,7 @@ export async function loadNightFlightMorningReview({supabase,userId}={}){
 
   const {data:jobRows,error:jobsError}=await supabase
     .from('night_flight_jobs')
-    .select('run_id,job_key,source,job_snapshot,area,status,last_error,match_cache_key,processed_at,created_at')
+    .select('run_id,job_key,source,job_snapshot,area,status,already_applied,last_error,match_cache_key,processed_at,created_at')
     .eq('run_id',run.id)
     .order('created_at',{ascending:true})
   if(jobsError) throw new Error(`Night Flight review jobs read failed: ${jobsError.message||'unknown Supabase error'}`)
@@ -48,6 +48,7 @@ export async function loadNightFlightMorningReview({supabase,userId}={}){
     source:row.source,
     area:row.area??null,
     status:row.status,
+    alreadyApplied:row.already_applied===true,
     lastError:row.last_error||null,
     matchCacheKey:row.match_cache_key||null,
     processedAt:row.processed_at||null,
