@@ -14,6 +14,17 @@ export function nightFlightAppliedHistoryJobId(row={}){
   return clean(linkedIn?.[1]||key)
 }
 
+async function assertNightFlightRunOwnership({supabase,userId,runId}){
+  const {data,error}=await supabase
+    .from('night_flight_runs')
+    .select('id')
+    .eq('id',runId)
+    .eq('user_id',userId)
+    .maybeSingle()
+  if(error) throw new Error(`Night Flight run ownership check failed: ${error.message||'unknown Supabase error'}`)
+  if(!data?.id) throw new Error('Night Flight run is not available for user')
+}
+
 async function loadNightFlightRunJobRows({supabase,runId}){
   const {data,error}=await supabase
     .from('night_flight_jobs')
@@ -67,6 +78,7 @@ export async function reconcileNightFlightAppliedHistory({supabase,userId,runId}
   const run=clean(runId)
   if(!user||!run) throw new Error('Night Flight Applied History reconciliation requires userId and runId')
 
+  await assertNightFlightRunOwnership({supabase,userId:user,runId:run})
   const jobRows=await loadNightFlightRunJobRows({supabase,runId:run})
   const appliedIds=await loadAppliedHistoryJobIdsForNightFlightRun({supabase,userId:user,runId:run,jobRows})
   const matched=[]
