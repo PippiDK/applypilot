@@ -10,7 +10,7 @@ test('Task 2 bridge module exists',()=>{
 
 const load=()=>import('./night-flight-main-search-bridge.js')
 
-const nf=(overrides={})=>({processed:true,source:'linkedin',matchCacheKey:'cache-1',processedAt:'2026-09-07T00:00:00Z',job:{},analysis:{expertiseMatch:82},...overrides})
+const nf=(overrides={})=>({processed:true,source:'linkedin',cvSourceVersion:'cv-current',matchCacheKey:'cache-1',processedAt:'2026-09-07T00:00:00Z',job:{},analysis:{expertiseMatch:82},...overrides})
 
 test('matches a LinkedIn Search job by exact source + sourceJobId and enriches only that job',async()=>{
   const {enrichSearchJobsWithNightFlight}=await load()
@@ -24,6 +24,7 @@ test('matches a LinkedIn Search job by exact source + sourceJobId and enriches o
   assert.equal(result[0].job.nightFlight.processed,true)
   assert.equal(result[0].job.nightFlight.analysis,entry.analysis)
   assert.equal(result[0].job.nightFlight.matchCacheKey,'cache-1')
+  assert.equal(result[0].job.nightFlight.cvSourceVersion,'cv-current')
   assert.equal(result[1],input[1])
   assert.deepEqual(result.map(item=>item.job.title),['A','B'])
 })
