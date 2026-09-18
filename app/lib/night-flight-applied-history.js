@@ -14,26 +14,28 @@ export function nightFlightAppliedHistoryJobId(row={}){
   return clean(linkedIn?.[1]||key)
 }
 
+async function loadNightFlightRunJobRows({supabase,runId}){
+  const {data,error}=await supabase
+    .from('night_flight_jobs')
+    .select('job_key,job_snapshot')
+    .eq('run_id',runId)
+  if(error) throw new Error(`Night Flight jobs read failed: ${error.message||'unknown Supabase error'}`)
+  return Array.isArray(data)?data:[]
+}
+
 export async function loadAppliedHistoryJobIdsForNightFlightRun({
   supabase,
   userId,
   runId,
+  jobRows,
 }={}){
   requireSupabase(supabase)
   const user=clean(userId)
   const run=clean(runId)
   if(!user||!run) throw new Error('Night Flight Applied History lookup requires userId and runId')
 
-  const {data:jobRows,error:jobsError}=await supabase
-    .from('night_flight_jobs')
-    .select('job_key,job_snapshot')
-    .eq('run_id',run)
-  if(jobsError) throw new Error(`Night Flight jobs read failed: ${jobsError.message||'unknown Supabase error'}`)
-
-  const jobIds=[...new Set((jobRows||[])
-    .map(nightFlightAppliedHistoryJobId)
-    .filter(Boolean))]
-
+  const rows=Array.isArray(jobRows)?jobRows:await loadNightFlightRunJobRows({supabase,runId:run})
+  const jobIds=[...new Set(rows.map(nightFlightAppliedHistoryJobId).filter(Boolean))]
   if(!jobIds.length) return new Set()
 
   const {data:appliedRows,error:appliedError}=await supabase
@@ -47,4 +49,38 @@ export async function loadAppliedHistoryJobIdsForNightFlightRun({
   return new Set((appliedRows||[])
     .map(row=>clean(row?.job_id))
     .filter(jobId=>jobId&&requested.has(jobId)))
+}
+
+async function updateAlreadyApplied({supabase,runId,jobKeys,value}){
+  if(!jobKeys.length) return
+  const {error}=await supabase
+    .from('night_flight_jobs')
+    .update({already_applied:value})
+    .eq('run_id',runId)
+    .in('job_key',jobKeys)
+  if(error) throw new Error(`Night Flight Already Applied update failed: ${error.message||'unknown Supabase error'}`)
+}
+
+export async function reconcileNightFlightAppliedHistory({supabase,userId,runId}={}){
+  requireSupabase(supabase)
+  const user=clean(userId)
+  const run=clean(runId)
+  if(!user||!run) throw new Error('Night Flight Applied History reconciliation requires userId and runId')
+
+  const jobRows=await loadNightFlightRunJobRows({supabase,runId:run})
+  const appliedIds=await loadAppliedHistoryJobIdsForNightFlightRun({supabase,userId:user,runId:run,jobRows})
+  const matched=[]
+  const unmatched=[]
+
+  for(const row of jobRows){
+    const key=clean(row?.job_key)
+    if(!key) continue
+    const appliedId=nightFlightAppliedHistoryJobId(row)
+    ;(appliedId&&appliedIds.has(appliedId)?matched:unmatched).push(key)
+  }
+
+  await updateAlreadyApplied({supabase,runId:run,jobKeys:matched,value:true})
+  await updateAlreadyApplied({supabase,runId:run,jobKeys:unmatched,value:false})
+
+  return {runId:run,jobsChecked:matched.length+unmatched.length,alreadyApplied:matched.length}
 }
