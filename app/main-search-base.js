@@ -804,7 +804,7 @@ export default function Home(){
             </div>}
           />
 
-          <div className="expertiseHero">
+          <div className="expertiseHero" data-cv-source-version={cvData?.sourceVersion||''}>
             <div className="expertiseHeroHead"><div><p className="eyebrow">EXPERTISE MATCH</p><p className="expertiseIntro">Full JD ↔ Source CV professional expertise only</p></div><div className="expertiseScore">{expertiseState.loading&&expertiseState.jobKey===jobKey?'…':expertise?`${expertise.expertiseMatch}%`:'N/A'}</div></div>
             {expertiseState.loading&&expertiseState.jobKey===jobKey&&<div className="expertiseLoading">Analysing professional requirements and Source CV evidence…</div>}
             {expertiseState.error&&expertiseState.jobKey===jobKey&&<div className="errorBox"><b>Expertise Match analysis failed safely</b><span>{expertiseState.error}</span></div>}

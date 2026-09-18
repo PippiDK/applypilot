@@ -68,6 +68,20 @@ function findActiveJobIdentity(node){
   return null
 }
 
+function findCurrentCvSourceVersion(node){
+  if(Array.isArray(node)){
+    for(const child of node){const found=findCurrentCvSourceVersion(child);if(found)return found}
+    return ''
+  }
+  if(!React.isValidElement(node)) return ''
+  if(node.props?.className==='expertiseHero') return String(node.props?.['data-cv-source-version']||'').trim()
+  for(const child of React.Children.toArray(node.props?.children)){
+    const found=findCurrentCvSourceVersion(child)
+    if(found) return found
+  }
+  return ''
+}
+
 function analysisItems(values,prefix){
   const items=Array.isArray(values)?values:[]
   return items.map((item,index)=>React.createElement('p',{key:index},`${prefix} ${item}`))
@@ -137,6 +151,7 @@ export default function Home(){
   },[])
   const tree=MainSearchBase()
   const activeNightFlightJob=findActiveJobIdentity(tree)
-  const cachedNightFlightAnalysis=resolveNightFlightExpertise({job:activeNightFlightJob,index:nightFlightIndex})
+  const currentCvSourceVersion=findCurrentCvSourceVersion(tree)
+  const cachedNightFlightAnalysis=resolveNightFlightExpertise({job:activeNightFlightJob,index:nightFlightIndex,sourceVersion:currentCvSourceVersion})
   return transformMainSearchTree(tree,nightFlightIndex,cachedNightFlightAnalysis)
 }

@@ -16,7 +16,7 @@ export async function loadNightFlightIndex({supabase,userId}={}){
 
   const runs=assertQuery(await supabase
     .from('night_flight_runs')
-    .select('id,target_date')
+    .select('id,target_date,cv_source_version')
     .eq('user_id',user)
     .order('target_date',{ascending:false}),
   'Night Flight index runs read failed')
@@ -26,6 +26,7 @@ export async function loadNightFlightIndex({supabase,userId}={}){
   const runIds=runs.map(run=>clean(run?.id)).filter(Boolean)
   if(!runIds.length) return {jobs:{}}
   const runRank=new Map(runIds.map((id,index)=>[id,index]))
+  const runCvSourceVersion=new Map(runs.map(run=>[clean(run?.id),clean(run?.cv_source_version)]))
 
   const rows=assertQuery(await supabase
     .from('night_flight_jobs')
@@ -59,6 +60,7 @@ export async function loadNightFlightIndex({supabase,userId}={}){
     jobs[key]={
       processed:true,
       source:clean(row.source)||null,
+      cvSourceVersion:runCvSourceVersion.get(clean(row.run_id))||null,
       alreadyApplied:row.already_applied===true,
       matchCacheKey,
       processedAt:row.processed_at||null,
