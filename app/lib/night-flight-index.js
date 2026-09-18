@@ -29,7 +29,7 @@ export async function loadNightFlightIndex({supabase,userId}={}){
 
   const rows=assertQuery(await supabase
     .from('night_flight_jobs')
-    .select('run_id,job_key,source,job_snapshot,status,match_cache_key,processed_at')
+    .select('run_id,job_key,source,job_snapshot,status,already_applied,match_cache_key,processed_at')
     .in('run_id',runIds)
     .eq('status','READY'),
   'Night Flight index jobs read failed')
@@ -59,6 +59,7 @@ export async function loadNightFlightIndex({supabase,userId}={}){
     jobs[key]={
       processed:true,
       source:clean(row.source)||null,
+      alreadyApplied:row.already_applied===true,
       matchCacheKey,
       processedAt:row.processed_at||null,
       job:row.job_snapshot||{},
