@@ -72,6 +72,7 @@ function publicNightFlightEntry(entry={}){
   return {
     processed:entry?.processed===true,
     source:clean(entry?.source)||null,
+    cvSourceVersion:clean(entry?.cvSourceVersion)||null,
     matchCacheKey:clean(entry?.matchCacheKey)||null,
     processedAt:entry?.processedAt||null,
     analysis:entry?.analysis??null,

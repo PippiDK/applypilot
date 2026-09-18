@@ -1,6 +1,7 @@
 import {lastCompletedCopenhagenDate,runNightFlightLastCompletedDayDiscovery} from './night-flight-last-completed-day.js'
 import {persistNightFlightAreaScope} from './night-flight-area-scope.js'
 import {processNightFlightRunMatches} from './night-flight-match-processor.js'
+import {cleanupNightFlightRuns} from './night-flight-retention.js'
 
 const COPENHAGEN_TIME_ZONE='Europe/Copenhagen'
 
@@ -85,6 +86,7 @@ export async function runNightFlightScheduler({
   supabase,
   now=new Date(),
   runUser=runNightFlightForUser,
+  cleanup=cleanupNightFlightRuns,
 }={}){
   requireSupabase(supabase)
   const current=resolveNow(now)
@@ -97,6 +99,16 @@ export async function runNightFlightScheduler({
       results:[],
       failures:[],
     }
+  }
+
+  let cleanupResult
+  try{
+    const result=await cleanup({supabase,now:current})
+    cleanupResult={ok:true,...(result||{})}
+  }catch(error){
+    const message=safeErrorMessage(error)
+    console.error('[night-flight-retention] cleanup failed',message)
+    cleanupResult={ok:false,error:message}
   }
 
   const {data,error}=await supabase
@@ -121,6 +133,7 @@ export async function runNightFlightScheduler({
 
   return {
     skipped:false,
+    cleanup:cleanupResult,
     usersEligible:userIds.length,
     usersSucceeded:userIds.length-failures.length,
     usersFailed:failures.length,

@@ -162,3 +162,50 @@ test('Task 7 cron route is protected by CRON_SECRET and uses server admin Supaba
   assert.match(source,/createAdminSupabaseClient/)
   assert.match(source,/runNightFlightScheduler/)
 })
+
+
+test('F5 runs Night Flight cleanup once per eligible scheduler tick',async()=>{
+  const mod=await loadScheduler()
+  const supabase=fakeSupabase({settings:[{user_id:'u1',enabled:true}]})
+  const cleanupCalls=[]
+  const result=await mod.runNightFlightScheduler({
+    supabase,
+    now:new Date('2026-09-18T00:00:00.000Z'),
+    cleanup:async({now})=>{cleanupCalls.push(now.toISOString());return {cutoffDate:'2026-09-03',deletedRuns:2,deletedRunIds:['a','b']}},
+    runUser:async()=>({status:'READY'}),
+  })
+  assert.equal(cleanupCalls.length,1)
+  assert.equal(result.cleanup.ok,true)
+  assert.equal(result.cleanup.deletedRuns,2)
+  assert.equal(result.usersSucceeded,1)
+})
+
+test('F5 cleanup failure is non-blocking for normal Night Flight processing',async()=>{
+  const mod=await loadScheduler()
+  const supabase=fakeSupabase({settings:[{user_id:'u1',enabled:true}]})
+  let userRuns=0
+  const result=await mod.runNightFlightScheduler({
+    supabase,
+    now:new Date('2026-09-18T00:00:00.000Z'),
+    cleanup:async()=>{throw new Error('cleanup unavailable')},
+    runUser:async()=>{userRuns+=1;return {status:'READY'}},
+  })
+  assert.equal(userRuns,1)
+  assert.equal(result.usersSucceeded,1)
+  assert.equal(result.usersFailed,0)
+  assert.equal(result.cleanup.ok,false)
+  assert.match(result.cleanup.error,/cleanup unavailable/i)
+})
+
+test('F5 skipped pre-02 Copenhagen tick does not run cleanup',async()=>{
+  const mod=await loadScheduler()
+  const supabase=fakeSupabase()
+  let cleanupCalls=0
+  const result=await mod.runNightFlightScheduler({
+    supabase,
+    now:new Date('2026-01-15T00:00:00.000Z'),
+    cleanup:async()=>{cleanupCalls+=1;return {deletedRuns:0}},
+  })
+  assert.equal(result.skipped,true)
+  assert.equal(cleanupCalls,0)
+})

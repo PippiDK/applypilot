@@ -103,3 +103,16 @@ test('rejects missing authenticated user id',async()=>{
   const {loadNightFlightIndex}=await loadModule()
   await assert.rejects(()=>loadNightFlightIndex({supabase:fakeSupabase(),userId:''}),/Authenticated user is required/)
 })
+
+
+test('F1 exposes the Night Flight run CV source version with the saved Match',async()=>{
+  const {loadNightFlightIndex}=await loadModule()
+  const supabase=fakeSupabase({
+    runs:[{id:'run-cv',target_date:'2026-09-18',cv_source_version:'cv-current'}],
+    jobs:[{run_id:'run-cv',job_key:'linkedin:444',source:'linkedin',job_snapshot:{sourceJobId:'444'},status:'READY',match_cache_key:'cache-cv',processed_at:'2026-09-18T02:00:00Z'}],
+    cache:[{cache_key:'cache-cv',analysis:{expertiseMatch:84}}],
+  })
+  const result=await loadNightFlightIndex({supabase,userId:'user-1'})
+  assert.equal(result.jobs['linkedin:444'].cvSourceVersion,'cv-current')
+  assert.equal(result.jobs['linkedin:444'].analysis.expertiseMatch,84)
+})
