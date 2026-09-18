@@ -9,6 +9,31 @@ function assertQuery(result,label){
   return Array.isArray(result?.data)?result.data:[]
 }
 
+export function nightFlightSearchJobKey(job={}){
+  const source=clean(job?.source).toLowerCase()
+  const sourceJobId=clean(job?.sourceJobId)
+  if(!sourceJobId) return ''
+  if(sourceJobId.includes(':')) return sourceJobId
+  return source?`${source}:${sourceJobId}`:sourceJobId
+}
+
+export function findReusableNightFlightMatch({index,job,cvSourceVersion}={}){
+  const jobKey=nightFlightSearchJobKey(job)
+  const currentCvSourceVersion=clean(cvSourceVersion)
+  if(!jobKey||!currentCvSourceVersion) return null
+
+  const saved=index?.jobs?.[jobKey]
+  if(!saved?.analysis||typeof saved.analysis!=='object') return null
+  if(clean(saved.cvSourceVersion)!==currentCvSourceVersion) return null
+
+  return {
+    jobKey,
+    analysis:saved.analysis,
+    matchCacheKey:clean(saved.matchCacheKey)||null,
+    processedAt:saved.processedAt||null,
+  }
+}
+
 export async function loadNightFlightIndex({supabase,userId}={}){
   requireSupabase(supabase)
   const user=clean(userId)
@@ -16,7 +41,7 @@ export async function loadNightFlightIndex({supabase,userId}={}){
 
   const runs=assertQuery(await supabase
     .from('night_flight_runs')
-    .select('id,target_date')
+    .select('id,target_date,cv_source_version')
     .eq('user_id',user)
     .order('target_date',{ascending:false}),
   'Night Flight index runs read failed')
@@ -26,6 +51,7 @@ export async function loadNightFlightIndex({supabase,userId}={}){
   const runIds=runs.map(run=>clean(run?.id)).filter(Boolean)
   if(!runIds.length) return {jobs:{}}
   const runRank=new Map(runIds.map((id,index)=>[id,index]))
+  const runById=new Map(runs.map(run=>[clean(run?.id),run]))
 
   const rows=assertQuery(await supabase
     .from('night_flight_jobs')
@@ -62,6 +88,7 @@ export async function loadNightFlightIndex({supabase,userId}={}){
       alreadyApplied:row.already_applied===true,
       matchCacheKey,
       processedAt:row.processed_at||null,
+      cvSourceVersion:clean(runById.get(clean(row.run_id))?.cv_source_version)||null,
       job:row.job_snapshot||{},
       analysis:matchCacheKey?analysisByKey.get(matchCacheKey)??null:null,
     }
