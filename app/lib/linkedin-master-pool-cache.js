@@ -36,8 +36,8 @@ export function isLinkedInMasterPoolFresh(snapshot={},now=new Date(),maxAgeMs=LI
 export function writeLinkedInMasterPool({storage,fingerprint,candidates=[],verifiedJobs=[]}={}){
   const key=masterPoolStorageKey(fingerprint)
   if(!storage||!key) return {candidates:[],verifiedJobs:[],savedAt:null}
-  const safeCandidates=Array.isArray(candidates)?candidates.slice(0,500):[]
-  const safeVerifiedJobs=Array.isArray(verifiedJobs)?verifiedJobs.slice(0,500):[]
+  const safeCandidates=Array.isArray(candidates)?candidates.slice(-500):[]
+  const safeVerifiedJobs=Array.isArray(verifiedJobs)?verifiedJobs.slice(-500):[]
   const savedAt=new Date().toISOString()
   try{
     storage.setItem(key,JSON.stringify({version:2,candidates:safeCandidates,verifiedJobs:safeVerifiedJobs,savedAt}))

@@ -18,7 +18,7 @@ test('deduplicates one LinkedIn query shared by exact and expanded directions wh
     {key:'senior project manager|expanded|project manager',role:'Senior Project Manager',query:'Project Manager',discoveryMode:'expanded',tier:'primary',origin:'cv',cvSlots:[2]}
   ]}
   const result=await searchLinkedInShadow({freshnessDays:7,unionSearchPlan:plan,fetcher:async()=>{calls++;return card('4456000000','Project Manager')}})
-  assert.equal(calls,1)
+  assert.equal(calls,2) // One request per distinct freshness window, not per role.
   assert.equal(result.candidates.length,1)
   assert.deepEqual(result.candidates[0].foundBy.map(x=>[x.role,x.discoveryMode]),[['Project Manager','exact'],['Senior Project Manager','expanded']])
 })

@@ -26,6 +26,7 @@ import {fetchAppliedJobs,loadAppliedJobs,persistAppliedJobs} from './lib/applied
 import AppliedJobsArchive from './components/applied-jobs-archive.js'
 import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
 import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
+import {freshnessSelectionFromDays,freshnessResultLabel} from './lib/freshness-selection.js'
 import {companyConnection,connectedCompanyNames,defaultCompanyWatch,readCompanyWatch,writeCompanyWatch,TARGET_COMPANIES} from './lib/company-watch.js'
 import {CONSULTANT_PORTALS,connectedConsultantPortalIds,defaultConsultantPortals,readConsultantPortals,writeConsultantPortals} from './lib/consultant-portals.js'
 import SearchAudit from './components/search-audit.js'
@@ -36,7 +37,7 @@ import SearchPlanPreview from './components/search-plan-preview.js'
 import BestCvPanel from './components/best-cv-panel.js'
 import filterStyles from './components/job-filters.module.css'
 
-const WINDOWS=[1,3,7,14]
+const WINDOWS=[{days:1,label:'1 Day'},{days:3,label:'Previous Day'},{days:5,label:'5 Days'},{days:10,label:'10 Days'}]
 const EMPTY_SEARCH_PROFILE={...DEFAULT_PROFILE,exclusions:''}
 const EMPTY_ROLE_STATE={status:'idle',error:'',source:'',totalCount:0,analysedCount:0,failedCvs:[]}
 
@@ -54,7 +55,7 @@ function sourceDedupeKey(job={}){const company=String(job.company||'').toLowerCa
 function mergeSourceItems(groups=[]){const out=[];const byKey=new Map();for(const item of groups.flat()){const key=sourceDedupeKey(item?.job);if(key&&byKey.has(key)){const index=byKey.get(key);const current=out[index];const currentOfficial=String(current?.job?.source||'')==='company_site';const itemOfficial=String(item?.job?.source||'')==='company_site';if(itemOfficial&&!currentOfficial){out[index]=item;continue}if(currentOfficial&&!itemOfficial)continue;const richer=String(item?.job?.description||item?.job?.fullJd||'').length>String(current?.job?.description||current?.job?.fullJd||'').length?item:current;out[index]=richer;continue}if(key)byKey.set(key,out.length);out.push(item)}return out}
 
 export default function Home(){
-  const [freshnessDays,setFreshnessDays]=useState(7)
+  const [freshnessDays,setFreshnessDays]=useState(5)
   const [jobs,setJobs]=useState([])
   const [selectedSources,setSelectedSources]=useState(()=>[...DEFAULT_SEARCH_SOURCES])
   const [companyWatch,setCompanyWatch]=useState(()=>defaultCompanyWatch())
@@ -723,7 +724,7 @@ export default function Home(){
     {nightFlightSyncWarning&&<div className="warningBox"><b>Night Flight backend is not synced</b><span>{nightFlightSyncWarning}</span></div>}
 
     <section className="controls">
-      <div><small>POSTED WITHIN</small><div className="choices">{WINDOWS.map(days=><button key={days} className={freshnessDays===days?'choice selected':'choice'} onClick={()=>setFreshnessDays(days)}>{days} day{days===1?'':'s'}</button>)}</div></div>
+      <div><small>POSTED WITHIN</small><div className="choices">{WINDOWS.map(({days,label})=><button key={days} className={freshnessDays===days?'choice selected':'choice'} onClick={()=>setFreshnessDays(days)}>{label}</button>)}</div></div>
       <div><small>SEARCH SOURCES</small><div className="choices"><label className="choice"><input type="checkbox" checked={selectedSources.includes('linkedin')} onChange={()=>toggleSource('linkedin')}/> LinkedIn</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobindex')} onChange={()=>toggleSource('jobindex')}/> Jobindex</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobnet')} onChange={()=>toggleSource('jobnet')}/> Jobnet</label></div></div>
       <button className="primary" onClick={search} disabled={state.loading}>{state.loading?'Searching…':'Search'}</button>
     </section>
@@ -754,7 +755,7 @@ export default function Home(){
 
     <section className="grid">
       <div className="list">
-        <div className="listHead"><div><h2>Live matches</h2>{jobs.length>0&&<small className={filterStyles.resultCount}>{visibleJobs.length} of {jobs.length}</small>}</div><small>Newest {freshnessDays} days</small></div>
+        <div className="listHead"><div><h2>Live matches</h2>{jobs.length>0&&<small className={filterStyles.resultCount}>{visibleJobs.length} of {jobs.length}</small>}</div><small>{freshnessResultLabel(freshnessSelectionFromDays(freshnessDays))}</small></div>
         {jobs.length>0&&<details className={filterStyles.filters}>
           <summary><span>FILTERS</span><span>{visibleJobs.length} of {jobs.length}</span></summary>
           <div className={filterStyles.body}>

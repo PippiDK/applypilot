@@ -1,4 +1,4 @@
-const WINDOWS=new Set([1,3,7,14])
+const WINDOWS=new Set([1,3,5,7,10,14])
 const GENERIC_ROLE_WORDS=new Set(['senior','sr','junior','jr','principal','global','regional','international','experienced','manager','lead','specialist','consultant','coordinator'])
 const TECH_CONTEXT=new Set(['it','software','digital','technology','tech','data','platform','application','applications','cloud','cyber','integration','network','networks','telecom','telecommunications','satellite','saas','erp','crm','api','devops'])
 const ROLE_ANCHOR_GROUPS={
