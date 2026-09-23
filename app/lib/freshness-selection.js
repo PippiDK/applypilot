@@ -4,7 +4,7 @@ const DAY_MS=86400000
 export const FRESHNESS_OPTIONS=[
   {id:'today',label:'1 Day',requestDays:1},
   {id:'yesterday',label:'Previous Day',requestDays:3},
-  {id:'5d',label:'5 Days',requestDays:7},
+  {id:'5d',label:'5 Days',requestDays:5},
   {id:'10d',label:'10 Days',requestDays:14},
 ]
 
@@ -41,6 +41,7 @@ export function freshnessRequestDays(selection){
 
 export function freshnessSelectionFromDays(days){
   const requested=Number(days)
+  if(requested===7)return '5d' // Legacy 7-day callers still use the five-day result cap.
   return FRESHNESS_OPTIONS.find(option=>option.requestDays===requested)?.id||'5d'
 }
 

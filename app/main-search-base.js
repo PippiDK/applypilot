@@ -36,7 +36,7 @@ import SearchPlanPreview from './components/search-plan-preview.js'
 import BestCvPanel from './components/best-cv-panel.js'
 import filterStyles from './components/job-filters.module.css'
 
-const WINDOWS=[1,3,7,14]
+const WINDOWS=[1,3,5,7,14]
 const EMPTY_SEARCH_PROFILE={...DEFAULT_PROFILE,exclusions:''}
 const EMPTY_ROLE_STATE={status:'idle',error:'',source:'',totalCount:0,analysedCount:0,failedCvs:[]}
 
