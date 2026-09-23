@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,applicationPackState} from './lib/profile-review.js'
 import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'
 import {CV_LIBRARY_STORAGE_KEY,MAX_CVS,createCvLibrary,normalizeCvLibrary,upsertCvSlot,removeCvSlot,getPrimaryCv,readyCvCount} from './lib/cv-library.js'
@@ -21,8 +21,8 @@ import {evaluateJobConditions} from './lib/job-conditions.js'
 import {fitLabel} from './lib/fit-label.js'
 import {compareShadowToLegacy} from './lib/shadow-search-compare.js'
 import {JOB_STATUS_OPTIONS,readJobStatuses,writeJobStatus} from './lib/job-statuses.js'
-import {archiveAppliedJob,syncAppliedArchive} from './lib/applied-jobs.js'
-import {fetchAppliedJobs,loadAppliedJobs,persistAppliedJobs} from './lib/applied-jobs-client.js'
+import {archiveAppliedJob,removeAppliedJob,syncAppliedArchive} from './lib/applied-jobs.js'
+import {deleteAppliedJob,fetchAppliedJobs,loadAppliedJobs,persistAppliedJobs} from './lib/applied-jobs-client.js'
 import AppliedJobsArchive from './components/applied-jobs-archive.js'
 import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
 import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
@@ -72,6 +72,10 @@ export default function Home(){
   const [appliedJobs,setAppliedJobs]=useState([])
   const [appliedSaveError,setAppliedSaveError]=useState('')
   const [appliedArchiveOpen,setAppliedArchiveOpen]=useState(false)
+  const appliedJobsRef=useRef([])
+  const archiveWriteQueue=useRef(Promise.resolve())
+  const archiveRevision=useRef(0)
+  const jobStatusesRef=useRef({})
   const [state,setState]=useState({loading:false,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
   const [shadowState,setShadowState]=useState({status:'idle',error:'',stats:null,coverage:null,comparison:null})
   const [cvData,setCvData]=useState(null)
@@ -129,14 +133,17 @@ export default function Home(){
 
   useEffect(()=>{
     let active=true
-    setJobStatuses(readJobStatuses(localStorage))
+    const restoredStatuses=readJobStatuses(localStorage)
+    jobStatusesRef.current=restoredStatuses
+    setJobStatuses(restoredStatuses)
     ;(async()=>{
       try{
         const jobs=await loadAppliedJobs({
           storage:localStorage,
           bootstrapJobs:Array.isArray(window.__APPLYPILOT_APPLIED_JOBS__)?window.__APPLYPILOT_APPLIED_JOBS__:undefined,
         })
-        if(active){
+        if(active&&archiveRevision.current===0){
+          appliedJobsRef.current=jobs
           setAppliedJobs(jobs)
           setAppliedSaveError('')
         }
@@ -259,18 +266,28 @@ export default function Home(){
     setDraft(current=>({...current,cvName:'',factBank:[],skills:[],cvParsedAt:''}))
   }
 
-  function persistAppliedArchive(next){
+  function persistAppliedArchive(next,{removeJobId=null}={}){
+    const revision=++archiveRevision.current
+    appliedJobsRef.current=next
     setAppliedJobs(next)
     setAppliedSaveError('')
-    void persistAppliedJobs(next)
+    // Serialize add/revoke: a quick APPLIED → CONSIDERING cannot be undone by a slower POST.
+    const operation=archiveWriteQueue.current.then(()=>removeJobId?deleteAppliedJob(removeJobId):persistAppliedJobs(next))
+    archiveWriteQueue.current=operation.then(()=>undefined,()=>undefined)
+    void operation
       .then(stored=>{
+        if(revision!==archiveRevision.current) return
+        appliedJobsRef.current=stored
         setAppliedJobs(stored)
         setAppliedSaveError('')
       })
       .catch(async()=>{
+        if(revision!==archiveRevision.current) return
         setAppliedSaveError('Applied History could not be saved. Your durable archive was not updated.')
         try{
           const stored=await fetchAppliedJobs()
+          if(revision!==archiveRevision.current) return
+          appliedJobsRef.current=stored
           setAppliedJobs(stored)
         }catch{}
       })
@@ -278,9 +295,13 @@ export default function Home(){
 
   function changeJobStatus(jobId,status){
     const item=jobs.find(candidate=>candidate?.job?.sourceJobId===jobId)
-    setJobStatuses(current=>writeJobStatus({storage:localStorage,statuses:current,jobId,status}))
+    const nextStatuses=writeJobStatus({storage:localStorage,statuses:jobStatusesRef.current,jobId,status})
+    jobStatusesRef.current=nextStatuses
+    setJobStatuses(nextStatuses)
     if(status==='applied'&&item){
-      persistAppliedArchive(archiveAppliedJob({archive:appliedJobs,job:item.job,evaluation:item.evaluation}))
+      persistAppliedArchive(archiveAppliedJob({archive:appliedJobsRef.current,job:item.job,evaluation:item.evaluation}))
+    }else if(status!=='applied'&&appliedJobsRef.current.some(job=>job.jobId===jobId)){
+      persistAppliedArchive(removeAppliedJob({archive:appliedJobsRef.current,jobId}),{removeJobId:jobId})
     }
   }
 
@@ -455,8 +476,8 @@ export default function Home(){
 
     const mergedJobs=mergeSourceItems(successful.map(result=>Array.isArray(result.data.jobs)?result.data.jobs:[]))
     setJobs(mergedJobs)
-    const nextAppliedJobs=syncAppliedArchive({archive:appliedJobs,items:mergedJobs,statuses:jobStatuses})
-    if(JSON.stringify(nextAppliedJobs)!==JSON.stringify(appliedJobs)) persistAppliedArchive(nextAppliedJobs)
+    const nextAppliedJobs=syncAppliedArchive({archive:appliedJobsRef.current,items:mergedJobs,statuses:jobStatusesRef.current})
+    if(JSON.stringify(nextAppliedJobs)!==JSON.stringify(appliedJobsRef.current)) persistAppliedArchive(nextAppliedJobs)
     else setAppliedJobs(nextAppliedJobs)
 
     const stats={

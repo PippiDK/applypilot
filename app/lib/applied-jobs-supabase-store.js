@@ -45,3 +45,15 @@ export async function loadAppliedJobsFromSupabase({supabase,userId}={}){
   if(error) throw error
   return normalizeAppliedJobs((data||[]).map(jobFromRow))
 }
+
+export async function removeAppliedJobFromSupabase({supabase,userId,jobId}={}){
+  const id=String(jobId??'').trim()
+  if(!supabase||!userId||!id) throw new Error('Applied History deletion requires an authenticated user and job ID')
+  const {error}=await supabase
+    .from('applied_jobs')
+    .delete()
+    .eq('user_id',userId)
+    .eq('job_id',id)
+  if(error) throw error
+  return true
+}
