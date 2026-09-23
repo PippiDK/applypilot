@@ -67,3 +67,40 @@ test('RED freshness: ordinary Search exposes a true 5-day option rather than onl
   assert.ok(options.includes(5),`5-day freshness option must exist; found: ${options.join(',')}`)
   assert.match(main,/Newest\s*\{freshnessDays\}/)
 })
+
+
+test('superset integration: independently requested one-day jobs remain in five-day Search',async()=>{
+  const {searchLinkedInProfile}=await import('./linkedin-profile-search.js')
+  const {filterJobItemsByStatus}=await import('./job-list-filters.js')
+  const now=new Date('2026-09-18T12:00:00Z')
+  const horizons=[]
+  const detail=date=>{
+    const desc='Lead enterprise IT projects, scope, milestones, risk, dependencies, governance, implementation and stakeholder delivery. '.repeat(6)
+    const data={'@context':'https://schema.org','@type':'JobPosting',title:'Senior IT Project Manager',
+      datePosted:date,validThrough:'2026-10-01',hiringOrganization:{'@type':'Organization',name:'Example Co'},
+      jobLocation:{'@type':'Place',address:{'@type':'PostalAddress',addressLocality:'Copenhagen',addressCountry:'Denmark'}},description:desc}
+    return `<html><head><script type="application/ld+json">${JSON.stringify(data)}</script></head><body><div class="show-more-less-html__markup">${desc}</div></body></html>`
+  }
+  const fetcher=async url=>{
+    if(url.includes('/seeMoreJobPostings/search')){
+      const horizon=new URL(url).searchParams.get('f_TPR')
+      horizons.push(horizon)
+      return horizon==='r86400'?card('4454799999'):card('4454788888')
+    }
+    return detail(url.endsWith('4454799999')?'2026-09-18':'2026-09-16')
+  }
+  const rolePlan=planFor(['Senior IT Project Manager'])
+  const one=await searchLinkedInProfile({freshnessDays:1,unionSearchPlan:rolePlan,fetcher,now})
+  const five=await searchLinkedInProfile({freshnessDays:5,unionSearchPlan:rolePlan,fetcher,now})
+  const oneIds=new Set(one.jobs.map(item=>item.job.sourceJobId))
+  const fiveIds=new Set(five.jobs.map(item=>item.job.sourceJobId))
+  assert.ok(oneIds.has('4454799999'),'Narrow search must find current-day vacancy')
+  assert.ok(fiveIds.has('4454788888'),'Wide search must include older eligible vacancy')
+  for(const id of oneIds)assert.ok(fiveIds.has(id),`Five-day search lost ${id}`)
+  assert.ok(horizons.includes('r432000'),'Five-day LinkedIn request must use exactly 432000 seconds')
+  const statuses={'4454788888':'ignore'}
+  const visibleOne=filterJobItemsByStatus(one.jobs,statuses)
+  const visibleFive=filterJobItemsByStatus(five.jobs,statuses)
+  assert.deepEqual(visibleOne.map(x=>x.job.sourceJobId),['4454799999'])
+  assert.deepEqual(visibleFive.map(x=>x.job.sourceJobId),['4454799999'])
+})
