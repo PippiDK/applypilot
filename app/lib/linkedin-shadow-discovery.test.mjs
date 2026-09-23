@@ -9,7 +9,7 @@ const plan={directions:[
   {key:'programme delivery manager',role:'Programme Delivery Manager',tier:'adjacent',origin:'manual',cvSlots:[]}
 ]}
 
-test('issues exactly one start=0 Denmark search request per approved direction and never requests job detail',async()=>{
+test('wide discovery searches the current-day and selected windows without requesting job detail',async()=>{
   const urls=[]
   const fetcher=async url=>{
     urls.push(url)
@@ -18,18 +18,18 @@ test('issues exactly one start=0 Denmark search request per approved direction a
     return role==='Integration Project Manager'?card('1111111111','Integration Programme Manager'):card('2222222222','Programme Delivery Manager')
   }
   const result=await searchLinkedInShadow({freshnessDays:7,unionSearchPlan:plan,fetcher})
-  assert.equal(urls.length,2)
-  assert.deepEqual(urls.map(url=>new URL(url).searchParams.get('keywords')),['Integration Project Manager','Programme Delivery Manager'])
+  assert.equal(urls.length,4)
+  assert.deepEqual(urls.map(url=>new URL(url).searchParams.get('keywords')),['Integration Project Manager','Programme Delivery Manager','Integration Project Manager','Programme Delivery Manager'])
   for(const url of urls){
     const parsed=new URL(url)
     assert.equal(parsed.pathname,'/jobs-guest/jobs/api/seeMoreJobPostings/search')
     assert.equal(parsed.searchParams.get('location'),'Denmark')
-    assert.equal(parsed.searchParams.get('f_TPR'),'r604800')
+    assert.ok(['r86400','r604800'].includes(parsed.searchParams.get('f_TPR')))
     assert.equal(parsed.searchParams.get('sortBy'),'DD')
     assert.equal(parsed.searchParams.get('start'),'0')
     assert.equal(url.includes('/jobPosting/'),false)
   }
-  assert.equal(result.stats.searchRequests,2)
+  assert.equal(result.stats.searchRequests,4)
 })
 
 test('deduplicates jobs and aggregates every finding direction with provenance',async()=>{
@@ -53,7 +53,7 @@ test('preserves successful directions when another direction fails',async()=>{
     return card('1111111111')
   }})
   assert.equal(result.candidates.length,1)
-  assert.equal(result.stats.searchRequests,2)
+  assert.equal(result.stats.searchRequests,4)
   assert.equal(result.stats.searchFailures,1)
   assert.equal(result.coverage.status,'ACCESS LIMITED')
   assert.match(result.coverage.detail,/blocked/)
@@ -89,9 +89,9 @@ test('continues to the next LinkedIn discovery page so wider windows do not lose
     }
   })
 
-  assert.deepEqual(urls.map(url=>new URL(url).searchParams.get('start')),['0','25'])
+  assert.deepEqual(urls.map(url=>new URL(url).searchParams.get('start')),['0','25','0','25'])
   assert.equal(result.candidates.some(candidate=>candidate.jobId==='4454799999'),true)
-  assert.equal(result.stats.searchRequests,2)
+  assert.equal(result.stats.searchRequests,4)
   assert.equal(result.stats.discovered,26)
 })
 
@@ -114,6 +114,6 @@ test('duplicate-only intermediate page does not stop bounded paging early',async
       return ''
     }
   })
-  assert.deepEqual(urls.map(url=>new URL(url).searchParams.get('start')),['0','25','50'])
+  assert.deepEqual(urls.map(url=>new URL(url).searchParams.get('start')),['0','25','50','0','25','50'])
   assert.equal(result.candidates.some(candidate=>candidate.jobId==='4454999999'),true)
 })

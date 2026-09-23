@@ -92,8 +92,8 @@ test('7-day profile discovery follows LinkedIn pagination while pages stay full'
     return detailHtml({title:'Software Developer',description:'Develop, test and maintain production software and APIs for customer-facing services. '.repeat(8)})
   }
   const result=await searchLinkedInProfile({freshnessDays:7,unionSearchPlan:plan('Software Developer'),fetcher,now:new Date('2026-08-27T12:00:00Z')})
-  assert.deepEqual(searchStarts,[0,25,50])
-  assert.equal(result.stats.searchRequests,3)
+  assert.deepEqual(searchStarts,[0,25,50,0,25,50])
+  assert.equal(result.stats.searchRequests,6)
   assert.equal(result.jobs.length,51)
 })
 
