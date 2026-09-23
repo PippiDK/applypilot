@@ -18,7 +18,7 @@ export async function POST(request){
   if(!auth.user) return auth.response
   try{
     const body=await request.json().catch(()=>({}))
-    const freshnessDays=[1,3,7,14].includes(Number(body?.freshnessDays))?Number(body.freshnessDays):7
+    const freshnessDays=[1,3,5,7,14].includes(Number(body?.freshnessDays))?Number(body.freshnessDays):7
     const companies=Array.isArray(body?.companies)?body.companies:[]
     const exclusionRules=Array.isArray(body?.exclusionRules)?body.exclusionRules:[]
     const foundBy=Array.isArray(body?.unionSearchPlan?.directions)?body.unionSearchPlan.directions:[]

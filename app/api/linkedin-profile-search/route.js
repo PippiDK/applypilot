@@ -15,7 +15,7 @@ export async function POST(request){
 
   try{
     const body=await request.json().catch(()=>({}))
-    const freshnessDays=[1,3,7,14].includes(Number(body?.freshnessDays))?Number(body.freshnessDays):7
+    const freshnessDays=[1,3,5,7,14].includes(Number(body?.freshnessDays))?Number(body.freshnessDays):7
     const unionSearchPlan=body?.unionSearchPlan&&typeof body.unionSearchPlan==='object'?body.unionSearchPlan:{directions:[]}
     const exclusionRules=Array.isArray(body?.exclusionRules)?body.exclusionRules:[]
     const previousCandidates=Array.isArray(body?.previousCandidates)?body.previousCandidates.slice(0,500):[]
