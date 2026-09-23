@@ -62,10 +62,8 @@ test('RED freshness: Master Pool capacity retains newly discovered candidates, n
 
 test('RED freshness: ordinary Search exposes a true 5-day option rather than only 1/3/7/14',()=>{
   const main=readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8')
-  const options=main.match(/const WINDOWS=\[([^\]]+)\]/)?.[1]?.split(',').map(Number)
-  assert.ok(Array.isArray(options),'Expected existing Search freshness controls')
-  assert.ok(options.includes(5),`5-day freshness option must exist; found: ${options.join(',')}`)
-  assert.match(main,/Newest\s*\{freshnessDays\}/)
+  assert.match(main,/\{days:5,label:'5 Days'\}/)
+  assert.match(main,/freshnessResultLabel\(freshnessSelectionFromDays\(freshnessDays\)\)/)
 })
 
 
