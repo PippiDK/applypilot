@@ -14,7 +14,7 @@ export async function POST(request){
 
   try{
     const body=await request.json().catch(()=>({}))
-    const freshnessDays=[1,3,5,7,14].includes(Number(body?.freshnessDays))?Number(body.freshnessDays):7
+    const freshnessDays=[1,3,5,7,10,14].includes(Number(body?.freshnessDays))?Number(body.freshnessDays):7
     const cvText=String(body?.cvText??'').trim()
     if(cvText.length<100) return NextResponse.json({error:'Please Upload Your CV'},{status:400})
     const fetcher=createLinkedInStableFetcher()

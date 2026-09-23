@@ -19,7 +19,7 @@ export async function POST(request){
   if(!auth.user) return auth.response
   try{
     const body=await request.json().catch(()=>({}))
-    const freshnessDays=[1,3,5,7,14].includes(Number(body?.freshnessDays))?Number(body.freshnessDays):7
+    const freshnessDays=[1,3,5,7,10,14].includes(Number(body?.freshnessDays))?Number(body.freshnessDays):7
     const companies=Array.isArray(body?.companies)?body.companies:[]
     const exclusionRules=Array.isArray(body?.exclusionRules)?body.exclusionRules:[]
     const foundBy=Array.isArray(body?.unionSearchPlan?.directions)?body.unionSearchPlan.directions:[]
@@ -51,7 +51,7 @@ export async function POST(request){
       if(result.pass) jobs.push({job,evaluation:result.evaluation})
     }
     jobs.sort((a,b)=>b.evaluation.score-a.evaluation.score||(new Date(b.job.publishedAt||0)-new Date(a.job.publishedAt||0)))
-    const returnedJobs=freshnessDays===5?filterItemsByFreshnessSelection(jobs,'5d',new Date()):jobs
+    const returnedJobs=[5,10].includes(freshnessDays)?filterItemsByFreshnessSelection(jobs,freshnessDays===5?'5d':'10d',new Date()):jobs
     return NextResponse.json({
       jobs:returnedJobs,audit,
       stats:{...sourceStats,evaluated,returned:returnedJobs.length},

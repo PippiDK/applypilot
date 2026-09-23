@@ -1,7 +1,7 @@
 import {parseSearchHtml} from './linkedin-search.js'
 
 const LINKEDIN_SEARCH='https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search'
-const WINDOWS=new Set([1,3,5,7,14])
+const WINDOWS=new Set([1,3,5,7,10,14])
 const SEARCH_PAGE_SIZE=25
 const MAX_SEARCH_PAGES=4
 const MAX_SEARCH_REQUESTS=64

@@ -3,7 +3,7 @@ import {searchLinkedInShadow} from './linkedin-shadow-discovery.js'
 import {createAuditRecord,updateAuditRecord,auditList} from './linkedin-search-audit.js'
 
 const LINKEDIN_JOB_DETAIL='https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/'
-const WINDOWS=new Set([1,3,5,7,14])
+const WINDOWS=new Set([1,3,5,7,10,14])
 const DISCOVERY_HORIZON_DAYS=14
 const GENERIC_ROLE_WORDS=new Set(['senior','sr','junior','jr','principal','global','regional','international','experienced','manager','lead','specialist','consultant','coordinator'])
 
