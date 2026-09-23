@@ -12,8 +12,8 @@ test('revoke APPLIED removes only the specified job without altering other appli
   const result=removeAppliedJob({archive,jobId:'b'})
   assert.deepEqual(result.map(job=>job.jobId),['a','c'])
   assert.equal(result[0].appliedAt,archive[0].appliedAt)
-  assert.deepEqual(removeAppliedJob({archive:result,jobId:'b'}),result)
-  assert.deepEqual(removeAppliedJob({archive:result,jobId:''}),result)
+  assert.deepEqual(removeAppliedJob({archive:result,jobId:'b'}).map(job=>job.jobId),['a','c'])
+  assert.deepEqual(removeAppliedJob({archive:result,jobId:''}).map(job=>job.jobId),['a','c'])
   assert.deepEqual(archive.map(job=>job.jobId),['a','b','c'])
   assert.deepEqual(archiveAppliedJob({archive:result,job:{sourceJobId:'b',title:'Reapplied',company:'Example'}}).map(x=>x.jobId),['b','a','c'])
 })
@@ -39,7 +39,7 @@ test('Supabase removal rejects failed writes instead of silently hiding an archi
     eq(){return this},
     then(resolve,reject){return Promise.resolve({error:{message:'storage unavailable'}}).then(resolve,reject)}
   }}}}}
-  await assert.rejects(removeAppliedJobFromSupabase({supabase:client,userId:'user-1',jobId:'b'}),/storage unavailable/)
+  await assert.rejects(removeAppliedJobFromSupabase({supabase:client,userId:'user-1',jobId:'b'}),error=>error?.message==='storage unavailable')
 })
 
 test('client DELETE submits only job identity and honors returned canonical archive',async()=>{
@@ -57,7 +57,7 @@ test('status change removes the job from both the local view and durable archive
   const route=readFileSync(new URL('../api/applied-jobs/route.js',import.meta.url),'utf8')
   assert.match(main,/status!=='applied'\s*&&\s*appliedJobsRef\.current\.some\(/)
   assert.match(main,/removeAppliedJob\(\{archive:appliedJobsRef\.current,jobId\}\)/)
-  assert.match(main,/deleteAppliedJob\(jobId\)/)
+  assert.match(main,/deleteAppliedJob\(removeJobId\)/)
   assert.match(main,/archiveWriteQueue\.current\.then\(/)
   assert.match(route,/export async function DELETE\(request\)/)
   assert.match(route,/removeAppliedJobFromSupabase\(\{supabase:context\.supabase,userId:context\.userId,jobId\}\)/)

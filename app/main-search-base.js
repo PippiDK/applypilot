@@ -273,7 +273,7 @@ export default function Home(){
     setAppliedSaveError('')
     // Serialize add/revoke: a quick APPLIED → CONSIDERING cannot be undone by a slower POST.
     const operation=archiveWriteQueue.current.then(()=>removeJobId?deleteAppliedJob(removeJobId):persistAppliedJobs(next))
-    archiveWriteQueue.current=operation.catch(()=>{})
+    archiveWriteQueue.current=operation.then(()=>undefined,()=>undefined)
     void operation
       .then(stored=>{
         if(revision!==archiveRevision.current) return
