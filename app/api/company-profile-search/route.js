@@ -8,6 +8,7 @@ import { searchWorkableCompanies } from '../../lib/workable-company-source.js'
 import { searchLegacySuccessFactorsCompanies } from '../../lib/legacy-successfactors-company-source.js'
 import { searchCustomHtmlCompanies } from '../../lib/custom-html-company-source.js'
 import { evaluateProfileJob } from '../../lib/job-profile-evaluator.js'
+import { filterItemsByFreshnessSelection } from '../../lib/freshness-selection.js'
 
 export const runtime='nodejs'
 export const dynamic='force-dynamic'
@@ -50,10 +51,11 @@ export async function POST(request){
       if(result.pass) jobs.push({job,evaluation:result.evaluation})
     }
     jobs.sort((a,b)=>b.evaluation.score-a.evaluation.score||(new Date(b.job.publishedAt||0)-new Date(a.job.publishedAt||0)))
+    const returnedJobs=freshnessDays===5?filterItemsByFreshnessSelection(jobs,'5d',new Date()):jobs
     return NextResponse.json({
-      jobs,audit,
-      stats:{...sourceStats,evaluated,returned:jobs.length},
-      coverage:{source:'Company sites',freshnessDays,status:sourcePartial?'ACCESS LIMITED':jobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:sourceErrors||null},
+      jobs:returnedJobs,audit,
+      stats:{...sourceStats,evaluated,returned:returnedJobs.length},
+      coverage:{source:'Company sites',freshnessDays,status:sourcePartial?'ACCESS LIMITED':returnedJobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:sourceErrors||null},
       fetchedAt:new Date().toISOString(),
     })
   }catch(error){
