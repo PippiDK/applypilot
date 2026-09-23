@@ -23,7 +23,7 @@ test('exposes professional intensive-search cadence labels',()=>{
   assert.equal(freshnessRequestDays('today'),1)
   assert.equal(freshnessRequestDays('yesterday'),3)
   assert.equal(freshnessRequestDays('5d'),5)
-  assert.equal(freshnessRequestDays('10d'),14)
+  assert.equal(freshnessRequestDays('10d'),10)
 })
 
 test('maps the existing 1 3 7 14 controls to the new semantics',()=>{
@@ -31,6 +31,7 @@ test('maps the existing 1 3 7 14 controls to the new semantics',()=>{
   assert.equal(freshnessSelectionFromDays(3),'yesterday')
   assert.equal(freshnessSelectionFromDays(5),'5d')
   assert.equal(freshnessSelectionFromDays(7),'5d')
+  assert.equal(freshnessSelectionFromDays(10),'10d')
   assert.equal(freshnessSelectionFromDays(14),'10d')
 })
 
