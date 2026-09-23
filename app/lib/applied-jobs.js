@@ -68,3 +68,9 @@ export function syncAppliedArchive({archive=[],items=[],statuses={}}={}){
   }
   return next
 }
+
+export function removeAppliedJob({archive=[],jobId}={}){
+  const id=text(jobId)
+  const existing=normalizeAppliedJobs(archive)
+  return id?existing.filter(item=>item.jobId!==id):existing
+}

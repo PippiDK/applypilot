@@ -63,3 +63,15 @@ export async function loadAppliedJobs({storage,fetchImpl,bootstrapJobs}={}){
     return merged
   }
 }
+
+export async function deleteAppliedJob(jobId,{fetchImpl}={}){
+  const id=String(jobId??'').trim()
+  if(!id) throw new Error('Applied History deletion requires a job ID')
+  const request=resolveFetch(fetchImpl)
+  const response=await request('/api/applied-jobs',{
+    method:'DELETE',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({jobId:id}),
+  })
+  return responseJobs(response)
+}
