@@ -10,6 +10,8 @@ test('validation diagnosis classifies exact JD and CV quote failures without exp
   assert.equal(safeValidationDiagnosticCode(new Error('Unsafe prompt-like JD evidence in SECRET-ID.')),'UNSAFE_JD_EVIDENCE')
   assert.equal(safeValidationDiagnosticCode(new Error('Source CV evidence is required for SECRET-ID.')),'CV_EVIDENCE_MISSING')
   assert.equal(safeValidationDiagnosticCode(new Error('Expertise Match requirement IDs must be unique.')),'DUPLICATE_REQUIREMENT_ID')
+  assert.equal(safeValidationDiagnosticCode(new Error('Invalid Source CV evidence for SECRET-ID.')),'CV_EVIDENCE_INVALID')
+  assert.equal(safeValidationDiagnosticCode(new Error('NOT_EVIDENCED must not contain Source CV evidence for SECRET-ID.')),'CV_EVIDENCE_UNEXPECTED')
   assert.equal(safeValidationDiagnosticCode(new Error('Unrecognized private error: MY-CV-SECRET')),'OTHER_VALIDATION')
 })
 
@@ -30,4 +32,22 @@ test('only safe validation categories are persisted; raw CV and raw JD details s
   assert.match(queue,/VALIDATION_DIAGNOSTIC_CODES/)
   assert.match(queue,/safeCode\s*&&\s*code==='AI_EXPERTISE_VALIDATION'/)
   assert.doesNotMatch(queue,/console\.error\([^\n]*(sourceCv|jobDescription|fullJd)/)
+})
+
+test('validation diagnostic captures only numeric failed item position and precise missing CV category',async()=>{
+  const job={title:'Programme Manager',company:'Example',description:'Lead programme implementation and deliver technology transformation projects with stakeholder management, planning and governance.'}
+  const cv='Senior Project Manager with technology transformation experience and cross-functional delivery, stakeholder management and governance.'
+  const base={id:'one',capability:'Programme delivery',category:'delivery_execution',importance:'core',requirement:'Lead programme implementation',minimumYears:0,jdEvidence:['Lead programme implementation'],status:'NOT_EVIDENCED',cvEvidence:[],reason:'Not demonstrated.'}
+  const invalid={...base,id:'PRIVATE-CV-ID',status:'MATCHED',cvEvidence:['PRIVATE-NOT-IN-CV']}
+  await assert.rejects(evaluateExpertiseOnePass(job,cv,async()=>({items:[base,invalid]})),error=>{
+    assert.equal(error.code,'AI_EXPERTISE_VALIDATION')
+    assert.equal(error.diagnosticCode,'CV_EVIDENCE_NOT_IN_SOURCE')
+    assert.equal(error.diagnosticIndex,1)
+    return true
+  })
+  await assert.rejects(evaluateExpertiseOnePass(job,cv,async()=>({items:[base,{...base,id:'second',cvEvidence:['PRIVATE-CV-QUOTE']}]})),error=>{
+    assert.equal(error.diagnosticCode,'CV_EVIDENCE_UNEXPECTED')
+    assert.equal(error.diagnosticIndex,1)
+    return true
+  })
 })
