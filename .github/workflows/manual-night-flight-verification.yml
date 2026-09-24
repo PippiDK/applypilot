@@ -1,0 +1,25 @@
+name: Manual Night Flight verification
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check syntax and targeted tests
+        run: |
+          node --check app/lib/night-flight-manual-control.js
+          node --check app/lib/night-flight-match-processor.js
+          node --check app/lib/night-flight-match-queue.js
+          node --test app/lib/night-flight-manual-control.test.mjs app/lib/night-flight-match-queue.test.mjs app/lib/night-flight-match-processor.test.mjs app/lib/night-flight-scheduler.test.mjs
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Full regression
+        run: npm test
+      - name: Production build
+        run: npm run build
