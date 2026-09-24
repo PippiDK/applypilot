@@ -45,7 +45,9 @@ function safeErrorMessage(error){
   const message=safeCode&&!safeStage?'Night Flight Match failed safely.':(text||'Night Flight Match failed')
   const diagnostic=String(error?.diagnosticCode??'')
   const safeDiagnostic=safeCode&&code==='AI_EXPERTISE_VALIDATION'&&VALIDATION_DIAGNOSTIC_CODES.has(diagnostic)?` · ${diagnostic}`:''
-  return `${safeCode?`${code} · `:''}${message}${safeDiagnostic}`.slice(0,500)
+  const index=error?.diagnosticIndex
+  const safeIndex=safeDiagnostic&&Number.isInteger(index)&&index>=0&&index<18?` · ITEM_${index+1}`:''
+  return `${safeCode?`${code} · `:''}${message}${safeDiagnostic}${safeIndex}`.slice(0,500)
 }
 
 function isNonRetryableError(error){
