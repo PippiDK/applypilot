@@ -31,6 +31,12 @@ export default function NightFlightDrawer({children}){
           </div>
         </section>
         <section className={styles.section}>
+          <div className={styles.sectionHeading}>
+            <div><h3>Manual Control</h3><p>Start, resume or retry Night Flight whenever you need.</p></div>
+            <a href="/night-flight-control" className={styles.manualLink} onClick={()=>setOpen(false)}>Open →</a>
+          </div>
+        </section>
+        <section className={styles.section}>
           <h3>Morning Review</h3>
           <div id="nightFlightReviewHost" className={styles.reviewHost}/>
         </section>
