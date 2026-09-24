@@ -1,0 +1,4 @@
+.progress{display:flex;align-items:center;gap:10px;width:fit-content;max-width:100%;margin:12px 0 4px;padding:8px 12px;border:1px solid rgba(167,139,250,.48);border-radius:8px;background:rgba(109,40,217,.17);color:#ddd6fe;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.spinner{display:inline-block;width:16px;height:16px;flex:0 0 16px;box-sizing:border-box;border:2px solid rgba(221,214,254,.35);border-top-color:#e9d5ff;border-radius:50%;animation:manualSpinner .8s linear infinite}
+@keyframes manualSpinner{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.spinner{animation-duration:2.5s}}
