@@ -71,7 +71,8 @@ function evidenceFound(source,evidence){
 export function validateExpertiseOnePass(value,jobDescription='',sourceCv=''){
   if(!value||typeof value!=='object'||Array.isArray(value)||!Array.isArray(value.items)||value.items.length<1||value.items.length>18) throw new Error('Expertise Match must contain 1 to 18 grounded requirements.')
   const ids=new Set()
-  for(const item of value.items){
+  for(const [itemIndex,item] of value.items.entries()){
+    try{
     const id=text(item?.id)
     if(!id||ids.has(id)) throw new Error('Expertise Match requirement IDs must be unique.')
     ids.add(id)
@@ -87,6 +88,11 @@ export function validateExpertiseOnePass(value,jobDescription='',sourceCv=''){
     }else{
       if(item.cvEvidence.length<1) throw new Error(`Source CV evidence is required for ${id}.`)
       for(const excerpt of item.cvEvidence) if(!evidenceFound(sourceCv,excerpt)) throw new Error(`Source CV evidence for ${id} was not found in Source CV.`)
+    }
+    }catch(error){
+      // Diagnostic metadata only: preserve the original validation failure.
+      error.diagnosticIndex=itemIndex
+      throw error
     }
   }
   verifyJdGrounding(jobDescription,value.items)
