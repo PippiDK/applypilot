@@ -19,7 +19,6 @@ export default function NightFlightControl(){
       const body=await response.json()
       if(!response.ok) throw new Error(body.error||'Could not load Night Flight')
       setRuns(Array.isArray(body.runs)?body.runs:[])
-      setError('')
     }catch(e){setError(e.message||'Could not load Night Flight')}
     finally{setLoading(false)}
   },[])
