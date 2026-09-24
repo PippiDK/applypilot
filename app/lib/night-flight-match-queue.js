@@ -76,13 +76,14 @@ function claimPriority(row){
   return 99
 }
 
-async function loadClaimCandidates({supabase,runId}){
-  const result=await supabase
+async function loadClaimCandidates({supabase,runId,onlyJobKey=''}){
+  let query=supabase
     .from('night_flight_jobs')
     .select(SELECT_FIELDS)
     .eq('run_id',runId)
     .in('status',CLAIMABLE_STATUSES)
-    .order('created_at',{ascending:true})
+  if(onlyJobKey) query=query.eq('job_key',onlyJobKey)
+  const result=await query.order('created_at',{ascending:true})
   const rows=assertQueryResult(result,'Night Flight queue read failed')
   return Array.isArray(rows)?rows:[]
 }
@@ -128,6 +129,7 @@ export async function claimNextNightFlightJob({
   leaseMs=DEFAULT_NIGHT_FLIGHT_PROCESSING_LEASE_MS,
   maxAttempts=DEFAULT_NIGHT_FLIGHT_MAX_ATTEMPTS,
   excludeJobKeys=[],
+  onlyJobKey='',
 }={}){
   requireSupabase(supabase)
   const id=requireRunId(runId)
@@ -137,7 +139,7 @@ export async function claimNextNightFlightJob({
   const excluded=new Set(Array.from(excludeJobKeys||[],clean).filter(Boolean))
 
   for(let pass=0;pass<3;pass+=1){
-    const rows=await loadClaimCandidates({supabase,runId:id})
+    const rows=await loadClaimCandidates({supabase,runId:id,onlyJobKey:clean(onlyJobKey)})
     const candidates=[]
 
     for(const row of rows){
@@ -276,6 +278,7 @@ export async function processNightFlightQueue({
   maxAttempts=DEFAULT_NIGHT_FLIGHT_MAX_ATTEMPTS,
   leaseMs=DEFAULT_NIGHT_FLIGHT_PROCESSING_LEASE_MS,
   maxJobs=Infinity,
+  onlyJobKey='',
 }={}){
   requireSupabase(supabase)
   const id=requireRunId(runId)
@@ -287,7 +290,7 @@ export async function processNightFlightQueue({
   const attemptedJobKeys=new Set()
 
   while(processed<limit){
-    const claimed=await claimNextNightFlightJob({supabase,runId:id,now,leaseMs:lease,maxAttempts:attemptsLimit,excludeJobKeys:attemptedJobKeys})
+    const claimed=await claimNextNightFlightJob({supabase,runId:id,now,leaseMs:lease,maxAttempts:attemptsLimit,excludeJobKeys:attemptedJobKeys,onlyJobKey})
     if(!claimed) break
     attemptedJobKeys.add(clean(claimed.job_key))
 
