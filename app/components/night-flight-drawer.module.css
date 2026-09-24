@@ -23,3 +23,6 @@
   .drawer{width:min(560px,100vw);padding:18px}
   .sectionHeading{align-items:flex-start;flex-direction:column}
 }
+
+.manualLink{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;padding:9px 14px;border:1px solid #8563b0;border-radius:9px;background:#39264d;color:#f3e8ff;font-size:13px;font-weight:700;text-decoration:none;white-space:nowrap}
+.manualLink:hover,.manualLink:focus-visible{background:#513467;border-color:#b794e2;color:#fff}
