@@ -1,3 +1,5 @@
+import {VALIDATION_DIAGNOSTIC_CODES} from './night-flight-validation-diagnostics.js'
+
 export const DEFAULT_NIGHT_FLIGHT_MAX_ATTEMPTS=3
 export const DEFAULT_NIGHT_FLIGHT_PROCESSING_LEASE_MS=15*60*1000
 export const DEFAULT_NIGHT_FLIGHT_JOBS_PER_INVOCATION=3
@@ -41,7 +43,9 @@ function safeErrorMessage(error){
   const safeCode=/^AI_[A-Z0-9_]{1,76}$/.test(code)
   const safeStage=/^[a-zA-Z0-9_-]{1,64} AI stage failed\.$/.test(text)
   const message=safeCode&&!safeStage?'Night Flight Match failed safely.':(text||'Night Flight Match failed')
-  return `${safeCode?`${code} · `:''}${message}`.slice(0,500)
+  const diagnostic=String(error?.diagnosticCode??'')
+  const safeDiagnostic=safeCode&&code==='AI_EXPERTISE_VALIDATION'&&VALIDATION_DIAGNOSTIC_CODES.has(diagnostic)?` · ${diagnostic}`:''
+  return `${safeCode?`${code} · `:''}${message}${safeDiagnostic}`.slice(0,500)
 }
 
 function isNonRetryableError(error){

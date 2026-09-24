@@ -285,3 +285,23 @@ test('Task 6 finalizes READY when all in-scope persisted jobs are complete',asyn
   assert.equal(result.jobsFailed,0)
   assert.equal(result.jobsSkipped,1)
 })
+
+test('validation diagnostic persists a fixed category without private JD/CV excerpts or changing retry behavior',async()=>{
+  const mod=await loadModule()
+  const supabase=fakeSupabase({jobs:[job('diagnostic','QUEUED')],runs:[run()]})
+  const claimed=await mod.claimNextNightFlightJob({supabase,runId:'run-6',now:new Date('2026-09-05T02:00:00Z')})
+  const validationError=new Error('Private CV text and confidential JD contents')
+  validationError.code='AI_EXPERTISE_VALIDATION'
+  validationError.diagnosticCode='CV_EVIDENCE_NOT_IN_SOURCE'
+  const failed=await mod.failNightFlightJob({supabase,claimedJob:claimed,error:validationError,now:new Date('2026-09-05T02:00:05Z')})
+  assert.equal(failed.status,'FAILED')
+  assert.equal(failed.attempts,1)
+  assert.equal(failed.last_error,'AI_EXPERTISE_VALIDATION · Night Flight Match failed safely. · CV_EVIDENCE_NOT_IN_SOURCE')
+  assert.doesNotMatch(failed.last_error,/confidential|Private|CV text/)
+
+  const bad=fakeSupabase({jobs:[job('untrusted','QUEUED')],runs:[run()]})
+  const claim=await mod.claimNextNightFlightJob({supabase:bad,runId:'run-6',now:new Date('2026-09-05T02:00:00Z')})
+  validationError.diagnosticCode='PRIVATE_DO_NOT_LOG'
+  const sanitized=await mod.failNightFlightJob({supabase:bad,claimedJob:claim,error:validationError,now:new Date('2026-09-05T02:00:05Z')})
+  assert.equal(sanitized.last_error,'AI_EXPERTISE_VALIDATION · Night Flight Match failed safely.')
+})
