@@ -1,5 +1,6 @@
 import {callStructuredAi} from './ai-client.js'
 import {normalizeEvidenceText,verifyJdGrounding} from './evidence-guard.js'
+import {safeValidationDiagnosticCode} from './night-flight-validation-diagnostics.js'
 
 export const EXPERTISE_CATEGORIES=['delivery_execution','domain_functional_expertise','technical_platform_capabilities','leadership_stakeholder_scope','required_experience_qualifications']
 export const EXPERTISE_IMPORTANCE=['critical','core','supporting']
@@ -109,5 +110,5 @@ export async function evaluateExpertiseOnePass(job,sourceCv,modelCall){
     modelCall
   })
   try{return validateExpertiseOnePass(result,description,cv)}
-  catch(error){if(!error.code)error.code='AI_EXPERTISE_VALIDATION';throw error}
+  catch(error){if(!error.code)error.code='AI_EXPERTISE_VALIDATION';error.diagnosticCode=safeValidationDiagnosticCode(error);throw error}
 }
