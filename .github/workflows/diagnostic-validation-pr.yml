@@ -1,0 +1,20 @@
+name: Diagnostic validation PR
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  diagnostic-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax validation
+        run: |
+          node --check app/lib/night-flight-validation-diagnostics.js
+          node --check app/lib/expertise-one-pass.js
+          node --check app/lib/night-flight-match-queue.js
+      - name: Targeted offline diagnostics tests
+        run: node --test app/lib/night-flight-validation-diagnostics.test.mjs app/lib/night-flight-match-queue.test.mjs
