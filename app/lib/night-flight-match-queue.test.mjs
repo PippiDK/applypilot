@@ -307,3 +307,18 @@ test('validation diagnostic persists a fixed category without private JD/CV exce
   const sanitized=await mod.failNightFlightJob({supabase:bad,claimedJob:claim,error:validationError,now:new Date('2026-09-05T02:00:05Z')})
   assert.equal(sanitized.last_error,'AI_EXPERTISE_VALIDATION · Night Flight Match failed safely.')
 })
+
+test('manual retry can scope claims to one job without touching other queued or READY work',async()=>{
+  const mod=await loadModule()
+  const supabase=fakeSupabase({jobs:[job('ready','READY'),job('other','QUEUED'),job('target','QUEUED')],runs:[run()]})
+  const calls=[]
+  const result=await mod.processNightFlightQueue({
+    supabase,runId:'run-6',onlyJobKey:'target',maxJobs:1,now:()=>new Date('2026-09-05T02:00:00.000Z'),
+    processJob:async claimed=>{calls.push(claimed.job_key);return {matchCacheKey:'target-cache'}},
+  })
+  assert.deepEqual(calls,['target'])
+  assert.equal(supabase.state.jobs.find(x=>x.job_key==='target').status,'READY')
+  assert.equal(supabase.state.jobs.find(x=>x.job_key==='other').status,'QUEUED')
+  assert.equal(supabase.state.jobs.find(x=>x.job_key==='ready').status,'READY')
+  assert.equal(result.status,'RUNNING')
+})
