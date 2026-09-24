@@ -25,4 +25,4 @@ No long-running loop of the entire queue in a single serverless invocation. One 
 - Resume works by explicit retained run ID irrespective of date/time and does not rediscover.
 - Retry only one FAILED job, preserving READY; diagnostics saved in existing last_error.
 - Invalid, foreign or nonexistent run rejected; CSRF origin check; preview write denied.
-- Unit, targeted, full regression and build green; TEST before LIVE.
+- Unit, targeted, full regression and build green; verify TEST/LIVE schema compatibility. Preview write API is deliberately disabled due to synthetic preview identity, so end-to-end authenticated POST requires production session. Do not treat a green mocked test as a completed live AI run.
