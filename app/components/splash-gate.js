@@ -1,12 +1,20 @@
 'use client'
 
-import {useState} from 'react'
+import {useEffect,useState} from 'react'
+import {usePathname} from 'next/navigation'
 import {SPLASH_MOTION} from '../lib/splash-motion.js'
 import styles from './splash-gate.module.css'
 
 export default function SplashGate({children}){
+  const pathname=usePathname()
   const [entered,setEntered]=useState(false)
-  if(entered) return children
+
+  // Manual Control is an internal tool, not a new app entrance. Once visited,
+  // returning to ApplyPilot via client navigation must not replay the splash.
+  useEffect(()=>{
+    if(pathname==='/night-flight-control') setEntered(true)
+  },[pathname])
+  if(entered||pathname==='/night-flight-control') return children
 
   const motionStyle={
     '--logo-delay':`${SPLASH_MOTION.logoZoomDelayMs}ms`,

@@ -1,5 +1,6 @@
 'use client'
 import {useCallback,useEffect,useState} from 'react'
+import Link from 'next/link'
 import styles from './manual-progress.module.css'
 
 const frame={maxWidth:960,margin:'32px auto',padding:'0 18px',fontFamily:'system-ui,sans-serif',color:'#e5e7eb'}
@@ -60,7 +61,7 @@ export default function NightFlightControl(){
   }
 
   return <main style={frame}>
-    <p><a href="/" style={{color:'#f9a8d4'}}>← ApplyPilot</a></p>
+    <p><Link href="/" style={{color:'#f9a8d4'}}>← ApplyPilot</Link></p>
     <h1>Night Flight · Manual Control</h1>
     <p style={muted}>Run at any time. Start uses the previous Copenhagen calendar day; Resume and Retry use an existing frozen run. Each invocation processes at most three jobs. READY results are preserved.</p>
     <div style={panel}>

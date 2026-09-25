@@ -1,5 +1,6 @@
 'use client'
 import {useEffect,useState} from 'react'
+import Link from 'next/link'
 import styles from './night-flight-drawer.module.css'
 
 export default function NightFlightDrawer({children}){
@@ -33,7 +34,7 @@ export default function NightFlightDrawer({children}){
         <section className={styles.section}>
           <div className={styles.sectionHeading}>
             <div><h3>Manual Control</h3><p>Start, resume or retry Night Flight whenever you need.</p></div>
-            <a href="/night-flight-control" className={styles.manualLink} onClick={()=>setOpen(false)}>Open →</a>
+            <Link href="/night-flight-control" className={styles.manualLink} onClick={()=>setOpen(false)}>Open →</Link>
           </div>
         </section>
         <section className={styles.section}>
