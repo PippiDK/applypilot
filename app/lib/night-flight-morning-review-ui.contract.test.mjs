@@ -59,6 +59,8 @@ test('Morning Review uses the distinct recovery error before rendering a second 
 
 test('NF-AA-6 renders Already Applied as a separate badge without replacing Night Flight processing status',()=>{
   assert.match(component,/item\.alreadyApplied&&<span className=\{styles\.alreadyApplied\}>APPLIED<\/span>/)
-  assert.match(component,/item\.status==='READY'\?'READY':'FAILED'/)
+  assert.match(component,/jobBadge\(item\.status\)\.label/)
+  assert.match(component,/status==='FAILED'[^\n]*tone:'failed'/)
+  assert.match(component,/status==='QUEUED'[^\n]*tone:'pending'/)
   assert.doesNotMatch(component,/writeJobStatus|JOB_STATUS_STORAGE_KEY|localStorage/)
 })
