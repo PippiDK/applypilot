@@ -7,6 +7,16 @@ import styles from './night-flight-morning-review.module.css'
 const POLL_INTERVAL_MS=45000
 const ACTIVE_RUN_STATUSES=new Set(['PENDING','RUNNING'])
 const TERMINAL_RUN_STATUSES=new Set(['READY','READY_WITH_ERRORS','NO_JOBS','FAILED'])
+const IN_PROGRESS_JOB_STATUSES=new Set(['QUEUED','PROCESSING','RETRY'])
+
+function jobBadge(status){
+  if(status==='READY') return {label:'READY',tone:'ready'}
+  if(status==='FAILED') return {label:'FAILED',tone:'failed'}
+  if(status==='QUEUED') return {label:'QUEUED',tone:'pending'}
+  if(status==='PROCESSING') return {label:'PROCESSING',tone:'pending'}
+  if(status==='RETRY') return {label:'RETRY',tone:'pending'}
+  return {label:'UNKNOWN',tone:'pending'}
+}
 
 function formatDay(value){
   if(!value) return '—'
@@ -102,16 +112,16 @@ export default function NightFlightMorningReview(){
           return
         }
 
-        setProgress(status.progress||null)
-        if(TERMINAL_RUN_STATUSES.has(status.run?.status)){
-          const refreshed=await fetchNightFlightReview()
-          if(!active) return
+        const refreshed=await fetchNightFlightReview()
+        if(!active) return
+        if(refreshed?.run?.id===review.run.id){
           setReview(refreshed)
           setProgress(progressFromReview(refreshed))
           setSelectedKey(current=>refreshed?.jobs?.some(item=>item.key===current)?current:(refreshed?.jobs?.[0]?.key||''))
-          return
+        }else{
+          setProgress(status.progress||null)
         }
-        schedule()
+        if(!TERMINAL_RUN_STATUSES.has(status.run?.status)) schedule()
       }catch{
         if(active) schedule()
       }
@@ -190,7 +200,7 @@ export default function NightFlightMorningReview(){
               </span>
               <span className={styles.jobMeta}>{item.job?.company||'Company unavailable'} · {item.job?.location||item.source||'Location unavailable'}</span>
               <span className={styles.jobBadges}>
-                <span className={item.status==='READY'?styles.ready:styles.failed}>{item.status==='READY'?'READY':'FAILED'}</span>
+                <span className={styles[jobBadge(item.status).tone]}>{jobBadge(item.status).label}</span>
                 {item.alreadyApplied&&<span className={styles.alreadyApplied}>APPLIED</span>}
               </span>
             </button>)}
@@ -201,6 +211,7 @@ export default function NightFlightMorningReview(){
               {vacancyUrl&&<a className={`secondary openLink ${styles.vacancyLink}`} href={vacancyUrl} target="_blank" rel="noreferrer">Open vacancy</a>}
             </div>
             {!selected&&<p className={styles.muted}>No review jobs for this run.</p>}
+            {IN_PROGRESS_JOB_STATUSES.has(selected?.status)&&<p className={styles.muted}>Match has not finished yet ({jobBadge(selected.status).label}). This is not a failed analysis. Refreshes automatically while the run is active.</p>}
             {selected?.status==='FAILED'&&<>
               <div className={styles.failure}>{selected.lastError||'Automatic Profile Match failed.'}</div>
               {visibleRecoveryError&&<div className={styles.failure}>{visibleRecoveryError}</div>}
