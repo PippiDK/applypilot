@@ -119,3 +119,9 @@ test('deterministicTruthCheck rejects evidence not grounded in the selected base
   assert.equal(result.verdict,'FAIL')
   assert.equal(result.issues.some(issue=>issue.code==='UNKNOWN_EVIDENCE'),true)
 })
+
+
+test('rejects AXON broken-word excerpt until guarded fallback exists',async()=>{
+  const {verifyJdGrounding}=await load()
+  assert.equal(verifyJdGrounding('You will d efine and manage the product vision.',[{id:'axon',jdEvidence:['define and manage the product vision']}]),true)
+})
