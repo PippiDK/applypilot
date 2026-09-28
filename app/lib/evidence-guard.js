@@ -15,7 +15,7 @@ export function normalizeEvidenceText(value=''){
 }
 
 function formattingOnlyJdMatch(source,excerpt){
-  const words=value=>normalizeEvidenceText(value).match(/[\\p{L}\\p{N}]+/gu)||[]
+  const words=value=>normalizeEvidenceText(value).match(/[\p{L}\p{N}]+/gu)||[]
   const actual=words(source),expected=words(excerpt)
   if(!expected.length) return false
   for(let start=0;start<actual.length;start++){
