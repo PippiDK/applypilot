@@ -14,6 +14,22 @@ export function normalizeEvidenceText(value=''){
     .toLowerCase()
 }
 
+function formattingOnlyJdMatch(source,excerpt){
+  const words=value=>normalizeEvidenceText(value).match(/[\p{L}\p{N}]+/gu)||[]
+  const actual=words(source),expected=words(excerpt)
+  if(!expected.length) return false
+  for(let start=0;start<actual.length;start++){
+    let at=start,matched=true
+    for(const word of expected){
+      if(actual[at]===word){at++;continue}
+      if(actual[at]?.length===1&&actual[at+1]?.length>=3&&actual[at]+actual[at+1]===word){at+=2;continue}
+      matched=false;break
+    }
+    if(matched) return true
+  }
+  return false
+}
+
 export function verifyJdGrounding(jobDescription='',priorities=[]){
   const normalizedJd=normalizeEvidenceText(jobDescription)
   if(!normalizedJd) throw new Error('Insufficient job description for safe tailoring.')
@@ -22,7 +38,7 @@ export function verifyJdGrounding(jobDescription='',priorities=[]){
       const excerpt=String(rawExcerpt??'').trim()
       if(INSTRUCTION_LIKE.test(excerpt)) throw new Error(`Unsafe prompt-like JD evidence in ${priority?.id||'priority'}.`)
       const normalizedExcerpt=normalizeEvidenceText(excerpt)
-      if(!normalizedExcerpt||!normalizedJd.includes(normalizedExcerpt)) throw new Error(`JD evidence for ${priority?.id||'priority'} was not found in the job description.`)
+      if(!normalizedExcerpt||!normalizedJd.includes(normalizedExcerpt)&&!formattingOnlyJdMatch(jobDescription,excerpt)) throw new Error(`JD evidence for ${priority?.id||'priority'} was not found in the job description.`)
     }
   }
   return true
