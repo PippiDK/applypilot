@@ -77,7 +77,7 @@ test('review helpers accept current live LinkedIn result shape',()=>{
 test('merged UI restores Search Profile persistence without wiring it into LinkedIn search',()=>{
   const source=(fs.readFileSync(new URL('../page.js',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
   assert.match(source,/localStorage\.getItem\('applypilot-profile'\)/)
-  assert.match(source,/localStorage\.setItem\('applypilot-profile'/)
+  assert.match(source,/writeSearchProfileStorage\(\{storage:localStorage,profile:/)
   assert.match(source,/BUILD YOUR SEARCH AGENT/)
   assert.match(source,/Step \{profileStep\} of 4/)
   assert.match(source,/Save profile/)
