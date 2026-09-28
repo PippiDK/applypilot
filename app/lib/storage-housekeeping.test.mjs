@@ -60,7 +60,7 @@ test('Search Profile write prunes obsolete master pools before saving',()=>{
 })
 
 test('quota recovery clears only disposable caches and retries Search Profile once',()=>{
-  const storage=memoryStorage({quotaLimit:260})
+  const storage=memoryStorage({quotaLimit:400})
   storage.setItem('applypilot-cv-library','C'.repeat(70))
   storage.setItem('applypilot-job-statuses-v1','S'.repeat(20))
   storage.setItem(masterPoolStorageKey('current'),'P'.repeat(80))
