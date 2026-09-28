@@ -70,7 +70,7 @@ test('Task 2D route and Search Profile save wiring are present, with guarded ser
   const pageSource = (readFileSync(pagePath, 'utf8')+'\n'+readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8'))
   assert.match(pageSource, /requestNightFlightProfileSync/)
   const saveStart = pageSource.indexOf('async function saveProfile()')
-  const localCommit = pageSource.indexOf("localStorage.setItem('applypilot-profile'", saveStart)
+  const localCommit = pageSource.indexOf("writeSearchProfileStorage({storage:localStorage,profile:saved", saveStart)
   const guardedSync = pageSource.indexOf('await attemptNightFlightProfileSync', saveStart)
   assert.ok(saveStart >= 0 && guardedSync > saveStart, 'Search Profile save must await the Task 2E Night Flight sync guard')
   assert.ok(localCommit > guardedSync, 'Guarded server sync attempt must finish before local profile commit')

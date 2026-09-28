@@ -8,6 +8,29 @@ export function masterPoolStorageKey(fingerprint=''){
   return key?LINKEDIN_MASTER_POOL_STORAGE_PREFIX+':'+key:''
 }
 
+function storageKeys(storage){
+  if(!storage||typeof storage.key!=='function'||!Number.isFinite(Number(storage.length))) return []
+  const keys=[]
+  for(let index=0;index<Number(storage.length);index++){
+    const key=storage.key(index)
+    if(typeof key==='string') keys.push(key)
+  }
+  return keys
+}
+
+export function clearObsoleteLinkedInMasterPools({storage,keepFingerprint=''}={}){
+  const keepKey=masterPoolStorageKey(keepFingerprint)
+  let removed=0
+  for(const key of storageKeys(storage)){
+    if(!key.startsWith(LINKEDIN_MASTER_POOL_STORAGE_PREFIX+':')||key===keepKey) continue
+    try{
+      storage.removeItem(key)
+      removed++
+    }catch{}
+  }
+  return removed
+}
+
 export function readLinkedInMasterPoolSnapshot({storage,fingerprint}={}){
   const key=masterPoolStorageKey(fingerprint)
   if(!storage||!key) return {candidates:[],verifiedJobs:[],savedAt:null}
@@ -36,6 +59,7 @@ export function isLinkedInMasterPoolFresh(snapshot={},now=new Date(),maxAgeMs=LI
 export function writeLinkedInMasterPool({storage,fingerprint,candidates=[],verifiedJobs=[]}={}){
   const key=masterPoolStorageKey(fingerprint)
   if(!storage||!key) return {candidates:[],verifiedJobs:[],savedAt:null}
+  clearObsoleteLinkedInMasterPools({storage,keepFingerprint:fingerprint})
   const safeCandidates=Array.isArray(candidates)?candidates.slice(-500):[]
   const safeVerifiedJobs=Array.isArray(verifiedJobs)?verifiedJobs.slice(-500):[]
   const savedAt=new Date().toISOString()

@@ -1,22 +1,35 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {masterPoolStorageKey,readLinkedInMasterPool,readLinkedInMasterPoolSnapshot,isLinkedInMasterPoolFresh,writeLinkedInMasterPool} from './linkedin-master-pool-cache.js'
+import {clearObsoleteLinkedInMasterPools,masterPoolStorageKey,readLinkedInMasterPool,readLinkedInMasterPoolSnapshot,isLinkedInMasterPoolFresh,writeLinkedInMasterPool} from './linkedin-master-pool-cache.js'
 
 function memoryStorage(){
   const data=new Map()
   return {
+    get length(){return data.size},
+    key:index=>Array.from(data.keys())[index]??null,
     getItem:key=>data.has(key)?data.get(key):null,
     setItem:(key,value)=>data.set(key,String(value)),
     removeItem:key=>data.delete(key),
   }
 }
 
-test('master pool cache is isolated by Search Profile fingerprint',()=>{
+test('master pool cache keeps only the current Search Profile fingerprint',()=>{
   const storage=memoryStorage()
   writeLinkedInMasterPool({storage,fingerprint:'profile-a',candidates:[{jobId:'1'}]})
   writeLinkedInMasterPool({storage,fingerprint:'profile-b',candidates:[{jobId:'2'}]})
-  assert.deepEqual(readLinkedInMasterPool({storage,fingerprint:'profile-a'}),[{jobId:'1'}])
+  assert.deepEqual(readLinkedInMasterPool({storage,fingerprint:'profile-a'}),[])
   assert.deepEqual(readLinkedInMasterPool({storage,fingerprint:'profile-b'}),[{jobId:'2'}])
+})
+
+test('obsolete master pools are pruned without removing the current pool',()=>{
+  const storage=memoryStorage()
+  storage.setItem(masterPoolStorageKey('old-a'),'{}')
+  storage.setItem(masterPoolStorageKey('old-b'),'{}')
+  storage.setItem(masterPoolStorageKey('current'),'{}')
+  assert.equal(clearObsoleteLinkedInMasterPools({storage,keepFingerprint:'current'}),2)
+  assert.equal(storage.getItem(masterPoolStorageKey('old-a')),null)
+  assert.equal(storage.getItem(masterPoolStorageKey('old-b')),null)
+  assert.equal(storage.getItem(masterPoolStorageKey('current')),'{}')
 })
 
 test('master pool cache safely returns empty for missing or invalid data',()=>{
@@ -43,6 +56,8 @@ test('fresh-cache helper only allows short local view reuse',()=>{
 
 test('quota exhaustion does not fail master-pool writes',()=>{
   const quotaStorage={
+    get length(){return 0},
+    key:()=>null,
     getItem:()=>null,
     setItem:()=>{throw new DOMException('quota exceeded','QuotaExceededError')},
     removeItem:()=>{},

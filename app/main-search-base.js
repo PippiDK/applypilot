@@ -25,6 +25,7 @@ import {archiveAppliedJob,removeAppliedJob,syncAppliedArchive} from './lib/appli
 import {deleteAppliedJob,fetchAppliedJobs,loadAppliedJobs,persistAppliedJobs} from './lib/applied-jobs-client.js'
 import AppliedJobsArchive from './components/applied-jobs-archive.js'
 import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
+import {writeSearchProfileStorage} from './lib/storage-housekeeping.js'
 import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
 import {freshnessSelectionFromDays,freshnessResultLabel} from './lib/freshness-selection.js'
 import {companyConnection,connectedCompanyNames,defaultCompanyWatch,readCompanyWatch,writeCompanyWatch,TARGET_COMPANIES} from './lib/company-watch.js'
@@ -231,7 +232,7 @@ export default function Home(){
         setReviewOpen(false)
         setProfile(current=>{
           const next=resumeToProfile(current,primaryCv)
-          if(current.savedAt) localStorage.setItem('applypilot-profile',JSON.stringify(next))
+          if(current.savedAt) writeSearchProfileStorage({storage:localStorage,profile:next,keepMasterPoolFingerprint:next.unionSearchPlanFingerprint||next.unionSearchPlan?.fingerprint||''})
           return next
         })
         setDraft(current=>resetRoleDraft(resumeToProfile(current,primaryCv)))
@@ -260,7 +261,7 @@ export default function Home(){
     setReviewOpen(false)
     setProfile(current=>{
       const next={...current,cvName:'',factBank:[],skills:[],cvParsedAt:''}
-      if(current.savedAt) localStorage.setItem('applypilot-profile',JSON.stringify(next))
+      if(current.savedAt) writeSearchProfileStorage({storage:localStorage,profile:next,keepMasterPoolFingerprint:next.unionSearchPlanFingerprint||next.unionSearchPlan?.fingerprint||''})
       return next
     })
     setDraft(current=>({...current,cvName:'',factBank:[],skills:[],cvParsedAt:''}))
@@ -598,7 +599,7 @@ export default function Home(){
       const saved={...resumeToProfile(draft,cvData),primaryRoles,adjacentRoles,roles:combinedRoles(primaryRoles,adjacentRoles),rolesSourceVersion:cvData?.sourceVersion||draft.rolesSourceVersion||'',cvRoleProfiles:Array.isArray(draft.cvRoleProfiles)?draft.cvRoleProfiles:[],roleSources:Array.isArray(draft.roleSources)?draft.roleSources:[],rolesLibraryFingerprint:draft.rolesLibraryFingerprint||rolesLibraryFingerprint,rolesBuilderVersion:SEARCH_PROFILE_BUILDER_VERSION,unionSearchPlan:draftUnionSearchPlan,unionSearchPlanVersion:UNION_SEARCH_PLAN_VERSION,unionSearchPlanFingerprint:draftUnionSearchPlan.fingerprint,locations,workModels,geography,exclusions,exclusionRules:compiledExclusions.rules,exclusionsFingerprint:compiledExclusions.fingerprint,exclusionsParserVersion:compiledExclusions.parserVersion,exclusionsParsedAt:exclusions?new Date().toISOString():'',savedAt:new Date().toISOString()}
       const syncResult=await attemptNightFlightProfileSync({sync:requestNightFlightProfileSync,searchProfile:saved,cv:cvData?{text:cvData.cvText,sourceVersion:cvData.sourceVersion}:null})
       setNightFlightSyncWarning(syncResult.stale?syncResult.error:'')
-      localStorage.setItem('applypilot-profile',JSON.stringify(saved))
+      writeSearchProfileStorage({storage:localStorage,profile:saved,keepMasterPoolFingerprint:saved.unionSearchPlanFingerprint||saved.unionSearchPlan?.fingerprint||''})
       setProfile(saved)
       setDraft(saved)
       setProfileSaveState({loading:false,error:''})

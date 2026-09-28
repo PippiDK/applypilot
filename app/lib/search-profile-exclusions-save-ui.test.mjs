@@ -12,6 +12,8 @@ test('custom exclusions are compiled only on Save profile and then passed to pro
   assert.match(page,/exclusionsFingerprint:compiledExclusions\.fingerprint/)
   assert.match(page,/exclusionsParserVersion:compiledExclusions\.parserVersion/)
   assert.match(page,/Saving profile…/)
+  assert.match(page,/writeSearchProfileStorage\(\{storage:localStorage,profile:saved/)
+  assert.doesNotMatch(page,/localStorage\.setItem\('applypilot-profile'/)
   assert.doesNotMatch(page,/onChange=\{[^}]*requestSearchProfileExclusions/s)
   assert.match(page,/unionSearchPlan:profile\.unionSearchPlan/)
   assert.match(page,/exclusionRules:Array\.isArray\(profile\.exclusionRules\)\?profile\.exclusionRules:\[\]/)
