@@ -26,9 +26,10 @@ export const JOB_STATUS_FILTERS=[
   {id:'considering',label:'Considering'},
   {id:'applied',label:'Applied'},
   {id:'interview',label:'Interview'},
+  {id:'rejected',label:'Rejected'},
   {id:'ignore',label:'Ignored'},
 ]
-export const DEFAULT_JOB_STATUS_FILTERS=['none','considering','applied','interview']
+export const DEFAULT_JOB_STATUS_FILTERS=['none','considering','applied','interview','rejected']
 
 const AREA_ALIASES={
   greater_copenhagen:['greater copenhagen','ballerup','herlev','gladsaxe','soborg','rodovre','brondby','glostrup','taastrup','hoje-taastrup','hedehusene','albertslund','ishoj','vallensbaek','bagsvaerd','skovlunde','smorum'],
@@ -74,7 +75,7 @@ export function classifyWorkModel(job={}){
 export function classifyJobStatus(jobId,statuses={}){
   const key=String(jobId??'').trim()
   const status=key?statuses?.[key]:''
-  return status==='considering'||status==='applied'||status==='interview'||status==='ignore'?status:'none'
+  return status==='considering'||status==='applied'||status==='interview'||status==='rejected'||status==='ignore'?status:'none'
 }
 
 export function filterJobItems(items=[],selectedAreas=[],selectedWorkModels=[]){

@@ -21,6 +21,7 @@
 .jobStatusSelect.status-none{border-color:#343d48;color:#8994a1;background:#12171c}
 .jobStatusSelect.status-applied{border-color:#285e4a;color:#7ee2b8;background:#132019}
 .jobStatusSelect.status-interview{border-color:#be185d;color:#f9a8d4;background:#2a1220}
+.jobStatusSelect.status-rejected{border-color:#6b7280;color:#fca5a5;background:#25282d}
 .jobStatusSelect.status-considering{border-color:#65552d;color:#e7c56a;background:#211d12}
 .jobStatusSelect.status-ignore{border-color:#743d41;color:#ef9da2;background:#281819}
 @media(max-width:780px){.jobStatusSelect{left:90px}}

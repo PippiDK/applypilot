@@ -34,8 +34,8 @@ test('sync backfills application lifecycle statuses in memory only',()=>{
     {job:{sourceJobId:'b',title:'Role B',company:'B'}},
     {job:{sourceJobId:'c',title:'Role C',company:'C'}},
   ]
-  const archive=syncAppliedArchive({archive:[],items,statuses:{a:'applied',b:'interview',c:'ignore'}})
-  assert.deepEqual(archive.map(item=>[item.jobId,item.applicationStatus]),[['b','interview'],['a','applied']])
+  const archive=syncAppliedArchive({archive:[],items,statuses:{a:'applied',b:'interview',c:'rejected'}})
+  assert.deepEqual(archive.map(item=>[item.jobId,item.applicationStatus]),[['c','rejected'],['b','interview'],['a','applied']])
 })
 
 test('readAppliedJobs remains a legacy migration reader',()=>{
@@ -60,5 +60,24 @@ test('Applied to Interview keeps the same archive record and original applied da
   })
   assert.equal(archive.length,1)
   assert.equal(archive[0].applicationStatus,'interview')
+  assert.equal(archive[0].appliedAt,'2026-09-20T10:00:00.000Z')
+})
+
+
+test('Interview to Rejected keeps the same Applied History record and original applied date',()=>{
+  let archive=archiveAppliedJob({
+    archive:[],
+    job:{sourceJobId:'456',title:'Delivery Manager',company:'Acme'},
+    appliedAt:'2026-09-20T10:00:00.000Z',
+    applicationStatus:'interview',
+  })
+  archive=archiveAppliedJob({
+    archive,
+    job:{sourceJobId:'456',title:'Delivery Manager',company:'Acme'},
+    appliedAt:'2026-09-30T10:00:00.000Z',
+    applicationStatus:'rejected',
+  })
+  assert.equal(archive.length,1)
+  assert.equal(archive[0].applicationStatus,'rejected')
   assert.equal(archive[0].appliedAt,'2026-09-20T10:00:00.000Z')
 })

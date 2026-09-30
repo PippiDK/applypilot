@@ -7,7 +7,9 @@ function appliedDate(value){
 }
 
 function applicationStatusLabel(value){
-  return value==='interview'?'INTERVIEW':'APPLIED'
+  if(value==='interview') return 'INTERVIEW'
+  if(value==='rejected') return 'REJECTED'
+  return 'APPLIED'
 }
 
 export default function AppliedJobsArchive({jobs=[],error='',open,onOpen,onClose}){
@@ -33,7 +35,7 @@ export default function AppliedJobsArchive({jobs=[],error='',open,onOpen,onClose
               <small>Applied {appliedDate(item.appliedAt)}</small>
             </div>
             {item.originalUrl&&<a className="secondary openLink appliedArchiveLink" href={item.originalUrl} target="_blank" rel="noreferrer">Open vacancy</a>}
-          </article>):<div className="empty">No saved applications yet. Mark a vacancy APPLIED or INTERVIEW and it will stay here.</div>}
+          </article>):<div className="empty">No saved applications yet. Mark a vacancy APPLIED, INTERVIEW or REJECTED and it will stay here.</div>}
         </div>
       </aside>
     </div>}
