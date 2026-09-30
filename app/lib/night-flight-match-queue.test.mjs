@@ -266,6 +266,7 @@ test('Night Flight processes no more than the per-invocation job limit and leave
   assert.equal(supabase.state.jobs.find(row=>row.job_key==='ready').attempts,0)
   assert.equal(supabase.state.jobs.find(row=>row.job_key==='three').status,'QUEUED')
   assert.equal(result.status,'RUNNING')
+  assert.equal(result.jobsProcessedThisInvocation,2)
 })
 
 test('Task 6 finalizes READY when all in-scope persisted jobs are complete',async()=>{
@@ -321,4 +322,32 @@ test('manual retry can scope claims to one job without touching other queued or 
   assert.equal(supabase.state.jobs.find(x=>x.job_key==='other').status,'QUEUED')
   assert.equal(supabase.state.jobs.find(x=>x.job_key==='ready').status,'READY')
   assert.equal(result.status,'RUNNING')
+})
+
+
+test('recurring batching drains 15 queued jobs as five bounded invocations without reprocessing READY work',async()=>{
+  const mod=await loadModule()
+  const jobs=Array.from({length:15},(_,index)=>job(`batch-${String(index+1).padStart(2,'0')}`,'QUEUED'))
+  const supabase=fakeSupabase({jobs,runs:[run()]})
+  let tick=0
+  const now=()=>new Date(Date.parse('2026-09-05T02:00:00.000Z')+(tick++*1000))
+  const processed=[]
+  const statuses=[]
+
+  for(let invocation=0;invocation<5;invocation+=1){
+    const result=await mod.processNightFlightQueue({
+      supabase,
+      runId:'run-6',
+      maxJobs:3,
+      now,
+      processJob:async claimed=>({matchCacheKey:`cache:${claimed.job_key}`}),
+    })
+    processed.push(result.jobsProcessedThisInvocation)
+    statuses.push(result.status)
+  }
+
+  assert.deepEqual(processed,[3,3,3,3,3])
+  assert.deepEqual(statuses,['RUNNING','RUNNING','RUNNING','RUNNING','READY'])
+  assert.equal(supabase.state.jobs.filter(row=>row.status==='READY').length,15)
+  assert.ok(supabase.state.jobs.every(row=>row.attempts===1))
 })

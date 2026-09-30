@@ -16,7 +16,9 @@ jobs:
           node --check app/lib/night-flight-manual-control.js
           node --check app/lib/night-flight-match-processor.js
           node --check app/lib/night-flight-match-queue.js
-          node --test app/lib/night-flight-manual-control.test.mjs app/lib/night-flight-match-queue.test.mjs app/lib/night-flight-match-processor.test.mjs app/lib/night-flight-scheduler.test.mjs
+          node --check app/lib/night-flight-worker.js
+          node --check app/api/cron/night-flight-worker/route.js
+          node --test app/lib/night-flight-manual-control.test.mjs app/lib/night-flight-match-queue.test.mjs app/lib/night-flight-match-processor.test.mjs app/lib/night-flight-scheduler.test.mjs app/lib/night-flight-worker.test.mjs
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Full regression

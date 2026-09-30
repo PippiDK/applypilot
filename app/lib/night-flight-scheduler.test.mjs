@@ -145,11 +145,17 @@ test('Task 7 isolates one user failure and continues the remaining enabled users
   assert.match(result.failures[0].error,/source failed/i)
 })
 
-test('Task 7 Vercel config uses only two daily UTC cron ticks for DST-safe Copenhagen scheduling',async()=>{
+test('Vercel config preserves discovery ticks and uses Hobby-safe hourly continuation jobs overnight',async()=>{
   const config=JSON.parse(await readFile(new URL('../../vercel.json',import.meta.url),'utf8'))
   assert.deepEqual(config.crons,[
     {path:'/api/cron/night-flight',schedule:'0 0 * * *'},
     {path:'/api/cron/night-flight',schedule:'0 1 * * *'},
+    {path:'/api/cron/night-flight-worker',schedule:'0 2 * * *'},
+    {path:'/api/cron/night-flight-worker',schedule:'0 3 * * *'},
+    {path:'/api/cron/night-flight-worker',schedule:'0 4 * * *'},
+    {path:'/api/cron/night-flight-worker',schedule:'0 5 * * *'},
+    {path:'/api/cron/night-flight-worker',schedule:'0 6 * * *'},
+    {path:'/api/cron/night-flight-worker',schedule:'0 7 * * *'},
   ])
 })
 
