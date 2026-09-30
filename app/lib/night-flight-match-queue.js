@@ -303,5 +303,6 @@ export async function processNightFlightQueue({
     processed+=1
   }
 
-  return reconcileNightFlightRun({supabase,runId:id,now})
+  const reconciled=await reconcileNightFlightRun({supabase,runId:id,now})
+  return {...reconciled,jobsProcessedThisInvocation:processed}
 }
