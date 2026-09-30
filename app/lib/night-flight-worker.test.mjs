@@ -87,3 +87,28 @@ test('recurring worker cron route stays protected and server-side',async()=>{
   assert.match(source,/createAdminSupabaseClient/)
   assert.match(source,/runNightFlightWorker/)
 })
+
+
+test('recurring worker can advance a 15-job run over five independent ticks',async()=>{
+  const supabase=fakeSupabase([
+    {id:'run-15',user_id:'u1',target_date:'2026-09-29',status:'RUNNING',created_at:'2026-09-30T00:00:00Z'},
+  ])
+  let remaining=15
+  const batches=[]
+
+  for(let tick=0;tick<5;tick+=1){
+    const result=await runNightFlightWorker({
+      supabase,
+      processMatches:async()=>{
+        const processed=Math.min(3,remaining)
+        remaining-=processed
+        return {status:remaining===0?'READY':'RUNNING',jobsProcessedThisInvocation:processed}
+      },
+    })
+    batches.push(result.jobsProcessedThisInvocation)
+    assert.equal(result.idle,false)
+  }
+
+  assert.deepEqual(batches,[3,3,3,3,3])
+  assert.equal(remaining,0)
+})
