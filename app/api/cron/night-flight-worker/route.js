@@ -1,6 +1,6 @@
 import {NextResponse} from 'next/server'
-import {createAdminSupabaseClient} from '../../../../lib/supabase/admin.js'
-import {runNightFlightWorker} from '../../../../lib/night-flight-worker.js'
+import {createAdminSupabaseClient} from '../../../lib/supabase/admin.js'
+import {runNightFlightWorker} from '../../../lib/night-flight-worker.js'
 
 export const dynamic='force-dynamic'
 
