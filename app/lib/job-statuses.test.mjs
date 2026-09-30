@@ -28,3 +28,18 @@ test('ordinary jobs keep STATUS when no manual status exists',async()=>{
   const {resolveJobStatus}=await load()
   assert.equal(resolveJobStatus({manualStatus:'',job:{}}),'')
 })
+
+
+test('Interview is a manual application lifecycle status',async()=>{
+  const {JOB_STATUS_OPTIONS,isApplicationStatus}=await load()
+  assert.equal(JOB_STATUS_OPTIONS.some(option=>option.value==='interview'&&option.label==='INTERVIEW'),true)
+  assert.equal(isApplicationStatus('applied'),true)
+  assert.equal(isApplicationStatus('interview'),true)
+  assert.equal(isApplicationStatus('considering'),false)
+  assert.equal(isApplicationStatus('ignore'),false)
+})
+
+test('Interview overrides derived Night Flight exactly like other manual statuses',async()=>{
+  const {resolveJobStatus}=await load()
+  assert.equal(resolveJobStatus({manualStatus:'interview',job:{nightFlight:{processed:true}}}),'interview')
+})
