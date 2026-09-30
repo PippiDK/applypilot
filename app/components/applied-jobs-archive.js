@@ -12,7 +12,7 @@ function applicationStatusLabel(value){
   return 'APPLIED'
 }
 
-export default function AppliedJobsArchive({jobs=[],error='',open,onOpen,onClose}){
+export default function AppliedJobsArchive({jobs=[],error='',open,onOpen,onClose,onStatusChange}){
   return <>
     <button className="appliedArchiveTab" onClick={onOpen} aria-label="Open applied jobs archive">
       <span>APPLIED</span><b>{jobs.length}</b>
@@ -31,7 +31,16 @@ export default function AppliedJobsArchive({jobs=[],error='',open,onOpen,onClose
               {item.relevanceScore!=null&&<strong>{Math.round(item.relevanceScore*10)}%</strong>}
             </div>
             <div className="appliedArchiveLifecycle">
-              <span className={`applicationStatusBadge applicationStatus-${item.applicationStatus||'applied'}`}>{applicationStatusLabel(item.applicationStatus)}</span>
+              <select
+                className={`applicationStatusBadge applicationStatusSelect applicationStatus-${item.applicationStatus||'applied'}`}
+                value={item.applicationStatus||'applied'}
+                onChange={event=>onStatusChange?.(item.jobId,event.target.value)}
+                aria-label={`Application status for ${item.title}`}
+              >
+                <option value="applied">APPLIED</option>
+                <option value="interview">INTERVIEW</option>
+                <option value="rejected">REJECTED</option>
+              </select>
               <small>Applied {appliedDate(item.appliedAt)}</small>
             </div>
             {item.originalUrl&&<a className="secondary openLink appliedArchiveLink" href={item.originalUrl} target="_blank" rel="noreferrer">Open vacancy</a>}
