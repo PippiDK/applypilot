@@ -2,13 +2,27 @@ import {VALIDATION_DIAGNOSTIC_CODES} from './night-flight-validation-diagnostics
 
 export const DEFAULT_NIGHT_FLIGHT_MAX_ATTEMPTS=3
 export const DEFAULT_NIGHT_FLIGHT_PROCESSING_LEASE_MS=15*60*1000
-export const DEFAULT_NIGHT_FLIGHT_JOBS_PER_INVOCATION=3
+export const DEFAULT_NIGHT_FLIGHT_TIME_BUDGET_MS=210*1000
+export const DEFAULT_NIGHT_FLIGHT_MIN_REMAINING_MS=20*1000
+export const DEFAULT_NIGHT_FLIGHT_429_BACKOFF_MS=5*1000
+export const DEFAULT_NIGHT_FLIGHT_MAX_429_WAIT_MS=30*1000
 
 const SELECT_FIELDS='run_id,job_key,source,job_snapshot,area,status,attempts,last_error,match_cache_key,processed_at,created_at,updated_at'
 const CLAIMABLE_STATUSES=['QUEUED','RETRY','PROCESSING']
 const ACTIVE_STATUSES=new Set(['QUEUED','PROCESSING','RETRY'])
 
 const clean=value=>String(value??'').replace(/\s+/g,' ').trim()
+const QUOTA_MARKER='PROVIDER_QUOTA'
+const defaultSleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))
+
+function isProvider429(error){return clean(error?.code)==='AI_PROVIDER_HTTP_429'}
+function isProviderQuota429(error){return isProvider429(error)&&error?.provider429Kind==='quota'}
+function isQuotaBlockedRow(row){return row?.status==='RETRY'&&clean(row?.last_error).includes(QUOTA_MARKER)}
+function retryDelayMs(error){
+  const hinted=Number(error?.retryAfterMs)
+  const desired=Number.isFinite(hinted)&&hinted>=0?hinted:DEFAULT_NIGHT_FLIGHT_429_BACKOFF_MS
+  return Math.min(DEFAULT_NIGHT_FLIGHT_MAX_429_WAIT_MS,Math.max(1000,desired))
+}
 
 function requireSupabase(supabase){
   if(!supabase||typeof supabase.from!=='function') throw new Error('Night Flight queue requires Supabase')
@@ -44,10 +58,11 @@ function safeErrorMessage(error){
   const safeStage=/^[a-zA-Z0-9_-]{1,64} AI stage failed\.$/.test(text)
   const message=safeCode&&!safeStage?'Night Flight Match failed safely.':(text||'Night Flight Match failed')
   const diagnostic=String(error?.diagnosticCode??'')
+  const quotaMarker=safeCode&&code==='AI_PROVIDER_HTTP_429'&&error?.provider429Kind==='quota'?` · ${QUOTA_MARKER}`:''
   const safeDiagnostic=safeCode&&code==='AI_EXPERTISE_VALIDATION'&&VALIDATION_DIAGNOSTIC_CODES.has(diagnostic)?` · ${diagnostic}`:''
   const index=error?.diagnosticIndex
   const safeIndex=safeDiagnostic&&Number.isInteger(index)&&index>=0&&index<18?` · ITEM_${index+1}`:''
-  return `${safeCode?`${code} · `:''}${message}${safeDiagnostic}${safeIndex}`.slice(0,500)
+  return `${safeCode?`${code} · `:''}${message}${quotaMarker}${safeDiagnostic}${safeIndex}`.slice(0,500)
 }
 
 function isNonRetryableError(error){
@@ -70,6 +85,7 @@ function isStaleProcessing(row,now,leaseMs){
 }
 
 function claimPriority(row){
+  if(isQuotaBlockedRow(row)) return -1
   if(row?.status==='QUEUED') return 0
   if(row?.status==='PROCESSING') return 1
   if(row?.status==='RETRY') return 2
@@ -206,13 +222,15 @@ export async function failNightFlightJob({
   requireSupabase(supabase)
   requireCurrentClaim(claimedJob)
   const attemptsLimit=positiveInteger(maxAttempts,DEFAULT_NIGHT_FLIGHT_MAX_ATTEMPTS)
-  const final=isNonRetryableError(error)||Number(claimedJob.attempts||0)>=attemptsLimit
+  const quota=isProviderQuota429(error)
+  const final=!quota&&(isNonRetryableError(error)||Number(claimedJob.attempts||0)>=attemptsLimit)
   const stamp=resolveNow(now).toISOString()
   const failed=await casUpdateJob({
     supabase,
     row:claimedJob,
     payload:{
       status:final?'FAILED':'RETRY',
+      attempts:quota?Math.max(0,Number(claimedJob.attempts||0)-1):Number(claimedJob.attempts||0),
       last_error:safeErrorMessage(error),
       processed_at:final?stamp:null,
       updated_at:stamp,
@@ -279,30 +297,74 @@ export async function processNightFlightQueue({
   leaseMs=DEFAULT_NIGHT_FLIGHT_PROCESSING_LEASE_MS,
   maxJobs=Infinity,
   onlyJobKey='',
+  timeBudgetMs=DEFAULT_NIGHT_FLIGHT_TIME_BUDGET_MS,
+  minRemainingMs=DEFAULT_NIGHT_FLIGHT_MIN_REMAINING_MS,
+  sleep=defaultSleep,
+  clock=()=>Date.now(),
 }={}){
   requireSupabase(supabase)
   const id=requireRunId(runId)
   if(typeof processJob!=='function') throw new Error('Night Flight queue requires processJob')
+  if(typeof sleep!=='function'||typeof clock!=='function') throw new Error('Night Flight queue timing dependencies are invalid')
   const attemptsLimit=positiveInteger(maxAttempts,DEFAULT_NIGHT_FLIGHT_MAX_ATTEMPTS)
   const lease=positiveNumber(leaseMs,DEFAULT_NIGHT_FLIGHT_PROCESSING_LEASE_MS)
   const limit=Number.isFinite(Number(maxJobs))?Math.max(0,Number(maxJobs)):Infinity
+  const budget=positiveNumber(timeBudgetMs,DEFAULT_NIGHT_FLIGHT_TIME_BUDGET_MS)
+  const reserve=positiveNumber(minRemainingMs,DEFAULT_NIGHT_FLIGHT_MIN_REMAINING_MS)
+  const started=Number(clock())
+  const deadline=(Number.isFinite(started)?started:Date.now())+budget
+  const remaining=()=>{
+    const current=Number(clock())
+    return Math.max(0,deadline-(Number.isFinite(current)?current:Date.now()))
+  }
   let processed=0
+  let stopReason=null
   const attemptedJobKeys=new Set()
 
   while(processed<limit){
+    if(remaining()<=reserve){stopReason='TIME_BUDGET';break}
     const claimed=await claimNextNightFlightJob({supabase,runId:id,now,leaseMs:lease,maxAttempts:attemptsLimit,excludeJobKeys:attemptedJobKeys,onlyJobKey})
     if(!claimed) break
     attemptedJobKeys.add(clean(claimed.job_key))
-
-    try{
-      const result=await processJob(claimed)
-      await completeNightFlightJob({supabase,claimedJob:claimed,matchCacheKey:result?.matchCacheKey,now})
-    }catch(error){
-      await failNightFlightJob({supabase,claimedJob:claimed,error,maxAttempts:attemptsLimit,now})
-    }
     processed+=1
+
+    let result
+    let failure=null
+    try{result=await processJob(claimed)}catch(error){failure=error}
+
+    if(failure&&isProvider429(failure)){
+      if(isProviderQuota429(failure)){
+        await failNightFlightJob({supabase,claimedJob:claimed,error:failure,maxAttempts:attemptsLimit,now})
+        stopReason='PROVIDER_QUOTA'
+        break
+      }
+      const delay=retryDelayMs(failure)
+      if(remaining()<=delay+reserve){
+        await failNightFlightJob({supabase,claimedJob:claimed,error:failure,maxAttempts:attemptsLimit,now})
+        stopReason='RATE_LIMIT_TIME_BUDGET'
+        break
+      }
+      await sleep(delay)
+      try{
+        result=await processJob(claimed)
+        failure=null
+      }catch(retryError){
+        await failNightFlightJob({supabase,claimedJob:claimed,error:retryError,maxAttempts:attemptsLimit,now})
+        if(isProvider429(retryError)){
+          stopReason=isProviderQuota429(retryError)?'PROVIDER_QUOTA':'RATE_LIMIT_REPEAT'
+          break
+        }
+        continue
+      }
+    }
+
+    if(failure){
+      await failNightFlightJob({supabase,claimedJob:claimed,error:failure,maxAttempts:attemptsLimit,now})
+      continue
+    }
+    await completeNightFlightJob({supabase,claimedJob:claimed,matchCacheKey:result?.matchCacheKey,now})
   }
 
   const reconciled=await reconcileNightFlightRun({supabase,runId:id,now})
-  return {...reconciled,jobsProcessedThisInvocation:processed}
+  return {...reconciled,jobsProcessedThisInvocation:processed,stopReason}
 }

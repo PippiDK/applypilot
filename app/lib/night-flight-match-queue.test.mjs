@@ -325,29 +325,122 @@ test('manual retry can scope claims to one job without touching other queued or 
 })
 
 
-test('recurring batching drains 15 queued jobs as five bounded invocations without reprocessing READY work',async()=>{
+test('adaptive invocation drains queued work without a fixed three-job cap',async()=>{
   const mod=await loadModule()
   const jobs=Array.from({length:15},(_,index)=>job(`batch-${String(index+1).padStart(2,'0')}`,'QUEUED'))
   const supabase=fakeSupabase({jobs,runs:[run()]})
-  let tick=0
-  const now=()=>new Date(Date.parse('2026-09-05T02:00:00.000Z')+(tick++*1000))
-  const processed=[]
-  const statuses=[]
-
-  for(let invocation=0;invocation<5;invocation+=1){
-    const result=await mod.processNightFlightQueue({
-      supabase,
-      runId:'run-6',
-      maxJobs:3,
-      now,
-      processJob:async claimed=>({matchCacheKey:`cache:${claimed.job_key}`}),
-    })
-    processed.push(result.jobsProcessedThisInvocation)
-    statuses.push(result.status)
-  }
-
-  assert.deepEqual(processed,[3,3,3,3,3])
-  assert.deepEqual(statuses,['RUNNING','RUNNING','RUNNING','RUNNING','READY'])
+  const result=await mod.processNightFlightQueue({
+    supabase,
+    runId:'run-6',
+    clock:()=>0,
+    processJob:async claimed=>({matchCacheKey:`cache:${claimed.job_key}`}),
+  })
+  assert.equal(result.jobsProcessedThisInvocation,15)
+  assert.equal(result.status,'READY')
+  assert.equal(result.stopReason,null)
   assert.equal(supabase.state.jobs.filter(row=>row.status==='READY').length,15)
   assert.ok(supabase.state.jobs.every(row=>row.attempts===1))
+})
+
+test('temporary 429 waits once on the same claim, then continues the queue',async()=>{
+  const mod=await loadModule()
+  const supabase=fakeSupabase({jobs:[job('one','QUEUED'),job('two','QUEUED')],runs:[run()]})
+  const calls=[]
+  const sleeps=[]
+  let oneCalls=0
+  const rateLimit=()=>{
+    const error=new Error('expertise_match_one_pass AI stage failed.')
+    error.code='AI_PROVIDER_HTTP_429'
+    error.provider429Kind='rate_limit'
+    error.retryAfterMs=7000
+    return error
+  }
+  const result=await mod.processNightFlightQueue({
+    supabase,runId:'run-6',clock:()=>0,sleep:async ms=>{sleeps.push(ms)},
+    processJob:async claimed=>{
+      calls.push(claimed.job_key)
+      if(claimed.job_key==='one'&&oneCalls++===0) throw rateLimit()
+      return {matchCacheKey:`cache:${claimed.job_key}`}
+    },
+  })
+  assert.deepEqual(calls,['one','one','two'])
+  assert.deepEqual(sleeps,[7000])
+  assert.equal(result.status,'READY')
+  assert.equal(result.stopReason,null)
+  assert.equal(supabase.state.jobs.find(row=>row.job_key==='one').attempts,1)
+})
+
+test('repeated temporary 429 stops only this invocation and leaves later work queued',async()=>{
+  const mod=await loadModule()
+  const supabase=fakeSupabase({jobs:[job('one','QUEUED'),job('two','QUEUED')],runs:[run()]})
+  const rateLimit=new Error('expertise_match_one_pass AI stage failed.')
+  rateLimit.code='AI_PROVIDER_HTTP_429'
+  rateLimit.provider429Kind='rate_limit'
+  rateLimit.retryAfterMs=1000
+  const result=await mod.processNightFlightQueue({
+    supabase,runId:'run-6',clock:()=>0,sleep:async()=>{},
+    processJob:async()=>{throw rateLimit},
+  })
+  assert.equal(result.stopReason,'RATE_LIMIT_REPEAT')
+  assert.equal(result.jobsProcessedThisInvocation,1)
+  assert.equal(supabase.state.jobs.find(row=>row.job_key==='one').status,'RETRY')
+  assert.equal(supabase.state.jobs.find(row=>row.job_key==='one').attempts,1)
+  assert.equal(supabase.state.jobs.find(row=>row.job_key==='two').status,'QUEUED')
+  assert.equal(result.status,'RUNNING')
+})
+
+test('quota 429 pauses the invocation and later quota probes do not consume the attempt budget',async()=>{
+  const mod=await loadModule()
+  const supabase=fakeSupabase({jobs:[job('blocked','QUEUED'),job('later','QUEUED')],runs:[run()]})
+  const quota=()=>{
+    const error=new Error('expertise_match_one_pass AI stage failed.')
+    error.code='AI_PROVIDER_HTTP_429'
+    error.provider429Kind='quota'
+    return error
+  }
+
+  const first=await mod.processNightFlightQueue({
+    supabase,runId:'run-6',clock:()=>0,sleep:async()=>{},
+    processJob:async()=>{throw quota()},
+  })
+  assert.equal(first.stopReason,'PROVIDER_QUOTA')
+  const blockedAfterFirst=supabase.state.jobs.find(row=>row.job_key==='blocked')
+  assert.equal(blockedAfterFirst.status,'RETRY')
+  assert.equal(blockedAfterFirst.attempts,0)
+  assert.match(blockedAfterFirst.last_error,/PROVIDER_QUOTA/)
+  assert.equal(supabase.state.jobs.find(row=>row.job_key==='later').status,'QUEUED')
+
+  const seen=[]
+  const second=await mod.processNightFlightQueue({
+    supabase,runId:'run-6',clock:()=>0,sleep:async()=>{},
+    processJob:async claimed=>{seen.push(claimed.job_key);throw quota()},
+  })
+  assert.equal(second.stopReason,'PROVIDER_QUOTA')
+  assert.deepEqual(seen,['blocked'])
+  assert.equal(supabase.state.jobs.find(row=>row.job_key==='blocked').attempts,0)
+  assert.equal(supabase.state.jobs.find(row=>row.job_key==='later').status,'QUEUED')
+
+  const recovered=await mod.processNightFlightQueue({
+    supabase,runId:'run-6',clock:()=>0,sleep:async()=>{},
+    processJob:async claimed=>({matchCacheKey:`cache:${claimed.job_key}`}),
+  })
+  assert.equal(recovered.status,'READY')
+  assert.equal(supabase.state.jobs.find(row=>row.job_key==='blocked').attempts,1)
+  assert.equal(supabase.state.jobs.find(row=>row.job_key==='later').attempts,1)
+})
+
+test('adaptive queue stops before the serverless safety reserve and leaves remaining jobs for the next cron',async()=>{
+  const mod=await loadModule()
+  const supabase=fakeSupabase({jobs:[job('one','QUEUED'),job('two','QUEUED'),job('three','QUEUED')],runs:[run()]})
+  let elapsed=0
+  const result=await mod.processNightFlightQueue({
+    supabase,runId:'run-6',timeBudgetMs:210000,minRemainingMs:20000,clock:()=>elapsed,
+    processJob:async claimed=>{elapsed+=100000;return {matchCacheKey:`cache:${claimed.job_key}`}},
+  })
+  assert.equal(result.stopReason,'TIME_BUDGET')
+  assert.equal(result.jobsProcessedThisInvocation,2)
+  assert.equal(supabase.state.jobs.find(row=>row.job_key==='one').status,'READY')
+  assert.equal(supabase.state.jobs.find(row=>row.job_key==='two').status,'READY')
+  assert.equal(supabase.state.jobs.find(row=>row.job_key==='three').status,'QUEUED')
+  assert.equal(result.status,'RUNNING')
 })

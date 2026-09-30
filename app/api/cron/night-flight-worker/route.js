@@ -3,6 +3,7 @@ import {createAdminSupabaseClient} from '../../../lib/supabase/admin.js'
 import {runNightFlightWorker} from '../../../lib/night-flight-worker.js'
 
 export const dynamic='force-dynamic'
+export const maxDuration=300
 
 const clean=value=>String(value??'').trim()
 

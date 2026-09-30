@@ -1,4 +1,4 @@
-import {DEFAULT_NIGHT_FLIGHT_JOBS_PER_INVOCATION,processNightFlightQueue} from './night-flight-match-queue.js'
+import {processNightFlightQueue} from './night-flight-match-queue.js'
 import {getOrCreateExpertiseMatch,logicalExpertiseJobKey} from './expertise-match-server-cache.js'
 import {reconcileNightFlightAppliedHistory} from './night-flight-applied-history.js'
 
@@ -41,7 +41,7 @@ export async function processNightFlightRunMatches({
   const processed=await processQueue({
     supabase,
     runId:id,
-    maxJobs:onlyJobKey?1:DEFAULT_NIGHT_FLIGHT_JOBS_PER_INVOCATION,
+    maxJobs:onlyJobKey?1:Infinity,
     onlyJobKey,
     processJob:async claimedJob=>{
       const snapshot=claimedJob?.job_snapshot&&typeof claimedJob.job_snapshot==='object'?claimedJob.job_snapshot:{}
