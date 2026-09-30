@@ -3,9 +3,13 @@ export const JOB_STATUS_STORAGE_KEY='applypilot-job-statuses-v1'
 export const JOB_STATUS_OPTIONS=[
   {value:'',label:'STATUS'},
   {value:'applied',label:'APPLIED'},
+  {value:'interview',label:'INTERVIEW'},
   {value:'considering',label:'CONSIDERING'},
   {value:'ignore',label:'IGNORE'}
 ]
+
+export const APPLICATION_STATUSES=new Set(['applied','interview'])
+export const isApplicationStatus=status=>APPLICATION_STATUSES.has(String(status??'').trim())
 
 const VALID=new Set(JOB_STATUS_OPTIONS.map(option=>option.value).filter(Boolean))
 
