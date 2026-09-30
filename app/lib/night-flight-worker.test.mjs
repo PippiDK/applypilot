@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import {readFile} from 'node:fs/promises'
 import {runNightFlightWorker} from './night-flight-worker.js'
 
 function fakeSupabase(runs=[]){
@@ -75,4 +76,14 @@ test('recurring worker is safely idle when no RUNNING work can progress',async()
   })
   assert.equal(result.idle,true)
   assert.equal(result.candidatesScanned,1)
+})
+
+
+test('recurring worker cron route stays protected and server-side',async()=>{
+  const source=await readFile(new URL('../api/cron/night-flight-worker/route.js',import.meta.url),'utf8')
+  assert.match(source,/CRON_SECRET/)
+  assert.match(source,/authorization/i)
+  assert.match(source,/Bearer/)
+  assert.match(source,/createAdminSupabaseClient/)
+  assert.match(source,/runNightFlightWorker/)
 })
