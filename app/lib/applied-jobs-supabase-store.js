@@ -11,6 +11,7 @@ const rowFromJob=(userId,job)=>({
   published_at:job.publishedAt,
   applied_at:job.appliedAt,
   relevance_score:job.relevanceScore,
+  application_status:job.applicationStatus,
 })
 
 const jobFromRow=row=>({
@@ -23,6 +24,7 @@ const jobFromRow=row=>({
   publishedAt:row.published_at,
   appliedAt:row.applied_at,
   relevanceScore:row.relevance_score,
+  applicationStatus:row.application_status,
 })
 
 export async function upsertAppliedJobsToSupabase({supabase,userId,jobs=[]}={}){
@@ -39,7 +41,7 @@ export async function loadAppliedJobsFromSupabase({supabase,userId}={}){
   if(!supabase||!userId) return []
   const {data,error}=await supabase
     .from('applied_jobs')
-    .select('user_id,job_id,title,company,location,source,original_url,published_at,applied_at,relevance_score')
+    .select('user_id,job_id,title,company,location,source,original_url,published_at,applied_at,relevance_score,application_status')
     .eq('user_id',userId)
     .order('applied_at',{ascending:false})
   if(error) throw error

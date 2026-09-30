@@ -23,6 +23,7 @@ const remote=[{
   publishedAt:'2026-09-10',
   appliedAt:'2026-09-17T10:00:00.000Z',
   relevanceScore:88,
+  applicationStatus:'applied',
 }]
 
 const legacy=[
@@ -37,6 +38,7 @@ const legacy=[
     publishedAt:'2026-09-11',
     appliedAt:'2026-09-17T11:00:00.000Z',
     relevanceScore:81,
+    applicationStatus:'applied',
   },
 ]
 

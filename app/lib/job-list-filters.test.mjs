@@ -58,28 +58,30 @@ test('all selected is a no-op for the existing pool, including unclassified jobs
   assert.equal(filterJobItems(items,SEARCH_AREAS.map(x=>x.id),WORK_MODELS.map(x=>x.id)).length,1)
 })
 
-test('status filters expose no status, considering, applied and ignored in UI order',()=>{
+test('status filters expose Interview as an application lifecycle status',()=>{
   assert.deepEqual(JOB_STATUS_FILTERS.map(({id,label})=>[id,label]),[
     ['none','No status'],
     ['considering','Considering'],
     ['applied','Applied'],
+    ['interview','Interview'],
     ['ignore','Ignored'],
   ])
-  assert.deepEqual(DEFAULT_JOB_STATUS_FILTERS,['none','considering','applied'])
+  assert.deepEqual(DEFAULT_JOB_STATUS_FILTERS,['none','considering','applied','interview'])
 })
 
-test('status filter defaults to no status, considering and applied while hiding ignored',()=>{
+test('status filter defaults to no status, considering, applied and interview while hiding ignored',()=>{
   const items=[
     {job:{sourceJobId:'none'}},
     {job:{sourceJobId:'considering'}},
     {job:{sourceJobId:'applied'}},
+    {job:{sourceJobId:'interview'}},
     {job:{sourceJobId:'ignored'}},
   ]
-  const statuses={considering:'considering',applied:'applied',ignored:'ignore'}
+  const statuses={considering:'considering',applied:'applied',interview:'interview',ignored:'ignore'}
 
   assert.deepEqual(
     filterJobItemsByStatus(items,statuses).map(item=>item.job.sourceJobId),
-    ['none','considering','applied']
+    ['none','considering','applied','interview']
   )
 })
 
@@ -88,12 +90,14 @@ test('status filter can isolate applied and explicitly include ignored',()=>{
     {job:{sourceJobId:'none'}},
     {job:{sourceJobId:'considering'}},
     {job:{sourceJobId:'applied'}},
+    {job:{sourceJobId:'interview'}},
     {job:{sourceJobId:'ignored'}},
   ]
-  const statuses={considering:'considering',applied:'applied',ignored:'ignore'}
+  const statuses={considering:'considering',applied:'applied',interview:'interview',ignored:'ignore'}
 
   assert.equal(classifyJobStatus('none',statuses),'none')
   assert.deepEqual(filterJobItemsByStatus(items,statuses,['applied']).map(item=>item.job.sourceJobId),['applied'])
+  assert.deepEqual(filterJobItemsByStatus(items,statuses,['interview']).map(item=>item.job.sourceJobId),['interview'])
   assert.deepEqual(filterJobItemsByStatus(items,statuses,['ignore']).map(item=>item.job.sourceJobId),['ignored'])
 })
 

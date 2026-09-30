@@ -20,6 +20,7 @@
 .jobStatusSelect{position:absolute;left:90px;bottom:12px;z-index:2;max-width:170px;border-radius:999px;padding:5px 24px 5px 9px;background:#12171c;border:1px solid #343d48;color:#8994a1;font-size:9px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;outline:none}
 .jobStatusSelect.status-none{border-color:#343d48;color:#8994a1;background:#12171c}
 .jobStatusSelect.status-applied{border-color:#285e4a;color:#7ee2b8;background:#132019}
+.jobStatusSelect.status-interview{border-color:#6656a8;color:#c4b5fd;background:#1d1930}
 .jobStatusSelect.status-considering{border-color:#65552d;color:#e7c56a;background:#211d12}
 .jobStatusSelect.status-ignore{border-color:#743d41;color:#ef9da2;background:#281819}
 @media(max-width:780px){.jobStatusSelect{left:90px}}

@@ -20,7 +20,7 @@ import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-
 import {evaluateJobConditions} from './lib/job-conditions.js'
 import {fitLabel} from './lib/fit-label.js'
 import {compareShadowToLegacy} from './lib/shadow-search-compare.js'
-import {JOB_STATUS_OPTIONS,readJobStatuses,writeJobStatus} from './lib/job-statuses.js'
+import {JOB_STATUS_OPTIONS,isApplicationStatus,readJobStatuses,writeJobStatus} from './lib/job-statuses.js'
 import {archiveAppliedJob,removeAppliedJob,syncAppliedArchive} from './lib/applied-jobs.js'
 import {deleteAppliedJob,fetchAppliedJobs,loadAppliedJobs,persistAppliedJobs} from './lib/applied-jobs-client.js'
 import AppliedJobsArchive from './components/applied-jobs-archive.js'
@@ -299,9 +299,9 @@ export default function Home(){
     const nextStatuses=writeJobStatus({storage:localStorage,statuses:jobStatusesRef.current,jobId,status})
     jobStatusesRef.current=nextStatuses
     setJobStatuses(nextStatuses)
-    if(status==='applied'&&item){
-      persistAppliedArchive(archiveAppliedJob({archive:appliedJobsRef.current,job:item.job,evaluation:item.evaluation}))
-    }else if(status!=='applied'&&appliedJobsRef.current.some(job=>job.jobId===jobId)){
+    if(isApplicationStatus(status)&&item){
+      persistAppliedArchive(archiveAppliedJob({archive:appliedJobsRef.current,job:item.job,evaluation:item.evaluation,applicationStatus:status}))
+    }else if(!isApplicationStatus(status)&&appliedJobsRef.current.some(job=>job.jobId===jobId)){
       persistAppliedArchive(removeAppliedJob({archive:appliedJobsRef.current,jobId}),{removeJobId:jobId})
     }
   }

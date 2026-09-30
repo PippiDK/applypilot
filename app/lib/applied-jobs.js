@@ -1,3 +1,4 @@
+import {isApplicationStatus} from './job-statuses.js'
 export const APPLIED_JOBS_STORAGE_KEY='applypilot-applied-jobs-v1'
 
 const text=value=>String(value??'').trim()
@@ -17,6 +18,7 @@ function normalizeEntry(value){
     publishedAt:text(value.publishedAt)||null,
     appliedAt:text(value.appliedAt)||null,
     relevanceScore:Number.isFinite(relevanceScore)?relevanceScore:null,
+    applicationStatus:isApplicationStatus(value.applicationStatus)?value.applicationStatus:'applied',
   }
 }
 
@@ -39,7 +41,7 @@ export function readAppliedJobs(storage){
   catch{return []}
 }
 
-export function archiveAppliedJob({archive=[],job,evaluation,appliedAt}={}){
+export function archiveAppliedJob({archive=[],job,evaluation,appliedAt,applicationStatus='applied'}={}){
   const jobId=text(job?.sourceJobId||job?.jobId)
   if(!jobId) return normalizeAppliedJobs(archive)
   const previous=normalizeAppliedJobs(archive)
@@ -54,6 +56,7 @@ export function archiveAppliedJob({archive=[],job,evaluation,appliedAt}={}){
     publishedAt:job?.publishedAt||existing?.publishedAt,
     appliedAt:existing?.appliedAt||appliedAt||new Date().toISOString(),
     relevanceScore:evaluation?.score??existing?.relevanceScore,
+    applicationStatus:isApplicationStatus(applicationStatus)?applicationStatus:(existing?.applicationStatus||'applied'),
   })
   return normalizeAppliedJobs([entry,...previous.filter(item=>item.jobId!==jobId)])
 }
@@ -62,8 +65,9 @@ export function syncAppliedArchive({archive=[],items=[],statuses={}}={}){
   let next=normalizeAppliedJobs(archive)
   for(const item of Array.isArray(items)?items:[]){
     const jobId=text(item?.job?.sourceJobId)
-    if(jobId&&statuses?.[jobId]==='applied'){
-      next=archiveAppliedJob({archive:next,job:item.job,evaluation:item.evaluation})
+    const applicationStatus=jobId?statuses?.[jobId]:''
+    if(jobId&&isApplicationStatus(applicationStatus)){
+      next=archiveAppliedJob({archive:next,job:item.job,evaluation:item.evaluation,applicationStatus})
     }
   }
   return next

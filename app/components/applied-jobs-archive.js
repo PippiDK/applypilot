@@ -6,6 +6,10 @@ function appliedDate(value){
   return Number.isFinite(date.getTime())?date.toLocaleDateString('en-DK'):'Date unavailable'
 }
 
+function applicationStatusLabel(value){
+  return value==='interview'?'INTERVIEW':'APPLIED'
+}
+
 export default function AppliedJobsArchive({jobs=[],error='',open,onOpen,onClose}){
   return <>
     <button className="appliedArchiveTab" onClick={onOpen} aria-label="Open applied jobs archive">
@@ -24,9 +28,12 @@ export default function AppliedJobsArchive({jobs=[],error='',open,onOpen,onClose
               <div><b>{item.title}</b><span>{item.company}{item.location?' · '+item.location:''}</span></div>
               {item.relevanceScore!=null&&<strong>{Math.round(item.relevanceScore*10)}%</strong>}
             </div>
-            <small>Applied {appliedDate(item.appliedAt)}</small>
+            <div className="appliedArchiveLifecycle">
+              <span className={`applicationStatusBadge applicationStatus-${item.applicationStatus||'applied'}`}>{applicationStatusLabel(item.applicationStatus)}</span>
+              <small>Applied {appliedDate(item.appliedAt)}</small>
+            </div>
             {item.originalUrl&&<a className="secondary openLink appliedArchiveLink" href={item.originalUrl} target="_blank" rel="noreferrer">Open vacancy</a>}
-          </article>):<div className="empty">No saved applications yet. Mark a vacancy APPLIED and it will stay here.</div>}
+          </article>):<div className="empty">No saved applications yet. Mark a vacancy APPLIED or INTERVIEW and it will stay here.</div>}
         </div>
       </aside>
     </div>}
