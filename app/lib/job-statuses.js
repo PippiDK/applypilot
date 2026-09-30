@@ -4,11 +4,12 @@ export const JOB_STATUS_OPTIONS=[
   {value:'',label:'STATUS'},
   {value:'applied',label:'APPLIED'},
   {value:'interview',label:'INTERVIEW'},
+  {value:'rejected',label:'REJECTED'},
   {value:'considering',label:'CONSIDERING'},
   {value:'ignore',label:'IGNORE'}
 ]
 
-export const APPLICATION_STATUSES=new Set(['applied','interview'])
+export const APPLICATION_STATUSES=new Set(['applied','interview','rejected'])
 export const isApplicationStatus=status=>APPLICATION_STATUSES.has(String(status??'').trim())
 
 const VALID=new Set(JOB_STATUS_OPTIONS.map(option=>option.value).filter(Boolean))

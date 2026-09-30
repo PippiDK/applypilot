@@ -43,3 +43,11 @@ test('Interview overrides derived Night Flight exactly like other manual statuse
   const {resolveJobStatus}=await load()
   assert.equal(resolveJobStatus({manualStatus:'interview',job:{nightFlight:{processed:true}}}),'interview')
 })
+
+
+test('Rejected is an application lifecycle status and overrides derived Night Flight',async()=>{
+  const {JOB_STATUS_OPTIONS,isApplicationStatus,resolveJobStatus}=await load()
+  assert.equal(JOB_STATUS_OPTIONS.some(option=>option.value==='rejected'&&option.label==='REJECTED'),true)
+  assert.equal(isApplicationStatus('rejected'),true)
+  assert.equal(resolveJobStatus({manualStatus:'rejected',job:{nightFlight:{processed:true}}}),'rejected')
+})
