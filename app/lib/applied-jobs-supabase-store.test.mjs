@@ -51,6 +51,7 @@ test('upserts existing applied archive without deleting or expiring entries',asy
       publishedAt:'2026-09-01',
       appliedAt:'2026-09-03T10:00:00.000Z',
       relevanceScore:9.1,
+      applicationStatus:'interview',
     }]
   })
 
@@ -59,6 +60,7 @@ test('upserts existing applied archive without deleting or expiring entries',asy
   assert.equal(calls.upsert.payload[0].user_id,userId)
   assert.equal(calls.upsert.payload[0].job_id,'123')
   assert.equal(calls.upsert.payload[0].applied_at,'2026-09-03T10:00:00.000Z')
+  assert.equal(calls.upsert.payload[0].application_status,'interview')
 })
 
 test('loads Supabase rows in the existing Applied History shape',async()=>{
@@ -73,6 +75,7 @@ test('loads Supabase rows in the existing Applied History shape',async()=>{
     published_at:'2026-09-01',
     applied_at:'2026-09-03T10:00:00.000Z',
     relevance_score:9.1,
+    application_status:'interview',
   }]})
 
   const jobs=await loadAppliedJobsFromSupabase({supabase:client,userId})
@@ -86,5 +89,6 @@ test('loads Supabase rows in the existing Applied History shape',async()=>{
     publishedAt:'2026-09-01',
     appliedAt:'2026-09-03T10:00:00.000Z',
     relevanceScore:9.1,
+    applicationStatus:'interview',
   }])
 })
