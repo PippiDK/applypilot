@@ -266,6 +266,7 @@ test('Night Flight processes no more than the per-invocation job limit and leave
   assert.equal(supabase.state.jobs.find(row=>row.job_key==='ready').attempts,0)
   assert.equal(supabase.state.jobs.find(row=>row.job_key==='three').status,'QUEUED')
   assert.equal(result.status,'RUNNING')
+  assert.equal(result.jobsProcessedThisInvocation,2)
 })
 
 test('Task 6 finalizes READY when all in-scope persisted jobs are complete',async()=>{
