@@ -17,3 +17,11 @@ test('Interview UI is lifecycle-only and does not alter Night Flight matching co
   assert.match(archive,/applicationStatusBadge/)
   assert.match(archive,/INTERVIEW/)
 })
+
+
+test('Interview status uses the dedicated pink lifecycle treatment',()=>{
+  const globals=readFileSync(new URL('../globals.css',import.meta.url),'utf8')
+  const polish=readFileSync(new URL('../ux-polish.css',import.meta.url),'utf8')
+  assert.match(globals,/\.jobStatusSelect\.status-interview\{[^}]*border-color:#be185d;[^}]*color:#f9a8d4;[^}]*background:#2a1220/i)
+  assert.match(polish,/\.applicationStatus-interview\{[^}]*border:1px solid #be185d;[^}]*color:#f9a8d4;[^}]*background:#2a1220/i)
+})
