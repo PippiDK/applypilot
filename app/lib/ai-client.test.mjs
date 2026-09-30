@@ -173,3 +173,87 @@ test('production AI path classifies max-output-token incomplete responses safely
     else process.env.OPENAI_API_KEY=previousKey
   }
 })
+
+
+test('production AI path classifies a temporary 429 and preserves Retry-After safely',async()=>{
+  const {callStructuredAi}=await load()
+  const previousKey=process.env.OPENAI_API_KEY
+  const previousFetch=globalThis.fetch
+  process.env.OPENAI_API_KEY='sk-test-not-real'
+  globalThis.fetch=async()=>({
+    ok:false,status:429,
+    headers:{get:name=>String(name).toLowerCase()==='retry-after'?'2':null},
+    json:async()=>({error:{code:'rate_limit_exceeded',type:'rate_limit_error',message:'PRIVATE PROVIDER DETAIL'}}),
+  })
+  try{
+    await assert.rejects(
+      ()=>callStructuredAi({stage:'expertise_match_one_pass',instructions:'Analyze.',input:{jd:'PRIVATE-JD-CONTENT'},schema}),
+      error=>{
+        assert.equal(error.code,'AI_PROVIDER_HTTP_429')
+        assert.equal(error.provider429Kind,'rate_limit')
+        assert.equal(error.retryAfterMs,2000)
+        assert.doesNotMatch(error.message,/PRIVATE/)
+        return true
+      }
+    )
+  }finally{
+    globalThis.fetch=previousFetch
+    if(previousKey===undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY=previousKey
+  }
+})
+
+test('production AI path classifies quota 429 separately without leaking billing detail',async()=>{
+  const {callStructuredAi}=await load()
+  const previousKey=process.env.OPENAI_API_KEY
+  const previousFetch=globalThis.fetch
+  process.env.OPENAI_API_KEY='sk-test-not-real'
+  globalThis.fetch=async()=>({
+    ok:false,status:429,
+    headers:{get:()=>null},
+    json:async()=>({error:{code:'credit_balance_exhausted',type:'insufficient_quota',message:'PRIVATE BILLING DETAIL'}}),
+  })
+  try{
+    await assert.rejects(
+      ()=>callStructuredAi({stage:'expertise_match_one_pass',instructions:'Analyze.',input:{jd:'PRIVATE-JD-CONTENT'},schema}),
+      error=>{
+        assert.equal(error.code,'AI_PROVIDER_HTTP_429')
+        assert.equal(error.provider429Kind,'quota')
+        assert.equal(error.retryAfterMs,undefined)
+        assert.doesNotMatch(error.message,/PRIVATE|BILLING/)
+        return true
+      }
+    )
+  }finally{
+    globalThis.fetch=previousFetch
+    if(previousKey===undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY=previousKey
+  }
+})
+
+test('production AI path uses rate-limit reset headers when Retry-After is absent',async()=>{
+  const {callStructuredAi}=await load()
+  const previousKey=process.env.OPENAI_API_KEY
+  const previousFetch=globalThis.fetch
+  process.env.OPENAI_API_KEY='sk-test-not-real'
+  globalThis.fetch=async()=>({
+    ok:false,status:429,
+    headers:{get:name=>{
+      const key=String(name).toLowerCase()
+      if(key==='x-ratelimit-reset-requests') return '1.5s'
+      if(key==='x-ratelimit-reset-tokens') return '2s'
+      return null
+    }},
+    json:async()=>({error:{code:'rate_limit_exceeded',type:'rate_limit_error'}}),
+  })
+  try{
+    await assert.rejects(
+      ()=>callStructuredAi({stage:'expertise_match_one_pass',instructions:'Analyze.',input:{jd:'safe'},schema}),
+      error=>{assert.equal(error.retryAfterMs,2000);return true}
+    )
+  }finally{
+    globalThis.fetch=previousFetch
+    if(previousKey===undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY=previousKey
+  }
+})

@@ -63,7 +63,7 @@ export default function NightFlightControl(){
   return <main style={frame}>
     <p><Link href="/" style={{color:'#f9a8d4'}}>← ApplyPilot</Link></p>
     <h1>Night Flight · Manual Control</h1>
-    <p style={muted}>Run at any time. Start uses the previous Copenhagen calendar day; Resume and Retry use an existing frozen run. Each invocation processes at most three jobs. READY results are preserved.</p>
+    <p style={muted}>Run at any time. Start uses the previous Copenhagen calendar day; Resume and Retry use an existing frozen run. Each invocation processes as many queued jobs as fit safely within its time budget. READY results are preserved.</p>
     <div style={panel}>
       <button style={button} disabled={busy} onClick={()=>execute('start')}>Start / resume yesterday</button>
       <button style={button} disabled={busy} onClick={refresh}>Refresh status</button>

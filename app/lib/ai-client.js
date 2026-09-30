@@ -1,3 +1,43 @@
+const QUOTA_429_CODES=new Set(['credit_balance_exhausted','organization_usage_limit_exceeded','organization_spend_limit_exceeded','project_spend_limit_exceeded','insufficient_quota'])
+
+const cleanProviderValue=value=>String(value??'').trim().toLowerCase()
+
+function retryAfterMs(response){
+  const header=name=>response?.headers&&typeof response.headers.get==='function'?response.headers.get(name):null
+  const retry=String(header('retry-after')??'').trim()
+  if(retry){
+    const seconds=Number(retry)
+    if(Number.isFinite(seconds)&&seconds>=0) return Math.round(seconds*1000)
+    const at=Date.parse(retry)
+    if(Number.isFinite(at)) return Math.max(0,at-Date.now())
+  }
+  const parseReset=value=>{
+    const raw=String(value??'').trim().toLowerCase()
+    if(!raw) return null
+    if(/^\d+(?:\.\d+)?$/.test(raw)) return Math.round(Number(raw)*1000)
+    let total=0,matched=false
+    for(const part of raw.matchAll(/(\d+(?:\.\d+)?)(ms|s|m|h)/g)){
+      const amount=Number(part[1]),unit=part[2]
+      if(!Number.isFinite(amount)) continue
+      matched=true
+      total+=amount*(unit==='ms'?1:unit==='s'?1000:unit==='m'?60000:3600000)
+    }
+    return matched?Math.round(total):null
+  }
+  const resets=[parseReset(header('x-ratelimit-reset-requests')),parseReset(header('x-ratelimit-reset-tokens'))]
+    .filter(value=>Number.isFinite(value)&&value>=0)
+  return resets.length?Math.max(...resets):null
+}
+
+function classify429(response,data){
+  const code=cleanProviderValue(data?.error?.code)
+  const type=cleanProviderValue(data?.error?.type)
+  return {
+    kind:QUOTA_429_CODES.has(code)||type==='insufficient_quota'?'quota':'rate_limit',
+    retryAfterMs:retryAfterMs(response),
+  }
+}
+
 function outputTextFromResponse(data){
   if(typeof data?.output_text==='string'&&data.output_text.trim()) return data.output_text.trim()
   for(const item of data?.output||[]){
@@ -38,8 +78,18 @@ async function productionModelCall({stage,instructions,input,schema,maxOutputTok
     throw networkError
   }
   if(!response.ok){
+    let provider429=null
+    if(response.status===429){
+      let data=null
+      try{data=await response.json()}catch{}
+      provider429=classify429(response,data)
+    }
     const error=new Error(`OpenAI request failed with status ${response.status}.`)
     error.code=`AI_PROVIDER_HTTP_${response.status}`
+    if(provider429){
+      error.provider429Kind=provider429.kind
+      if(Number.isFinite(provider429.retryAfterMs)) error.retryAfterMs=provider429.retryAfterMs
+    }
     throw error
   }
   const data=await response.json()
@@ -63,6 +113,11 @@ export async function callStructuredAi({stage,instructions,input,schema,modelCal
   }catch(error){
     const safeError=new Error(`${safeStage} AI stage failed.`)
     if(typeof error?.code==='string'&&/^AI_[A-Z0-9_]+$/.test(error.code)) safeError.code=error.code
+    if(safeError.code==='AI_PROVIDER_HTTP_429'){
+      if(error?.provider429Kind==='quota'||error?.provider429Kind==='rate_limit') safeError.provider429Kind=error.provider429Kind
+      const wait=Number(error?.retryAfterMs)
+      if(Number.isFinite(wait)&&wait>=0) safeError.retryAfterMs=Math.min(wait,10*60*1000)
+    }
     throw safeError
   }
 }
