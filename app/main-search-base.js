@@ -306,6 +306,29 @@ export default function Home(){
     }
   }
 
+  function changeAppliedArchiveStatus(jobId,status){
+    if(!isApplicationStatus(status)) return
+    const existing=appliedJobsRef.current.find(job=>job.jobId===jobId)
+    if(!existing) return
+    const nextStatuses=writeJobStatus({storage:localStorage,statuses:jobStatusesRef.current,jobId,status})
+    jobStatusesRef.current=nextStatuses
+    setJobStatuses(nextStatuses)
+    persistAppliedArchive(archiveAppliedJob({
+      archive:appliedJobsRef.current,
+      job:{
+        sourceJobId:existing.jobId,
+        title:existing.title,
+        company:existing.company,
+        location:existing.location,
+        source:existing.source,
+        originalUrl:existing.originalUrl,
+        publishedAt:existing.publishedAt,
+      },
+      appliedAt:existing.appliedAt,
+      applicationStatus:status,
+    }))
+  }
+
   function toggleJobFilter(setter,id){
     setter(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id])
   }
@@ -858,7 +881,7 @@ export default function Home(){
       <ShadowSearchAudit shadowState={shadowState}/>
     </section>}
 
-    <AppliedJobsArchive jobs={appliedJobs} error={appliedSaveError} open={appliedArchiveOpen} onOpen={()=>setAppliedArchiveOpen(true)} onClose={()=>setAppliedArchiveOpen(false)}/>
+    <AppliedJobsArchive jobs={appliedJobs} error={appliedSaveError} open={appliedArchiveOpen} onOpen={()=>setAppliedArchiveOpen(true)} onClose={()=>setAppliedArchiveOpen(false)} onStatusChange={changeAppliedArchiveStatus}/>
 
     <footer>TEST · LinkedIn + Jobindex + Jobnet multi-source search</footer>
 
