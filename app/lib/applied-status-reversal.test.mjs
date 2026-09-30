@@ -52,10 +52,12 @@ test('client DELETE submits only job identity and honors returned canonical arch
   assert.deepEqual(result.map(job=>job.jobId),['a','c'])
 })
 
-test('status change removes the job from both the local view and durable archive, without editing other statuses',()=>{
+test('non-application status removes the job while Applied and Interview stay in durable history',()=>{
   const main=readFileSync(new URL('../main-search-base.js',import.meta.url),'utf8')
   const route=readFileSync(new URL('../api/applied-jobs/route.js',import.meta.url),'utf8')
-  assert.match(main,/status!=='applied'\s*&&\s*appliedJobsRef\.current\.some\(/)
+  assert.match(main,/isApplicationStatus\(status\)\s*&&\s*item/)
+  assert.match(main,/!isApplicationStatus\(status\)\s*&&\s*appliedJobsRef\.current\.some\(/)
+  assert.match(main,/applicationStatus:status/)
   assert.match(main,/removeAppliedJob\(\{archive:appliedJobsRef\.current,jobId\}\)/)
   assert.match(main,/deleteAppliedJob\(removeJobId\)/)
   assert.match(main,/archiveWriteQueue\.current\.then\(/)
