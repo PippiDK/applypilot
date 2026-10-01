@@ -867,6 +867,7 @@ export default function Home(){
         <h1>Find the right roles for your Search Profile in Denmark.</h1>
         <p>ApplyPilot searches across trusted job sources and company career sites to show your best opportunities.</p>
         <div className={`clientHeroReady ${resumeLoaded?'isReady':'isEmpty'}`}><span className="clientHeroReadyIcon">{resumeLoaded?'✓':'!'}</span>{resumeLoaded?'Profile Ready':'Profile Empty'}</div>
+        <div className="clientHeroFamily">AUVRAEN FAMILY PRODUCT</div>
       </div>
       <div className="metric clientHeroMetric"><b>{state.loading?<span className="matchesLoadingDots" aria-label="Searching"><i></i><i></i><i></i></span>:jobs.length}</b><span>matches</span></div>
     </section>
