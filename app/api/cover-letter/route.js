@@ -41,7 +41,8 @@ export async function POST(request){
       .filter(item=>item.blockId&&item.text)
       .slice(0,3):[]
 
-    const result=await writeCoverLetter({job,sourceCv,finalCvBlocks})
+    const languageMode=text(body?.languageMode)==='english'?'english':'same_as_job'
+    const result=await writeCoverLetter({job,sourceCv,finalCvBlocks,languageMode})
     if(!result.letter) return NextResponse.json({error:'Cover letter generation returned no usable text.'},{status:502})
     return NextResponse.json(result)
   }catch(error){
