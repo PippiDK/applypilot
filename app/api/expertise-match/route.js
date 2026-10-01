@@ -2,8 +2,7 @@ import {NextResponse} from 'next/server'
 import {analyzeExpertiseMatch} from '../../lib/expertise-service.js'
 import {resolveManualExpertiseMatch} from '../../lib/expertise-match-server-cache.js'
 import {loadLatestNightFlightProfileState} from '../../lib/night-flight-profile-store.js'
-import {requireUser} from '../../lib/auth/require-user.js'
-import {createServerSupabaseClient} from '../../lib/supabase/server.js'
+import {resolveNightFlightRequestContext} from '../../lib/night-flight-preview-context.js'
 
 export const dynamic='force-dynamic'
 const text=value=>String(value??'').trim()
@@ -19,7 +18,7 @@ function safeExpertiseError(error){
 }
 
 export async function POST(request){
-  const auth=await requireUser()
+  const {auth,supabase}=await resolveNightFlightRequestContext()
   if(!auth.user) return auth.response
 
   try{
@@ -35,7 +34,6 @@ export async function POST(request){
     }
     const cvText=text(body?.cvText)
     const cvSourceVersion=text(body?.cvSourceVersion)
-    const supabase=await createServerSupabaseClient()
     const profileState=await loadLatestNightFlightProfileState({supabase,userId:auth.user.id})
     const result=await resolveManualExpertiseMatch({
       supabase,
