@@ -2,7 +2,7 @@ import {NextResponse} from 'next/server'
 import {createServerSupabaseClient} from '../supabase/server.js'
 import {getUserRole} from './route-policy.js'
 
-const PREVIEW_USER_ID='00000000-0000-4000-8000-000000000001'
+const PREVIEW_USER_ID='14141414-1414-4141-8141-141414141414'
 
 export async function requireUser(){
   if(process.env.VERCEL_ENV==='preview'){
