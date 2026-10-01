@@ -462,3 +462,35 @@ footer{padding-top:36px;color:#566271}
     padding:9px 12px;
   }
 }
+
+
+/* AUVRAEN family signature · TEST */
+.clientHeroFamily{
+  position:absolute;
+  left:40px;
+  bottom:18px;
+  z-index:4;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  color:#f3a4ca;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  opacity:.92;
+}
+.clientHeroFamily:before{
+  content:'';
+  width:18px;
+  height:1px;
+  background:linear-gradient(90deg,#f779b5,rgba(247,121,181,.16));
+  box-shadow:0 0 10px rgba(247,121,181,.18);
+}
+@media(max-width:780px){
+  .clientHeroFamily{
+    position:static;
+    margin-top:16px;
+    font-size:9px;
+  }
+}
