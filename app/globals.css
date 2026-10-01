@@ -96,7 +96,9 @@
 
 /* CV Update Review — keep UPDATED editor visually equal to the ORIGINAL comparison box. */
 .updatedBox{display:flex;flex-direction:column}
-.updatedTextEditor{flex:1;min-height:0;height:100%;resize:none;overflow-y:auto;box-sizing:border-box}
+.updatedTextEditor{flex:1;min-height:0;height:100%;resize:none;overflow-y:auto;box-sizing:border-box;border:0;background:transparent;border-radius:0;padding:0;margin-top:8px;line-height:1.5}
+.updatedTextEditor:focus{border:0;outline:none}
+.updatedBox:focus-within{border-color:#58cfa2;box-shadow:0 0 0 1px rgba(88,207,162,.14) inset}
 
 
 /* Cover Letter MVP — TEST */
