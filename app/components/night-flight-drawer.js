@@ -15,18 +15,18 @@ export default function NightFlightDrawer({children}){
   },[open])
 
   return <>
-    <button type="button" className={styles.tab} onClick={()=>setOpen(true)} aria-label="Open Night Flight" aria-expanded={open}>
-      <span>NIGHT FLIGHT</span>
+    <button type="button" className={styles.tab} onClick={()=>setOpen(true)} aria-label="Open Night Pilot" aria-expanded={open}>
+      <span>NIGHT PILOT</span>
     </button>
     <div className={`${styles.backdrop} ${open?styles.visible:''}`} aria-hidden={!open} onMouseDown={event=>{if(event.target===event.currentTarget)setOpen(false)}}>
-      <aside className={styles.drawer} aria-label="Night Flight">
+      <aside className={styles.drawer} aria-label="Night Pilot">
         <div className={styles.heading}>
-          <div><p className={styles.eyebrow}>NIGHT FLIGHT</p><h2>Night Flight</h2></div>
-          <button type="button" className={styles.close} aria-label="Close Night Flight" onClick={()=>setOpen(false)}>×</button>
+          <div><p className={styles.eyebrow}>NIGHT PILOT</p><h2>Night Pilot</h2></div>
+          <button type="button" className={styles.close} aria-label="Close Night Pilot" onClick={()=>setOpen(false)}>×</button>
         </div>
         <section className={styles.section}>
           <div className={styles.sectionHeading}>
-            <div><h3>Automation</h3><p>Run Night Flight automatically using your saved Search Profile.</p></div>
+            <div><h3>Automation</h3><p>Run Night Pilot automatically using your saved Search Profile.</p></div>
             <div id="nightFlightSettingsHost" className={styles.settingsHost}/>
           </div>
         </section>
