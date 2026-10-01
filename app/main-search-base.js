@@ -759,9 +759,22 @@ export default function Home(){
   return <main>
     <header><div><div className="brand">ApplyPilot</div><div className="tag">Search less. Apply better.</div></div><div className="headerActions"><div className={`sourceBadge profileStatus ${resumeLoaded?'statusReady':'statusEmpty'}`}>{resumeLoaded?'Profile ready':'Profile empty'}</div><div className="sourceBadge">MULTI-SOURCE + COMPANY WATCH · TEST</div></div></header>
 
-    <section className="hero">
-      <div><p className="eyebrow">MULTI-SOURCE · END-TO-END</p><h1>Find the right roles for your Search Profile in Denmark.</h1><p>Search Profile → selected sources → full job description → worthwhile matches only.</p></div>
-      <div className="metric"><b>{state.loading?'…':jobs.length}</b><span>matches</span></div>
+    <section className="hero clientHero">
+      <div className="clientHeroCopy">
+        <p className="eyebrow clientHeroEyebrow">FIND OPPORTUNITIES</p>
+        <h1>Find the right roles for your profile.</h1>
+        <p>ApplyPilot searches across trusted job sources and company career sites to show your best opportunities.</p>
+        <div className={`clientHeroReady ${resumeLoaded?'isReady':'isEmpty'}`}><span className="clientHeroReadyIcon">{resumeLoaded?'✓':'!'}</span>{resumeLoaded?'Profile Ready':'Profile Empty'}</div>
+      </div>
+      <div className="clientHeroVisual" aria-hidden="true">
+        <div className="clientHeroWave"></div>
+        <div className="clientHeroSpark clientHeroSparkOne"></div>
+        <div className="clientHeroSpark clientHeroSparkTwo"></div>
+        <div className="clientHeroCard clientHeroCardBack"><span></span><i></i><i></i></div>
+        <div className="clientHeroCard clientHeroCardMid"><span></span><i></i><i></i></div>
+        <div className="clientHeroCard clientHeroCardFront"><span></span><i></i><i></i><i></i></div>
+        <div className="clientHeroLens"><div></div></div>
+      </div>
     </section>
 
     <div className="profileStrip"><span className="profileSearchSummary">{profileSearchPlanSummary}</span><button className="profileEditButton" onClick={startProfile}>{profileReady?'Edit profile':'Search profile'}</button><button className="cvButton" onClick={startProfile}>{cvReadyCount?`✓ CVs ${cvReadyCount}/${MAX_CVS}`:'Upload CVs'}</button></div>
