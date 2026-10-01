@@ -3,7 +3,7 @@ const DAY_MS=86400000
 
 export const FRESHNESS_OPTIONS=[
   {id:'today',label:'1 Day',requestDays:1},
-  {id:'yesterday',label:'Previous Day',requestDays:3},
+  {id:'yesterday',label:'3 Days',requestDays:3},
   {id:'5d',label:'5 Days',requestDays:5},
   {id:'10d',label:'10 Days',requestDays:10},
 ]
@@ -48,7 +48,7 @@ export function freshnessSelectionFromDays(days){
 
 export function freshnessResultLabel(selection){
   if(selection==='today') return '1 Day'
-  if(selection==='yesterday') return 'Previous Day'
+  if(selection==='yesterday') return 'Newest 3 Days'
   if(selection==='10d') return 'Newest 10 Days'
   return 'Newest 5 Days'
 }
@@ -65,15 +65,7 @@ export function filterItemsByFreshnessSelection(items=[],selection='5d',now=new 
     })
   }
 
-  if(selection==='yesterday'){
-    const target=previousCopenhagenDateKey(current)
-    return (Array.isArray(items)?items:[]).filter(item=>{
-      const published=publishedDate(item)
-      return published&&copenhagenDateKey(published)===target
-    })
-  }
-
-  const horizonDays=selection==='10d'?10:5
+  const horizonDays=selection==='yesterday'?3:selection==='10d'?10:5
   const maxAge=horizonDays*DAY_MS
   return (Array.isArray(items)?items:[]).filter(item=>{
     const published=publishedDate(item)
