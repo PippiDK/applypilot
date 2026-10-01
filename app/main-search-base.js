@@ -933,7 +933,12 @@ export default function Home(){
           </div>
 
 
-          <div className="section"><h3>Application pack</h3><div className="docs"><div>{pack.cvReady?'✓':'○'} Tailored CV <span className={pack.cvReady?'ready':'pending'}>{pack.tailoredCvLabel}</span></div><div className="coverLetterPackItem"><span>{coverLetterReady?'✓':'○'} Cover letter</span><span className={coverLetterReady?'ready':'pending'}>{coverLetterReady?'Ready':currentCoverLetter?'Review needed':allReviewDecisionsMade?'Ready to generate':'Complete CV review first'}</span>{allReviewDecisionsMade&&<button className="coverLetterPackAction" onClick={()=>generateCoverLetter()} disabled={coverLetterRun.loading}>{coverLetterRun.loading?'Generating…':currentCoverLetter?'View':'Generate'}</button>}</div></div></div>
+          <div className="section coverLetterSection">
+            <div className="coverLetterSectionHead"><div><p className="eyebrow">COVER LETTER</p><h3>{currentCoverLetter?'Review your tailored cover letter':'Create your tailored cover letter'}</h3><p>{allReviewDecisionsMade?'Built from the Full JD, selected CV and your reviewed CV update.':'Complete the CV update first so the cover letter uses your final application positioning.'}</p></div><span className={coverLetterReady?'ready coverLetterSectionStatus':'pending coverLetterSectionStatus'}>{coverLetterReady?'Ready':currentCoverLetter?'Review needed':allReviewDecisionsMade?'Ready to generate':'CV update required'}</span></div>
+            <button className="primary coverLetterSectionAction" onClick={()=>generateCoverLetter()} disabled={!allReviewDecisionsMade||coverLetterRun.loading}>{coverLetterRun.loading?'Generating cover letter…':currentCoverLetter?'View cover letter':'Generate cover letter'}</button>
+          </div>
+
+          <div className="section"><h3>Application pack</h3><div className="docs"><div>{allReviewDecisionsMade?'✓':'○'} Tailored CV <span className={allReviewDecisionsMade?'ready':'pending'}>{allReviewDecisionsMade?'Ready':currentAdaptationResult?'Review needed':'Not generated yet'}</span></div><div><span>{coverLetterReady?'✓':'○'} Cover letter</span><span className={coverLetterReady?'ready':'pending'}>{coverLetterReady?'Ready':allReviewDecisionsMade?'Not generated yet':'Complete CV update first'}</span></div></div></div>
         </>})():<div className="emptyPanel"><h2>No selected vacancy</h2><p>{state.loading?'Searching for matching vacancies…':'Run search to see matching vacancies.'}</p></div>}
       </div>
     </section>
