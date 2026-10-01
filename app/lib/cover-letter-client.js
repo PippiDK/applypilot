@@ -1,6 +1,6 @@
 const text=value=>String(value??'').trim()
 
-export async function requestCoverLetter({baseline,job,finalCvBlocks=[],fetchImpl=fetch}={}){
+export async function requestCoverLetter({baseline,job,finalCvBlocks=[],languageMode='same_as_job',fetchImpl=fetch}={}){
   if(!baseline?.cvId||!baseline?.sourceVersion||!text(baseline?.cvText)) throw new Error('A complete selected CV is required for the cover letter.')
   const response=await fetchImpl('/api/cover-letter',{
     method:'POST',
@@ -19,7 +19,8 @@ export async function requestCoverLetter({baseline,job,finalCvBlocks=[],fetchImp
         fileName:text(baseline.fileName),
         cvText:String(baseline.cvText||'')
       },
-      finalCvBlocks:Array.isArray(finalCvBlocks)?finalCvBlocks:[]
+      finalCvBlocks:Array.isArray(finalCvBlocks)?finalCvBlocks:[],
+      languageMode:languageMode==='english'?'english':'same_as_job'
     })
   })
   const data=await response.json()
