@@ -504,32 +504,48 @@ export default function Home(){
       return {source:'consultant_portal',data}
     })())
 
-    const settled=await Promise.allSettled(tasks)
-    const successful=settled.filter(item=>item.status==='fulfilled').map(item=>item.value)
-    const failed=settled.filter(item=>item.status==='rejected')
-    if(!successful.length) throw failed[0]?.reason||new Error('Search failed')
+    const successful=[]
+    const failed=[]
+    const sourceLabel=[...selectedSources,...(activeCompanySites.length?['company-sites']:[]),...(activeConsultantPortals.length?['consultant-portals']:[])].join('+')
 
-    const mergedJobs=mergeSourceItems(successful.map(result=>Array.isArray(result.data.jobs)?result.data.jobs:[]))
-    setJobs(mergedJobs)
+    function progressiveSnapshot({done=false}={}){
+      const mergedJobs=mergeSourceItems(successful.map(result=>Array.isArray(result.data.jobs)?result.data.jobs:[]))
+      const stats={
+        masterPoolSize:successful.reduce((sum,result)=>sum+Number(result.data.stats?.masterPoolSize??result.data.stats?.discovered??0),0),
+        fullJdVerified:successful.reduce((sum,result)=>sum+Number(result.data.stats?.fullJdVerified??0),0),
+        returned:mergedJobs.length,
+      }
+      const audit=successful.flatMap(result=>(Array.isArray(result.data.audit)?result.data.audit:[]).map(row=>({...row,source:result.source})))
+      const limited=failed.length>0||successful.some(result=>result.data.coverage?.status==='ACCESS LIMITED')
+      setJobs(mergedJobs)
+      setState({
+        loading:!done,
+        error:'',
+        coverage:{source:sourceLabel,freshnessDays,status:limited?'ACCESS LIMITED':mergedJobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:failed[0]?.message||null},
+        stats,
+        fetchedAt:done?new Date().toISOString():null,
+        audit,
+      })
+      return mergedJobs
+    }
+
+    const progressiveTasks=tasks.map(task=>task.then(result=>{
+      successful.push(result)
+      progressiveSnapshot()
+      return result
+    }).catch(error=>{
+      failed.push(error)
+      progressiveSnapshot()
+      throw error
+    }))
+
+    await Promise.allSettled(progressiveTasks)
+    if(!successful.length) throw failed[0]||new Error('Search failed')
+
+    const mergedJobs=progressiveSnapshot({done:true})
     const nextAppliedJobs=syncAppliedArchive({archive:appliedJobsRef.current,items:mergedJobs,statuses:jobStatusesRef.current})
     if(JSON.stringify(nextAppliedJobs)!==JSON.stringify(appliedJobsRef.current)) persistAppliedArchive(nextAppliedJobs)
     else setAppliedJobs(nextAppliedJobs)
-
-    const stats={
-      masterPoolSize:successful.reduce((sum,result)=>sum+Number(result.data.stats?.masterPoolSize??result.data.stats?.discovered??0),0),
-      fullJdVerified:successful.reduce((sum,result)=>sum+Number(result.data.stats?.fullJdVerified??0),0),
-      returned:mergedJobs.length,
-    }
-    const audit=successful.flatMap(result=>(Array.isArray(result.data.audit)?result.data.audit:[]).map(row=>({...row,source:result.source})))
-    const limited=failed.length>0||successful.some(result=>result.data.coverage?.status==='ACCESS LIMITED')
-    setState({
-      loading:false,
-      error:'',
-      coverage:{source:[...selectedSources,...(activeCompanySites.length?['company-sites']:[]),...(activeConsultantPortals.length?['consultant-portals']:[])].join('+'),freshnessDays,status:limited?'ACCESS LIMITED':mergedJobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:failed[0]?.reason?.message||null},
-      stats,
-      fetchedAt:new Date().toISOString(),
-      audit,
-    })
   }catch(error){ setState({loading:false,error:error.message||'Search failed',coverage:null,stats:null,fetchedAt:null,audit:[]}) }
 }
   function startProfile(){
