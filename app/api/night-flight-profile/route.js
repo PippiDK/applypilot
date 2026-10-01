@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server'
-import { requireUser } from '../../lib/auth/require-user.js'
-import { createServerSupabaseClient } from '../../lib/supabase/server.js'
+import { resolveNightFlightRequestContext } from '../../lib/night-flight-preview-context.js'
 import { syncNightFlightProfileSave } from '../../lib/night-flight-profile-sync.js'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request) {
-  const auth = await requireUser()
+  const {auth,supabase} = await resolveNightFlightRequestContext()
   if (!auth.user) return auth.response
 
   try {
     const body = await request.json()
-    const supabase = await createServerSupabaseClient()
     const persisted = await syncNightFlightProfileSave({
       supabase,
       userId: auth.user.id,
