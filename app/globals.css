@@ -93,3 +93,7 @@
   .clientHero h1{font-size:32px}
   .clientHeroVisual{display:none}
 }
+
+/* CV Update Review — keep UPDATED editor visually equal to the ORIGINAL comparison box. */
+.updatedBox{display:flex;flex-direction:column}
+.updatedTextEditor{flex:1;min-height:0;height:100%;resize:none;overflow-y:auto;box-sizing:border-box}
