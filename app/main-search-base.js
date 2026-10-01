@@ -36,7 +36,7 @@ import SearchPlanPreview from './components/search-plan-preview.js'
 import BestCvPanel from './components/best-cv-panel.js'
 import filterStyles from './components/job-filters.module.css'
 
-const WINDOWS=[{days:1,label:'1 Day'},{days:3,label:'Previous Day'},{days:5,label:'5 Days'},{days:10,label:'10 Days'}]
+const WINDOWS=[{days:1,label:'1 Day'},{days:3,label:'3 Days'},{days:5,label:'5 Days'},{days:10,label:'10 Days'}]
 const EMPTY_SEARCH_PROFILE={...DEFAULT_PROFILE,exclusions:''}
 const EMPTY_ROLE_STATE={status:'idle',error:'',source:'',totalCount:0,analysedCount:0,failedCvs:[]}
 
