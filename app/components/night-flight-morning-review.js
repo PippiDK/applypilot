@@ -44,12 +44,12 @@ async function readJson(url,fallback){
 }
 
 async function fetchNightFlightReview(){
-  const data=await readJson('/api/night-flight-review','Night Flight review could not be loaded.')
+  const data=await readJson('/api/night-flight-review','Night Pilot review could not be loaded.')
   return data?.review||null
 }
 
 async function fetchNightFlightStatus(){
-  const data=await readJson('/api/night-flight-status','Night Flight status could not be loaded.')
+  const data=await readJson('/api/night-flight-status','Night Pilot status could not be loaded.')
   return data?.status||null
 }
 
@@ -88,7 +88,7 @@ export default function NightFlightMorningReview(){
       })
       .catch(fetchError=>{
         if(!active) return
-        setError(fetchError?.message||'Night Flight review could not be loaded.')
+        setError(fetchError?.message||'Night Pilot review could not be loaded.')
         setLoading(false)
       })
     return ()=>{active=false}
@@ -157,29 +157,29 @@ export default function NightFlightMorningReview(){
         cache:'no-store',
       })
       const payload=await response.json().catch(()=>({}))
-      if(!response.ok) throw new Error(payload?.error||'Night Flight Match recovery failed.')
+      if(!response.ok) throw new Error(payload?.error||'Night Pilot Match recovery failed.')
       const next=payload?.review||null
       setReview(next)
       setProgress(progressFromReview(next))
       setSelectedKey(selected.key)
     }catch(recoveryFailure){
-      setRecoveryError(recoveryFailure?.message||'Night Flight Match recovery failed.')
+      setRecoveryError(recoveryFailure?.message||'Night Pilot Match recovery failed.')
     }finally{
       setRecoveringKey('')
     }
   }
 
   const card=createPortal(
-    <div className={styles.card} aria-label="Night Flight Morning Review">
+    <div className={styles.card} aria-label="Night Pilot Morning Review">
       <div>
-        <div className={styles.eyebrow}>NIGHT FLIGHT</div>
+        <div className={styles.eyebrow}>NIGHT PILOT</div>
         <div className={styles.meta}>
           <span>Last completed day · {formatDay(review?.run?.targetDate)}</span>
           <span className={styles.counts}>{activeRun?`${visibleProgress.ready} / ${visibleProgress.total} ready`:`${counts.ready} READY · ${counts.failed} FAILED`}</span>
           {error&&<span className={styles.error}>{error}</span>}
         </div>
       </div>
-      <button type="button" className={styles.open} disabled={loading||!review} onClick={()=>setOpen(true)}>{loading?'Loading…':'Open Night Flight'}</button>
+      <button type="button" className={styles.open} disabled={loading||!review} onClick={()=>setOpen(true)}>{loading?'Loading…':'Open Night Pilot'}</button>
     </div>,
     host
   )
@@ -188,11 +188,11 @@ export default function NightFlightMorningReview(){
     <div className={styles.backdrop} onMouseDown={event=>{if(event.target===event.currentTarget)setOpen(false)}}>
       <section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="night-flight-review-title">
         <div className={styles.heading}>
-          <div><div className={styles.eyebrow}>NIGHT FLIGHT</div><h2 id="night-flight-review-title">Last completed day · {formatDay(review.run?.targetDate)}</h2></div>
-          <button type="button" className={styles.close} aria-label="Close Night Flight review" onClick={()=>setOpen(false)}>×</button>
+          <div><div className={styles.eyebrow}>NIGHT PILOT</div><h2 id="night-flight-review-title">Last completed day · {formatDay(review.run?.targetDate)}</h2></div>
+          <button type="button" className={styles.close} aria-label="Close Night Pilot review" onClick={()=>setOpen(false)}>×</button>
         </div>
         <div className={styles.body}>
-          <aside className={styles.list} aria-label="Night Flight jobs">
+          <aside className={styles.list} aria-label="Night Pilot jobs">
             {(review.jobs||[]).map(item=><button type="button" key={item.key} className={`${styles.job} ${selected?.key===item.key?styles.selected:''}`} onClick={()=>{setSelectedKey(item.key);setRecoveryError('')}}>
               <span className={styles.jobTopRow}>
                 <span className={styles.jobTitle}>{item.job?.title||'Untitled role'}</span>
