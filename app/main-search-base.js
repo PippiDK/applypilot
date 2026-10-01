@@ -14,6 +14,7 @@ import {SEARCH_AREAS,WORK_MODELS,JOB_STATUS_FILTERS,DEFAULT_JOB_STATUS_FILTERS,c
 import {selectAdaptationCv,selectedAdaptationCv} from './lib/cv-adaptation-selection.js'
 import {buildAdaptationBaseline,baselineKey,baselineMatches} from './lib/cv-adaptation-baseline.js'
 import {requestCvAdaptation} from './lib/cv-adaptation-client.js'
+import {requestCoverLetter} from './lib/cover-letter-client.js'
 import {ADAPTATION_DECISION,readAdaptationDecision,setAdaptationDecision,adaptationReviewBlocks} from './lib/cv-adaptation-decisions.js'
 import {requestExpertiseMatch} from './lib/expertise-match-client.js'
 import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'
@@ -97,6 +98,12 @@ export default function Home(){
   const [editedUpdates,setEditedUpdates]=useState({})
   const [sourceDocxFiles,setSourceDocxFiles]=useState({})
   const [exportState,setExportState]=useState({loading:false,error:'',baselineKey:''})
+  const [coverLetterOpen,setCoverLetterOpen]=useState(false)
+  const [coverLetters,setCoverLetters]=useState({})
+  const [coverLetterRun,setCoverLetterRun]=useState({loading:false,error:'',baselineKey:''})
+  const [editedCoverLetters,setEditedCoverLetters]=useState({})
+  const [acceptedCoverLetters,setAcceptedCoverLetters]=useState({})
+  const [coverLetterExportState,setCoverLetterExportState]=useState({loading:false,error:'',baselineKey:''})
   const visibleJobs=useMemo(()=>filterJobItemsByStatus(filterJobItems(jobs,selectedAreas,selectedWorkModels),jobStatuses,selectedStatuses),[jobs,selectedAreas,selectedWorkModels,jobStatuses,selectedStatuses])
   const active=visibleJobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||visibleJobs[0]||null
 
@@ -185,6 +192,10 @@ export default function Home(){
   const reviewedCount=activeAdaptationBaseline?reviewChanges.filter(change=>readAdaptationDecision(decisions,{jobId:activeAdaptationBaseline.jobId,cvId:activeAdaptationBaseline.cvId,sourceVersion:activeAdaptationBaseline.sourceVersion,blockId:change.blockId})).length:0
   const allReviewDecisionsMade=Boolean(currentAdaptationResult)&&reviewedCount===reviewChanges.length
   const selectedSourceDocx=activeAdaptationBaseline?sourceDocxFiles[activeAdaptationBaseline.sourceVersion]||null:null
+  const currentCoverLetter=activeBaselineKey?coverLetters[activeBaselineKey]||null:null
+  const editedCoverLetter=activeBaselineKey&&Object.prototype.hasOwnProperty.call(editedCoverLetters,activeBaselineKey)?editedCoverLetters[activeBaselineKey]:currentCoverLetter?.letter||''
+  const coverLetterAccepted=Boolean(activeBaselineKey&&acceptedCoverLetters[activeBaselineKey])
+  const coverLetterReady=Boolean(currentCoverLetter&&coverLetterAccepted)
   const profileCompletion=useMemo(()=>{
     const fields=[resumeLoaded,draft.roles,(draftLocations.length&&draftWorkModels.length)]
     return Math.round(fields.filter(Boolean).length/fields.length*100)
@@ -657,6 +668,7 @@ export default function Home(){
     setAdaptationRun({loading:false,error:'',jobKey:'',baselineKey:''})
     setExportState({loading:false,error:'',baselineKey:''})
     setReviewOpen(false)
+    setCoverLetterOpen(false)
   }
 
   async function runCvAdaptationReview(){
@@ -716,6 +728,73 @@ export default function Home(){
     if(!String(file.name||'').toLowerCase().endsWith('.docx')){ setExportState({loading:false,error:'Please choose the matching source DOCX file.',baselineKey:activeBaselineKey}); return }
     setSourceDocxFiles(current=>({...current,[activeAdaptationBaseline.sourceVersion]:file}))
     setExportState({loading:false,error:'',baselineKey:activeBaselineKey})
+  }
+
+  function finalCvBlocksForCoverLetter(){
+    if(!allReviewDecisionsMade) return []
+    return reviewChanges.map(change=>({
+      blockId:change.blockId,
+      text:decisionFor(change.blockId)===ADAPTATION_DECISION.ACCEPTED?editedUpdateFor(change):change.original
+    }))
+  }
+
+  async function generateCoverLetter({force=false}={}){
+    if(!active||!activeAdaptationBaseline||!allReviewDecisionsMade||coverLetterRun.loading) return
+    const key=activeBaselineKey
+    if(currentCoverLetter&&!force){ setCoverLetterOpen(true); return }
+    setCoverLetterOpen(true)
+    setCoverLetterRun({loading:true,error:'',baselineKey:key})
+    setCoverLetterExportState({loading:false,error:'',baselineKey:key})
+    setAcceptedCoverLetters(current=>({...current,[key]:false}))
+    try{
+      const result=await requestCoverLetter({
+        baseline:activeAdaptationBaseline,
+        job:active.job,
+        finalCvBlocks:finalCvBlocksForCoverLetter()
+      })
+      setCoverLetters(current=>({...current,[key]:result}))
+      setEditedCoverLetters(current=>({...current,[key]:result.letter}))
+      setCoverLetterRun({loading:false,error:'',baselineKey:key})
+    }catch(error){
+      setCoverLetterRun({loading:false,error:error.message||'Cover letter generation failed safely. Please try again.',baselineKey:key})
+    }
+  }
+
+  function acceptCoverLetter(){
+    if(!activeBaselineKey||!currentCoverLetter||!String(editedCoverLetter||'').trim()) return
+    setAcceptedCoverLetters(current=>({...current,[activeBaselineKey]:true}))
+  }
+
+  async function downloadCoverLetter(){
+    if(!active||!activeBaselineKey||!coverLetterAccepted||!String(editedCoverLetter||'').trim()||coverLetterExportState.loading) return
+    const company=String(active.job.company||'company').replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'')||'company'
+    const role=String(active.job.title||'role').replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'')||'role'
+    const outputName=`${company}_${role}_COVER_LETTER.docx`
+    setCoverLetterExportState({loading:true,error:'',baselineKey:activeBaselineKey})
+    try{
+      const res=await fetch('/api/export-cover-letter',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({letter:editedCoverLetter,outputName})
+      })
+      if(!res.ok){
+        let message='Cover letter DOCX could not be created.'
+        try{const data=await res.json();message=data.error||message}catch{}
+        throw new Error(message)
+      }
+      const blob=await res.blob()
+      const url=URL.createObjectURL(blob)
+      const anchor=document.createElement('a')
+      anchor.href=url
+      anchor.download=outputName
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+      setCoverLetterExportState({loading:false,error:'',baselineKey:activeBaselineKey})
+    }catch(error){
+      setCoverLetterExportState({loading:false,error:error.message||'Cover letter DOCX could not be created.',baselineKey:activeBaselineKey})
+    }
   }
 
   async function downloadTailoredCv(){
@@ -854,7 +933,7 @@ export default function Home(){
           </div>
 
 
-          <div className="section"><h3>Application pack</h3><div className="docs"><div>{pack.cvReady?'✓':'○'} Tailored CV <span className={pack.cvReady?'ready':'pending'}>{pack.tailoredCvLabel}</span></div><div>○ Cover letter <span className="pending">{pack.coverLetterLabel}</span></div></div></div>
+          <div className="section"><h3>Application pack</h3><div className="docs"><div>{pack.cvReady?'✓':'○'} Tailored CV <span className={pack.cvReady?'ready':'pending'}>{pack.tailoredCvLabel}</span></div><div className="coverLetterPackItem"><span>{coverLetterReady?'✓':'○'} Cover letter</span><span className={coverLetterReady?'ready':'pending'}>{coverLetterReady?'Ready':currentCoverLetter?'Review needed':allReviewDecisionsMade?'Ready to generate':'Complete CV review first'}</span>{allReviewDecisionsMade&&<button className="coverLetterPackAction" onClick={()=>generateCoverLetter()} disabled={coverLetterRun.loading}>{coverLetterRun.loading?'Generating…':currentCoverLetter?'View':'Generate'}</button>}</div></div></div>
         </>})():<div className="emptyPanel"><h2>No selected vacancy</h2><p>{state.loading?'Searching for matching vacancies…':'Run search to see matching vacancies.'}</p></div>}
       </div>
     </section>
@@ -871,6 +950,20 @@ export default function Home(){
       {profileStep===3&&<div className="wizard"><h3>What should ApplyPilot exclude?</h3><p>Optional. Write any hard no-go roles, industries, languages or working conditions. ApplyPilot interprets this text only when you save the profile.</p><textarea value={draft.exclusions} onChange={event=>setDraft(current=>({...current,exclusions:event.target.value}))} rows="6"/></div>}
       {profileStep===4&&<div className="wizard review"><h3>Confirm your search profile</h3><p>This saves your Search Profile and activates profile-driven LinkedIn discovery for future searches.</p><div className="reviewRow"><span>CV library</span><b>{readyCvs.length?readyCvs.map(cv=>`CV ${cv.slot} · ${cv.fileName}`).join(' · '):'No CVs uploaded'}</b></div><div className="reviewRow"><span>CV preparation</span><b>{cvReadyCount?`Ready — ${cvReadyCount} complete Source CV${cvReadyCount===1?'':'s'} prepared`:'CV not ready'}</b></div><div className="reviewRow"><span>Role profiles</span><b>{cvReadyCount?`${analysedRoleProfileCount}/${cvReadyCount} CVs analysed`:'Not generated'}</b></div><div className="reviewRow"><span>Target roles</span><b>{draft.roles||'Not set'}</b></div><div className="reviewRow"><span>Exclude</span><b>{draft.exclusions||'None'}</b></div>{profileSaveState.error&&<div className="errorBox"><b>Search Profile save failed</b><span>{profileSaveState.error}</span></div>}<div className="truth"><b>Truth rule</b><span>ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.</span></div></div>}
       <div className="modalActions"><button className="secondary" disabled={profileSaveState.loading} onClick={()=>profileStep===1?closeProfile():setProfileStep(step=>step-1)}>{profileStep===1?'Cancel':'Back'}</button>{profileStep<4?<button className="primary" disabled={(profileStep===1&&(Boolean(cvState.loadingSlot)||cvReadyCount===0))||(profileStep===2&&profileRoleState.status==='loading')} onClick={nextProfileStep}>Continue</button>:<button className="primary" disabled={profileSaveState.loading} onClick={saveProfile}>{profileSaveState.loading?'Saving profile…':'Save profile'}</button>}</div>
+    </div></div>}
+
+    {coverLetterOpen&&active&&activeAdaptationBaseline&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget&&!coverLetterRun.loading)setCoverLetterOpen(false)}}><div className="modal coverLetterModal">
+      <div className="modalHead"><div><p className="eyebrow">COVER LETTER REVIEW</p><h2>{active.job.title}</h2><p className="muted">{active.job.company} · {active.job.location}</p><p className="reviewBaseline">CV {selectedAdaptationCvRecord?.slot} · {activeAdaptationBaseline.fileName}</p></div><button className="close" onClick={()=>setCoverLetterOpen(false)} disabled={coverLetterRun.loading}>×</button></div>
+      {coverLetterRun.loading&&coverLetterRun.baselineKey===activeBaselineKey&&<div className="adaptationLoading"><b>Writing cover letter…</b><span>Using the Full JD, selected Source CV and your reviewed CV positioning.</span></div>}
+      {coverLetterRun.error&&coverLetterRun.baselineKey===activeBaselineKey&&<div className="errorBox"><b>Cover letter generation failed safely</b><span>{coverLetterRun.error}</span></div>}
+      {currentCoverLetter&&!coverLetterRun.loading&&<>
+        <div className="coverLetterReviewStatus"><b>{coverLetterAccepted?'✓ Cover letter accepted':'Cover letter ready for review'}</b><span>Editable draft · factual claims must remain grounded in the selected Source CV.</span></div>
+        <label className="coverLetterEditorLabel">LETTER · EDITABLE<textarea className="coverLetterEditor" value={editedCoverLetter} onChange={event=>{setEditedCoverLetters(current=>({...current,[activeBaselineKey]:event.target.value}));setAcceptedCoverLetters(current=>({...current,[activeBaselineKey]:false}))}} rows="18"/></label>
+        {currentCoverLetter.focusPoints?.length>0&&<div className="coverLetterFocus"><small>WHY THIS LETTER FITS</small>{currentCoverLetter.focusPoints.map((item,index)=><p key={index}>• {item}</p>)}</div>}
+        {coverLetterExportState.error&&coverLetterExportState.baselineKey===activeBaselineKey&&<div className="errorBox"><b>DOCX export failed</b><span>{coverLetterExportState.error}</span></div>}
+        <div className="coverLetterActions"><button className="secondary" onClick={()=>generateCoverLetter({force:true})} disabled={coverLetterRun.loading}>Regenerate</button><button className="primary" onClick={acceptCoverLetter} disabled={!String(editedCoverLetter||'').trim()}>{coverLetterAccepted?'✓ Accepted':'Accept'}</button></div>
+      </>}
+      <div className="reviewFooter"><button className="secondary" onClick={()=>setCoverLetterOpen(false)} disabled={coverLetterRun.loading||coverLetterExportState.loading}>Close review</button>{coverLetterAccepted&&<button className="primary" onClick={downloadCoverLetter} disabled={coverLetterExportState.loading}>{coverLetterExportState.loading?'Creating DOCX…':'Download cover letter DOCX'}</button>}</div>
     </div></div>}
 
     {reviewOpen&&active&&activeAdaptationBaseline&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget&&!adaptationRun.loading)setReviewOpen(false)}}><div className="modal reviewModal"><div className="modalHead"><div><p className="eyebrow">CV UPDATE REVIEW</p><h2>{active.job.title}</h2><p className="muted">{active.job.company} · {active.job.location}</p><p className="reviewBaseline">CV {selectedAdaptationCvRecord?.slot} · {activeAdaptationBaseline.fileName}</p></div><button className="close" onClick={()=>setReviewOpen(false)} disabled={adaptationRun.loading}>×</button></div>
