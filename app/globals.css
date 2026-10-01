@@ -97,3 +97,22 @@
 /* CV Update Review — keep UPDATED editor visually equal to the ORIGINAL comparison box. */
 .updatedBox{display:flex;flex-direction:column}
 .updatedTextEditor{flex:1;min-height:0;height:100%;resize:none;overflow-y:auto;box-sizing:border-box}
+
+
+/* Cover Letter MVP — TEST */
+.coverLetterPackItem{display:flex!important;align-items:center;gap:10px}
+.coverLetterPackItem>span:first-child{margin-right:auto}
+.coverLetterPackAction{border:1px solid #385244;background:#132019;color:#7ee2b8;border-radius:8px;padding:7px 10px;font-size:10px;font-weight:850;white-space:nowrap}
+.coverLetterPackAction:disabled{opacity:.55;cursor:default}
+.coverLetterModal{width:min(920px,100%)}
+.coverLetterReviewStatus{margin:18px 0;padding:14px 16px;border:1px solid #285e4a;background:#132019;border-radius:12px;display:flex;flex-direction:column;gap:5px}
+.coverLetterReviewStatus b{color:#7ee2b8}
+.coverLetterReviewStatus span{color:#aab5ae;font-size:12px}
+.coverLetterEditorLabel{display:flex;flex-direction:column;gap:9px;color:#7ee2b8;font-size:9px;font-weight:850;letter-spacing:.09em}
+.coverLetterEditor{min-height:410px;resize:vertical;line-height:1.55;background:#10151a}
+.coverLetterFocus{margin-top:14px;padding:14px 16px;border:1px solid #2a323c;background:#10151a;border-radius:12px}
+.coverLetterFocus small{color:#7f8c99;font-size:9px;letter-spacing:.09em;font-weight:850}
+.coverLetterFocus p{margin:7px 0 0;color:#aeb8c1;font-size:12px;line-height:1.45}
+.coverLetterActions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px}
+.coverLetterActions .primary{flex:0 0 auto;min-width:120px}
+@media(max-width:780px){.coverLetterPackItem{align-items:flex-start!important;flex-direction:column}.coverLetterPackItem>span:first-child{margin-right:0}.coverLetterPackAction{width:100%}.coverLetterEditor{min-height:340px}.coverLetterActions{flex-direction:column}.coverLetterActions button{width:100%}}
