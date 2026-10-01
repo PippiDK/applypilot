@@ -127,3 +127,13 @@
 .matchesLoadingDots i:nth-child(3){animation-delay:.28s}
 @keyframes matchesDotPulse{0%,60%,100%{opacity:.32;transform:translateY(0) scale(.9)}30%{opacity:1;transform:translateY(-3px) scale(1.08)}}
 @media(prefers-reduced-motion:reduce){.matchesLoadingDots i{animation:none;opacity:.75}}
+
+
+/* Cover Letter action section — keep Application Pack status-only. */
+.coverLetterSection{border-top:1px solid #252c35;margin-top:18px;padding-top:22px}
+.coverLetterSectionHead{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+.coverLetterSectionHead h3{margin:2px 0 7px;font-size:18px}
+.coverLetterSectionHead p:not(.eyebrow){margin:0;color:#909ba8;font-size:12px;line-height:1.45;max-width:620px}
+.coverLetterSectionStatus{white-space:nowrap;font-size:11px;font-weight:800}
+.coverLetterSectionAction{margin-top:16px;min-width:210px}
+@media(max-width:780px){.coverLetterSectionHead{flex-direction:column}.coverLetterSectionAction{width:100%}}
