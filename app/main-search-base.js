@@ -971,7 +971,7 @@ export default function Home(){
 
     <AppliedJobsArchive jobs={appliedJobs} error={appliedSaveError} open={appliedArchiveOpen} onOpen={()=>setAppliedArchiveOpen(true)} onClose={()=>setAppliedArchiveOpen(false)} onStatusChange={changeAppliedArchiveStatus}/>
 
-    <footer>TEST · LinkedIn + Jobindex + Jobnet multi-source search</footer>
+    <footer className="ecosystemFooter">ApplyPilot · Part of the <span>AUVRAEN</span> ecosystem</footer>
 
     {profileOpen&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget&&!profileSaveState.loading)closeProfile()}}><div className="modal profileModal">
       <div className="modalHead"><div><p className="eyebrow">BUILD YOUR SEARCH AGENT</p><h2>Search profile</h2></div><button className="close" onClick={closeProfile} disabled={profileSaveState.loading}>×</button></div>
