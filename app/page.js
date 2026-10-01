@@ -153,5 +153,18 @@ export default function Home(){
   const activeNightFlightJob=findActiveJobIdentity(tree)
   const currentCvSourceVersion=findCurrentCvSourceVersion(tree)
   const cachedNightFlightAnalysis=resolveNightFlightExpertise({job:activeNightFlightJob,index:nightFlightIndex,sourceVersion:currentCvSourceVersion})
-  return transformMainSearchTree(tree,nightFlightIndex,cachedNightFlightAnalysis)
+  return React.createElement(React.Fragment,null,
+    transformMainSearchTree(tree,nightFlightIndex,cachedNightFlightAnalysis),
+    React.createElement('a',{
+      className:'takeBreakLink',
+      href:'https://www.youtube.com/@Auvraen',
+      target:'_blank',
+      rel:'noreferrer',
+      'aria-label':'Take a break — open AUVRAEN on YouTube',
+      title:'Take a break ♡'
+    },
+      React.createElement('span',{className:'takeBreakPlane','aria-hidden':'true'},'✈'),
+      React.createElement('span',null,'Take a break ♡')
+    )
+  )
 }
