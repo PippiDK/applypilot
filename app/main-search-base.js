@@ -773,31 +773,14 @@ export default function Home(){
 
     {nightFlightSyncWarning&&<div className="warningBox"><b>Night Flight backend is not synced</b><span>{nightFlightSyncWarning}</span></div>}
 
-    <section className="controls">
+    <section className="controls clientControls">
       <div><small>POSTED WITHIN</small><div className="choices">{WINDOWS.map(({days,label})=><button key={days} className={freshnessDays===days?'choice selected':'choice'} onClick={()=>setFreshnessDays(days)}>{label}</button>)}</div></div>
-      <div><small>SEARCH SOURCES</small><div className="choices"><label className="choice"><input type="checkbox" checked={selectedSources.includes('linkedin')} onChange={()=>toggleSource('linkedin')}/> LinkedIn</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobindex')} onChange={()=>toggleSource('jobindex')}/> Jobindex</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobnet')} onChange={()=>toggleSource('jobnet')}/> Jobnet</label></div></div>
       <button className="primary" onClick={search} disabled={state.loading}>{state.loading?'Searching…':'Search'}</button>
     </section>
 
-    <section className="companyWatch">
-      <div className="companyWatchMain">
-        <label className="companyWatchToggle"><input type="checkbox" checked={companyWatch.enabled} onChange={toggleCompanyWatchEnabled}/><span><small>DIRECT COMPANY WATCH</small><b>Company career sites</b></span></label>
-        <div className="companyWatchActions"><span>{companyWatch.selected.length} companies selected</span><button className="secondary companyManage" onClick={()=>setCompanyWatchOpen(open=>!open)}>{companyWatchOpen?'Close':'Manage'}</button></div>
-      </div>
-      {companyWatchOpen&&<div className="companyWatchList">
-        {TARGET_COMPANIES.map(name=>{const connection=companyConnection(name);return <label key={name}><input type="checkbox" checked={companyWatch.selected.includes(name)} onChange={()=>toggleCompany(name)}/><span>{name}</span><small className={connection.status==='connected'?'ready':''}>{connection.status==='connected'?('Connected · '+connection.connector):'Connection pending'}</small></label>})}
-      </div>}
-    </section>
 
-    <section className="companyWatch consultantPortals">
-      <div className="companyWatchMain">
-        <label className="companyWatchToggle"><input type="checkbox" checked={consultantPortals.enabled} onChange={toggleConsultantPortalsEnabled}/><span><small>CONSULTANT PORTALS</small><b>Freelance & consulting assignments</b></span></label>
-        <div className="companyWatchActions"><span>{consultantPortals.selected.length} portals selected</span><button className="secondary companyManage" onClick={()=>setConsultantPortalsOpen(open=>!open)}>{consultantPortalsOpen?'Close':'Manage'}</button></div>
-      </div>
-      {consultantPortalsOpen&&<div className="companyWatchList consultantPortalList">
-        {CONSULTANT_PORTALS.map(portal=><label key={portal.id}><input type="checkbox" checked={consultantPortals.selected.includes(portal.id)} onChange={()=>toggleConsultantPortal(portal.id)}/><span>{portal.name}</span><small className={portal.status==='connected'?'ready':''}>{portal.status==='connected'?('Connected · '+portal.connector):'Connection pending'}</small></label>)}
-      </div>}
-    </section>
+
+
 
     {state.error&&<div className="errorBox"><b>{state.error==='Please Upload Your CV'?'Please Upload Your CV':'Search failed'}</b>{state.error!=='Please Upload Your CV'&&<span>{state.error}</span>}</div>}
     {state.stats&&<div className="searchMeta"><span><b>{state.stats.masterPoolSize??state.stats.discovered}</b> jobs discovered</span><span><b>{state.stats.fullJdVerified}</b> full JDs read</span><span><b>{state.stats.returned??jobs.length}</b> worthwhile after evaluation</span><span>Coverage: <b>{state.coverage?.status}</b></span></div>}
@@ -876,7 +859,7 @@ export default function Home(){
 
 
           <div className="section"><h3>Application pack</h3><div className="docs"><div>{pack.cvReady?'✓':'○'} Tailored CV <span className={pack.cvReady?'ready':'pending'}>{pack.tailoredCvLabel}</span></div><div>○ Cover letter <span className="pending">{pack.coverLetterLabel}</span></div></div></div>
-        </>})():<div className="emptyPanel"><h2>No selected vacancy</h2><p>{state.loading?'Searching LinkedIn public pages…':'Run the LinkedIn search to see matching vacancies.'}</p></div>}
+        </>})():<div className="emptyPanel"><h2>No selected vacancy</h2><p>{state.loading?'Searching LinkedIn public pages…':'Run search to see matching vacancies.'}</p></div>}
       </div>
     </section>
 
