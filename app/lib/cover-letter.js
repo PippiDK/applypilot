@@ -49,14 +49,15 @@ function sourceCvInput(sourceCv={}){
   }
 }
 
-export async function writeCoverLetter({job,sourceCv,finalCvBlocks=[]}={},modelCall){
+export async function writeCoverLetter({job,sourceCv,finalCvBlocks=[],languageMode='same_as_job'}={},modelCall){
   const result=await callStructuredAi({
     stage:'cover_letter_writer',
     instructions:COVER_LETTER_INSTRUCTIONS,
     input:{
       job:jobInput(job),
       sourceCv:sourceCvInput(sourceCv),
-      finalCvBlocks:Array.isArray(finalCvBlocks)?finalCvBlocks:[]
+      finalCvBlocks:Array.isArray(finalCvBlocks)?finalCvBlocks:[],
+      languageMode:languageMode==='english'?'english':'same_as_job'
     },
     schema:coverLetterSchema,
     maxOutputTokens:1800,
