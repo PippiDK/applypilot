@@ -30,8 +30,6 @@ import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib
 import {freshnessSelectionFromDays,freshnessResultLabel} from './lib/freshness-selection.js'
 import {companyConnection,connectedCompanyNames,defaultCompanyWatch,readCompanyWatch,writeCompanyWatch,TARGET_COMPANIES} from './lib/company-watch.js'
 import {CONSULTANT_PORTALS,connectedConsultantPortalIds,defaultConsultantPortals,readConsultantPortals,writeConsultantPortals} from './lib/consultant-portals.js'
-import SearchAudit from './components/search-audit.js'
-import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
 import SearchProfileRolesStep from './components/search-profile-roles-step.js'
 import SearchPlanPreview from './components/search-plan-preview.js'
@@ -862,12 +860,6 @@ export default function Home(){
         </>})():<div className="emptyPanel"><h2>No selected vacancy</h2><p>{state.loading?'Searching LinkedIn public pages…':'Run search to see matching vacancies.'}</p></div>}
       </div>
     </section>
-
-    {(state.audit.length>0||(shadowState.status!=='idle'&&shadowState.status!=='skipped'))&&<section className="auditLog">
-      <div className="auditLogTitle">AUDIT LOG</div>
-      <SearchAudit audit={state.audit}/>
-      <ShadowSearchAudit shadowState={shadowState}/>
-    </section>}
 
     <AppliedJobsArchive jobs={appliedJobs} error={appliedSaveError} open={appliedArchiveOpen} onOpen={()=>setAppliedArchiveOpen(true)} onClose={()=>setAppliedArchiveOpen(false)} onStatusChange={changeAppliedArchiveStatus}/>
 
