@@ -728,9 +728,9 @@ export default function Home(){
 
   function attachSourceDocx(file){
     if(!file||!activeAdaptationBaseline) return
-    if(!String(file.name||'').toLowerCase().endsWith('.docx')){ setExportState({loading:false,error:'Please choose the matching source DOCX file.',baselineKey:coverLetterKey}); return }
+    if(!String(file.name||'').toLowerCase().endsWith('.docx')){ setExportState({loading:false,error:'Please choose the matching source DOCX file.',baselineKey:activeBaselineKey}); return }
     setSourceDocxFiles(current=>({...current,[activeAdaptationBaseline.sourceVersion]:file}))
-    setExportState({loading:false,error:'',baselineKey:coverLetterKey})
+    setExportState({loading:false,error:'',baselineKey:activeBaselineKey})
   }
 
   function finalCvBlocksForCoverLetter(){
@@ -810,7 +810,7 @@ export default function Home(){
     const company=String(active.job.company||'tailored').replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'')||'tailored'
     const base=String(activeAdaptationBaseline.fileName||'CV').replace(/\.docx$/i,'')
     const outputName=`${base}_${company}_TAILORED.docx`
-    setExportState({loading:true,error:'',baselineKey:coverLetterKey})
+    setExportState({loading:true,error:'',baselineKey:activeBaselineKey})
     try{
       const form=new FormData()
       form.append('file',selectedSourceDocx)
@@ -831,9 +831,9 @@ export default function Home(){
       anchor.click()
       anchor.remove()
       URL.revokeObjectURL(url)
-      setExportState({loading:false,error:'',baselineKey:coverLetterKey})
+      setExportState({loading:false,error:'',baselineKey:activeBaselineKey})
     }catch(error){
-      setExportState({loading:false,error:error.message||'Tailored DOCX could not be created.',baselineKey:coverLetterKey})
+      setExportState({loading:false,error:error.message||'Tailored DOCX could not be created.',baselineKey:activeBaselineKey})
     }
   }
 
@@ -940,7 +940,7 @@ export default function Home(){
 
           <div className="section coverLetterSection">
             <div className="coverLetterSectionHead"><div><p className="eyebrow">COVER LETTER</p><h3>{currentCoverLetter?'Review your tailored cover letter':'Create your tailored cover letter'}</h3><p>{allReviewDecisionsMade?'Built from the Full JD, selected CV and your reviewed CV update.':'Complete the CV update first so the cover letter uses your final application positioning.'}</p></div><span className={coverLetterReady?'ready coverLetterSectionStatus':'pending coverLetterSectionStatus'}>{coverLetterReady?'Ready':currentCoverLetter?'Review needed':allReviewDecisionsMade?'Ready to generate':'CV update required'}</span></div>
-            <div className="coverLetterControls"><label className="coverLetterLanguageControl"><span>Language</span><select value={coverLetterLanguage} onChange={event=>setCoverLetterLanguages(current=>({...current,[coverLetterKey]:event.target.value}))} disabled={!activeBaselineKey||coverLetterRun.loading}><option value="same_as_job">Same as job description</option><option value="english">English</option></select></label><button className="primary coverLetterSectionAction" onClick={()=>generateCoverLetter()} disabled={!allReviewDecisionsMade||coverLetterRun.loading}>{coverLetterRun.loading?'Generating cover letter…':currentCoverLetter?'View cover letter':'Generate cover letter'}</button></div>
+            <div className="coverLetterControls"><label className="coverLetterLanguageControl"><span>Language</span><select value={coverLetterLanguage} onChange={event=>setCoverLetterLanguages(current=>({...current,[activeBaselineKey]:event.target.value}))} disabled={!activeBaselineKey||coverLetterRun.loading}><option value="same_as_job">Same as job description</option><option value="english">English</option></select></label><button className="primary coverLetterSectionAction" onClick={()=>generateCoverLetter()} disabled={!allReviewDecisionsMade||coverLetterRun.loading}>{coverLetterRun.loading?'Generating cover letter…':currentCoverLetter?'View cover letter':'Generate cover letter'}</button></div>
           </div>
 
           <div className="section"><h3>Application pack</h3><div className="docs"><div>{allReviewDecisionsMade?'✓':'○'} Tailored CV <span className={allReviewDecisionsMade?'ready':'pending'}>{allReviewDecisionsMade?'Ready':currentAdaptationResult?'Review needed':'Not generated yet'}</span></div><div><span>{coverLetterReady?'✓':'○'} Cover letter</span><span className={coverLetterReady?'ready':'pending'}>{coverLetterReady?'Ready':allReviewDecisionsMade?'Not generated yet':'Complete CV update first'}</span></div></div></div>
