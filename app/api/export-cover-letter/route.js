@@ -32,16 +32,20 @@ function headerTableXml(name,jobTitle){
 function documentXml({letter,jobTitle,cvText}){
   const contact=extractCvContactDetails(cvText)
   const header=headerTableXml(contact.name,text(jobTitle))
-  const body=String(letter||'').split(/\n+/).map(text).filter(Boolean).map(value=>paragraphXml(value,{after:170,size:22})).join('')
-  const signatureDetails=[
-    contact.email,
-    contact.phone,
-    contact.linkedIn
-  ].filter(Boolean)
-  const contactXml=signatureDetails.length
-    ? `<w:p><w:pPr><w:spacing w:before="60" w:after="0"/></w:pPr>${signatureDetails.map(value=>runXml(value,{size:19,color:'4B5563'})).join('<w:br/>')}</w:p>`
-    :''
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${header}<w:p><w:pPr><w:spacing w:after="220"/></w:pPr></w:p>${body}${contactXml}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="960" w:right="1020" w:bottom="960" w:left="1020" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`
+  const lines=String(letter||'').split(/\n+/).map(text).filter(Boolean)
+  if(contact.name){
+    for(let index=lines.length-1;index>=Math.max(0,lines.length-4);index--){
+      if(lines[index]===contact.name){lines.splice(index,1);break}
+    }
+  }
+  const body=lines.map(value=>paragraphXml(value,{after:170,size:22})).join('')
+  const signature=[
+    contact.name?paragraphXml(contact.name,{before:70,after:30,bold:true,size:22}):'',
+    contact.email?paragraphXml(contact.email,{after:20,size:19,color:'4B5563'}):'',
+    contact.phone?paragraphXml(contact.phone,{after:20,size:19,color:'4B5563'}):'',
+    contact.linkedIn?paragraphXml(contact.linkedIn,{after:0,size:19,color:'4B5563'}):''
+  ].join('')
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${header}<w:p><w:pPr><w:spacing w:after="220"/></w:pPr></w:p>${body}${signature}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="960" w:right="1020" w:bottom="960" w:left="1020" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`
 }
 
 export async function POST(request){
