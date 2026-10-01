@@ -45,7 +45,7 @@ export default function NightFlightSettings(){
       })
       .catch(error=>{
         if(!active) return
-        setStatus({loading:false,saving:false,loaded:false,error:error?.message||'Night Flight settings could not be loaded.',notice:''})
+        setStatus({loading:false,saving:false,loaded:false,error:error?.message||'Night Pilot settings could not be loaded.',notice:''})
       })
     return ()=>{active=false}
   },[open])
@@ -110,7 +110,7 @@ export default function NightFlightSettings(){
       setDraft(next)
       setStatus({loading:false,saving:false,loaded:true,error:'',notice:'Saved'})
     }catch(error){
-      setStatus(current=>({...current,saving:false,error:error?.message||'Night Flight settings could not be saved.',notice:''}))
+      setStatus(current=>({...current,saving:false,error:error?.message||'Night Pilot settings could not be saved.',notice:''}))
     }
   }
 
@@ -124,17 +124,17 @@ export default function NightFlightSettings(){
       <section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="night-flight-settings-title">
         <div className={styles.heading}>
           <div>
-            <p className={styles.eyebrow}>NIGHT FLIGHT</p>
-            <h2 id="night-flight-settings-title">Night Flight Settings</h2>
+            <p className={styles.eyebrow}>NIGHT PILOT</p>
+            <h2 id="night-flight-settings-title">Night Pilot Settings</h2>
             <p className={styles.description}>Prepares matches from the last completed day overnight.</p>
           </div>
-          <button type="button" className={styles.close} aria-label="Close Night Flight Settings" onClick={closeWithoutSaving}>×</button>
+          <button type="button" className={styles.close} aria-label="Close Night Pilot Settings" onClick={closeWithoutSaving}>×</button>
         </div>
 
         {status.loading?<div className={styles.loading}>Loading settings…</div>:<>
           <label className={styles.masterToggle}>
             <input type="checkbox" checked={draft.enabled} disabled={!status.loaded||status.saving} onChange={event=>setDraft(current=>({...current,enabled:event.target.checked}))}/>
-            <span><b>Run Night Flight automatically</b><small>Uses the latest saved Search Profile for the last completed day.</small></span>
+            <span><b>Run Night Pilot automatically</b><small>Uses the latest saved Search Profile for the last completed day.</small></span>
           </label>
 
           <fieldset className={styles.group} disabled={!status.loaded||status.saving}>
