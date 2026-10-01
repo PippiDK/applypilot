@@ -780,7 +780,12 @@ export default function Home(){
       const res=await fetch('/api/export-cover-letter',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({letter:editedCoverLetter,outputName})
+        body:JSON.stringify({
+          letter:editedCoverLetter,
+          outputName,
+          jobTitle:active.job.title,
+          cvText:activeAdaptationBaseline.cvText
+        })
       })
       if(!res.ok){
         let message='Cover letter DOCX could not be created.'
