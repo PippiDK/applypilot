@@ -58,7 +58,7 @@
 }
 .clientHeroCopy{position:relative;z-index:3;max-width:800px}
 .clientHero .clientHeroEyebrow{color:#f472b6;margin-bottom:12px}
-.clientHero h1{font-size:42px;max-width:860px;margin:0 0 12px}
+.clientHero h1{font-size:38px;max-width:860px;margin:0 0 12px}
 .clientHeroCopy>p:not(.eyebrow){max-width:790px;margin:0;color:#aab3bf;font-size:15px;line-height:1.5}
 .clientHeroReady{display:inline-flex;align-items:center;gap:8px;margin-top:20px;border:1px solid #285e4a;background:rgba(16,58,44,.48);color:#7ee2b8;padding:8px 13px;border-radius:999px;font-size:11px;font-weight:850}
 .clientHeroReady.isEmpty{border-color:#65552d;background:rgba(54,45,20,.5);color:#e7c56a}
