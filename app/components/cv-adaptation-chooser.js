@@ -14,13 +14,21 @@ export default function CvAdaptationChooser({cvLibrary,recommendedCvId='',select
 
   if(!choices.length) return null
 
+  const singleCv=choices.length===1?choices[0]:null
+
   return <section className={`${styles.card} cvWorkflowChooser`}>
     <div className={styles.head}>
-      <div><p className="eyebrow">SELECT CV TO ADAPT</p><p className={styles.intro}>Choose one of your ready CVs. Best CV remains a recommendation.</p></div>
-      <span className={styles.status}>{selectedCv?`${cvLabel(selectedCv)} selected`:'Not selected'}</span>
+      <div><p className="eyebrow">{singleCv?'CV FOR THIS JOB':'SELECT CV TO ADAPT'}</p><p className={styles.intro}>{singleCv?'Your ready CV is selected automatically.':'Choose one of your ready CVs. Best CV remains a recommendation.'}</p></div>
+      <span className={styles.status}>{singleCv?`${cvLabel(singleCv)} selected`:selectedCv?`${cvLabel(selectedCv)} selected`:'Not selected'}</span>
     </div>
     <div className={styles.choices}>
-      {choices.map(cv=>{const isRecommended=cv.id===recommended;const isSelected=cv.id===selected;return <button
+      {choices.map(cv=>{const isRecommended=cv.id===recommended;const isSelected=singleCv?true:cv.id===selected;return singleCv?<div
+        key={cv.id}
+        className={`${styles.choice} ${styles.selected}`}
+      >
+        <span className={styles.cvText}><b>{cvLabel(cv)}</b><small>{cv.fileName}</small></span>
+        <span className={styles.badges}><strong>SELECTED</strong></span>
+      </div>:<button
         type="button"
         key={cv.id}
         className={`${styles.choice} ${isSelected?styles.selected:''}`}
