@@ -137,3 +137,14 @@
 .coverLetterSectionStatus{white-space:nowrap;font-size:11px;font-weight:800}
 .coverLetterSectionAction{margin-top:16px;min-width:210px}
 @media(max-width:780px){.coverLetterSectionHead{flex-direction:column}.coverLetterSectionAction{width:100%}}
+
+
+/* Cover Letter language control */
+.coverLetterControls{display:flex;align-items:flex-end;gap:12px;margin-top:16px;flex-wrap:wrap}
+.coverLetterLanguageControl{display:flex;flex-direction:column;gap:6px}
+.coverLetterLanguageControl>span{color:#7f8a97;font-size:9px;font-weight:850;letter-spacing:.09em;text-transform:uppercase}
+.coverLetterLanguageControl select{min-width:210px;background:#151a20;border:1px solid #343d48;border-radius:10px;color:#e6ebef;padding:12px 34px 12px 12px;font:inherit;outline:none}
+.coverLetterLanguageControl select:focus{border-color:#58cfa2}
+.coverLetterLanguageControl select:disabled{opacity:.55}
+.coverLetterControls .coverLetterSectionAction{margin-top:0}
+@media(max-width:780px){.coverLetterControls{align-items:stretch;flex-direction:column}.coverLetterLanguageControl select{width:100%}}
