@@ -1,6 +1,6 @@
 import {NextResponse} from 'next/server'
-import {resolveNightFlightRequestContext} from '../../../lib/night-flight-preview-context.js'
-import {executeManualNightFlight} from '../../../lib/night-flight-manual-control.js'
+import {resolveNightFlightRequestContext} from '../../lib/night-flight-preview-context.js'
+import {executeManualNightFlight} from '../../lib/night-flight-manual-control.js'
 
 export const dynamic='force-dynamic'
 export const maxDuration=300
