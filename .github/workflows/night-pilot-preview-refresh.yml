@@ -1,0 +1,16 @@
+name: Refresh Night Pilot TEST
+on:
+  push:
+    branches:
+      - test/client-hero-design
+    paths:
+      - .github/workflows/night-pilot-preview-refresh.yml
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger current TEST Night Pilot run
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --max-time 300 --retry 1 \
+            "https://applypilot-k2x9e5bdn-auvraen-platform.vercel.app/api/night-flight-preview-refresh"
