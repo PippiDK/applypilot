@@ -1,5 +1,6 @@
 import JSZip from 'jszip'
 import {requireUser} from '../../lib/auth/require-user.js'
+import {extractCvContactDetails} from '../../lib/cv-contact-details.js'
 
 export const runtime='nodejs'
 export const dynamic='force-dynamic'
@@ -12,13 +13,35 @@ function safeOutputName(value='cover-letter.docx'){
   return name.toLowerCase().endsWith('.docx')?name:`${name}.docx`
 }
 
-function paragraphXml(value){
-  return `<w:p><w:pPr><w:spacing w:after="160"/></w:pPr><w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">${escapeXml(value)}</w:t></w:r></w:p>`
+function runXml(value,{bold=false,size=22,color=''}={}){
+  const colorXml=color?`<w:color w:val="${color}"/>`:''
+  return `<w:r><w:rPr>${bold?'<w:b/>':''}<w:sz w:val="${size}"/><w:szCs w:val="${size}"/>${colorXml}</w:rPr><w:t xml:space="preserve">${escapeXml(value)}</w:t></w:r>`
 }
 
-function documentXml(letter){
-  const paragraphs=String(letter||'').split(/\n+/).map(text).filter(Boolean).map(paragraphXml).join('')
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${paragraphs}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`
+function paragraphXml(value,{after=160,before=0,bold=false,size=22,color='',align='left'}={}){
+  return `<w:p><w:pPr><w:jc w:val="${align}"/><w:spacing w:before="${before}" w:after="${after}"/></w:pPr>${runXml(value,{bold,size,color})}</w:p>`
+}
+
+function headerTableXml(name,jobTitle){
+  if(!name&&!jobTitle) return ''
+  const left=name?runXml(name,{bold:true,size:28,color:'111111'}):''
+  const right=jobTitle?runXml(jobTitle,{bold:true,size:20,color:'345B4D'}):''
+  return `<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:bottom w:val="single" w:sz="8" w:space="0" w:color="A8B8B1"/><w:top w:val="nil"/><w:left w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="4200"/><w:gridCol w:w="4800"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="4200" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:spacing w:after="120"/></w:pPr>${left}</w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="4800" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:jc w:val="right"/><w:spacing w:after="120"/></w:pPr>${right}</w:p></w:tc></w:tr></w:tbl>`
+}
+
+function documentXml({letter,jobTitle,cvText}){
+  const contact=extractCvContactDetails(cvText)
+  const header=headerTableXml(contact.name,text(jobTitle))
+  const body=String(letter||'').split(/\n+/).map(text).filter(Boolean).map(value=>paragraphXml(value,{after:170,size:22})).join('')
+  const signatureDetails=[
+    contact.email,
+    contact.phone,
+    contact.linkedIn
+  ].filter(Boolean)
+  const contactXml=signatureDetails.length
+    ? `<w:p><w:pPr><w:spacing w:before="60" w:after="0"/></w:pPr>${signatureDetails.map(value=>runXml(value,{size:19,color:'4B5563'})).join('<w:br/>')}</w:p>`
+    :''
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${header}<w:p><w:pPr><w:spacing w:after="220"/></w:pPr></w:p>${body}${contactXml}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="960" w:right="1020" w:bottom="960" w:left="1020" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`
 }
 
 export async function POST(request){
@@ -28,12 +51,14 @@ export async function POST(request){
   try{
     const body=await request.json()
     const letter=text(body?.letter)
+    const jobTitle=text(body?.jobTitle)
+    const cvText=text(body?.cvText)
     if(letter.length<120) return Response.json({error:'A complete cover letter is required.'},{status:400})
 
     const zip=new JSZip()
     zip.file('[Content_Types].xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`)
     zip.folder('_rels').file('.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`)
-    zip.folder('word').file('document.xml',documentXml(letter))
+    zip.folder('word').file('document.xml',documentXml({letter,jobTitle,cvText}))
     const output=await zip.generateAsync({type:'nodebuffer',compression:'DEFLATE'})
     const outputName=safeOutputName(body?.outputName)
     return new Response(output,{status:200,headers:{
