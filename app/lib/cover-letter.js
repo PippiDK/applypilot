@@ -26,9 +26,12 @@ Hard rules:
 - Do not repeat the CV. Select 2-3 concrete facts most relevant to the vacancy.
 - Keep the tone direct, calm, credible and senior.
 - Avoid exaggerated adjectives and unsupported claims.
-- Use "Dear Hiring Team," unless a named recipient is explicitly present in the job description.
-- End with "Kind regards," and the candidate name when it can be read from the Source CV.
-- Return the finished letter and 3-4 short focus points explaining which grounded themes were used.`
+- Follow the supplied languageMode exactly.
+- If languageMode is "english", write the entire letter and focus points in English.
+- If languageMode is "same_as_job", use the dominant language of the job description. If the job description is mixed-language or unclear, use English.
+- Keep the greeting and closing in the same language as the letter. Use a natural generic hiring-team greeting unless a named recipient is explicitly present in the job description.
+- End with a natural professional closing in the same language and the candidate name when it can be read from the Source CV.
+- Return the finished letter and 3-4 short focus points in the same chosen language explaining which grounded themes were used.`
 
 function jobInput(job={}){
   return {
