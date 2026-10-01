@@ -766,15 +766,7 @@ export default function Home(){
         <p>ApplyPilot searches across trusted job sources and company career sites to show your best opportunities.</p>
         <div className={`clientHeroReady ${resumeLoaded?'isReady':'isEmpty'}`}><span className="clientHeroReadyIcon">{resumeLoaded?'✓':'!'}</span>{resumeLoaded?'Profile Ready':'Profile Empty'}</div>
       </div>
-      <div className="clientHeroVisual" aria-hidden="true">
-        <div className="clientHeroWave"></div>
-        <div className="clientHeroSpark clientHeroSparkOne"></div>
-        <div className="clientHeroSpark clientHeroSparkTwo"></div>
-        <div className="clientHeroCard clientHeroCardBack"><span></span><i></i><i></i></div>
-        <div className="clientHeroCard clientHeroCardMid"><span></span><i></i><i></i></div>
-        <div className="clientHeroCard clientHeroCardFront"><span></span><i></i><i></i><i></i></div>
-        <div className="clientHeroLens"><div></div></div>
-      </div>
+      <div className="metric clientHeroMetric"><b>{state.loading?'…':jobs.length}</b><span>matches</span></div>
     </section>
 
     <div className="profileStrip"><span className="profileSearchSummary">{profileSearchPlanSummary}</span><button className="profileEditButton" onClick={startProfile}>{profileReady?'Edit profile':'Search profile'}</button><button className="cvButton" onClick={startProfile}>{cvReadyCount?`✓ CVs ${cvReadyCount}/${MAX_CVS}`:'Upload CVs'}</button></div>
