@@ -855,7 +855,7 @@ export default function Home(){
 
 
           <div className="section"><h3>Application pack</h3><div className="docs"><div>{pack.cvReady?'✓':'○'} Tailored CV <span className={pack.cvReady?'ready':'pending'}>{pack.tailoredCvLabel}</span></div><div>○ Cover letter <span className="pending">{pack.coverLetterLabel}</span></div></div></div>
-        </>})():<div className="emptyPanel"><h2>No selected vacancy</h2><p>{state.loading?'Searching LinkedIn public pages…':'Run search to see matching vacancies.'}</p></div>}
+        </>})():<div className="emptyPanel"><h2>No selected vacancy</h2><p>{state.loading?'Searching for matching vacancies…':'Run search to see matching vacancies.'}</p></div>}
       </div>
     </section>
 
