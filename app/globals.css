@@ -411,3 +411,54 @@ footer{padding-top:36px;color:#566271}
 @media(prefers-reduced-motion:reduce){
   button,.secondary,.primary,.ghost,.choice,.cvButton,.job{transition:none}
 }
+
+
+/* Human touch · AUVRAEN break link */
+.takeBreakLink{
+  position:fixed;
+  right:0;
+  top:46%;
+  z-index:59;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  padding:10px 9px 10px 11px;
+  border:1px solid rgba(247,121,181,.28);
+  border-right:0;
+  border-radius:12px 0 0 12px;
+  background:linear-gradient(180deg,rgba(35,20,30,.94),rgba(24,16,23,.94));
+  color:#f6b4d3;
+  box-shadow:0 12px 34px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.025);
+  text-decoration:none;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.035em;
+  backdrop-filter:blur(8px);
+  transition:transform .16s ease,border-color .16s ease,background .16s ease,color .16s ease,box-shadow .16s ease;
+}
+.takeBreakLink:hover{
+  transform:translateX(-2px);
+  border-color:rgba(247,121,181,.46);
+  background:linear-gradient(180deg,rgba(48,25,38,.97),rgba(30,18,28,.97));
+  color:#ffd2e6;
+  box-shadow:0 16px 38px rgba(0,0,0,.32),0 0 24px rgba(247,121,181,.08);
+}
+.takeBreakPlane{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:18px;
+  height:18px;
+  font-size:12px;
+  transform:rotate(-8deg);
+}
+@media(max-width:760px){
+  .takeBreakLink{
+    top:auto;
+    right:12px;
+    bottom:14px;
+    border-right:1px solid rgba(247,121,181,.28);
+    border-radius:999px;
+    padding:9px 12px;
+  }
+}
