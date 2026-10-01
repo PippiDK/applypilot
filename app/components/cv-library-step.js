@@ -41,11 +41,6 @@ export default function CvLibraryStep({library,loadingSlot=null,error='',primary
 
     {error&&<div className="errorBox"><b>CV upload failed</b><span>{error}</span></div>}
 
-    {count>0&&<div className="successBox">
-      <b>✓ {count} of {MAX_CVS} CVs ready</b>
-      <span>{getCvSlot(library,1)?.skills?.length?`Detected signals from CV 1: ${(primarySkills.length?primarySkills:getCvSlot(library,1).skills).slice(0,8).join(' · ')}`:getCvSlot(library,1)?'CV 1 remains the active Search CV for now.':'Upload CV 1 to enable Search.'}</span>
-    </div>}
-
     {confirmSlot&&confirmCv&&<div className={styles.confirmBackdrop} onMouseDown={event=>{if(event.target===event.currentTarget)setConfirmSlot(null)}}>
       <div className={styles.confirmModal} role="dialog" aria-modal="true" aria-labelledby="remove-cv-title">
         <div className={styles.confirmBrand}>ApplyPilot</div>
