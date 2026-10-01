@@ -762,7 +762,7 @@ export default function Home(){
     <section className="hero clientHero">
       <div className="clientHeroCopy">
         <p className="eyebrow clientHeroEyebrow">FIND OPPORTUNITIES</p>
-        <h1>Find the right roles for your profile.</h1>
+        <h1>Find the right roles for your Search Profile in Denmark.</h1>
         <p>ApplyPilot searches across trusted job sources and company career sites to show your best opportunities.</p>
         <div className={`clientHeroReady ${resumeLoaded?'isReady':'isEmpty'}`}><span className="clientHeroReadyIcon">{resumeLoaded?'✓':'!'}</span>{resumeLoaded?'Profile Ready':'Profile Empty'}</div>
       </div>
