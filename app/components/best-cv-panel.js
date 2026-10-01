@@ -32,6 +32,11 @@ export default function BestCvPanel({job,cvLibrary,selectedCvId='',onSelectCv=()
     notifyAnalysis(cached)
   },[jobId,description,librarySignature])
 
+  useEffect(()=>{
+    if(readyCvs.length!==1||!jobId||selectedCvId===readyCvs[0].id) return
+    onSelectCv({...readyCvs[0],updateFocus:[]})
+  },[jobId,librarySignature,selectedCvId])
+
   async function runBestCv(){
     if(state.loading||!jobId||!description) return
     if(!readyCvs.length){
@@ -64,7 +69,7 @@ export default function BestCvPanel({job,cvLibrary,selectedCvId='',onSelectCv=()
   const advice=analysis?.recommendation==='update_recommended'?'UPDATE RECOMMENDED':'USE AS IS'
 
   return <>
-    <section className={`${styles.card} cvWorkflowBest`} data-best-cv-ready={Boolean(analysis)}>
+    {readyCvs.length>1&&<section className={`${styles.card} cvWorkflowBest`} data-best-cv-ready={Boolean(analysis)}>
       <div className={styles.head}>
         <div><p className="eyebrow">CV FOR THIS JOB</p><p className={styles.intro}>Compare the ready CVs, then choose the one to adapt. No merging.</p></div>
         <span className={styles.status}>{state.loading?'Analysing…':analysis?(state.source==='cache'?'Cached':'Recommended'):'Not analysed'}</span>
@@ -87,7 +92,7 @@ export default function BestCvPanel({job,cvLibrary,selectedCvId='',onSelectCv=()
         <div className={styles.ranking}><small>RANKED</small><span>{ranked.map(cv=>cvLabel(cv)).join(' › ')}</span></div>
         {analysis.recommendation==='update_recommended'&&analysis.updateFocus?.length>0&&<div className={styles.focus}><small>UPDATE FOCUS</small>{analysis.updateFocus.map((item,index)=><p key={index}>• {item}</p>)}</div>}
       </>}
-    </section>
+    </section>}
     <CvAdaptationChooser
       cvLibrary={cvLibrary}
       recommendedCvId={analysis?.recommendedCvId||''}
