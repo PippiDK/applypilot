@@ -16,7 +16,7 @@ const NOW=new Date('2026-09-03T10:00:00.000Z') // 12:00 in Copenhagen
 test('exposes professional intensive-search cadence labels',()=>{
   assert.deepEqual(FRESHNESS_OPTIONS.map(({id,label})=>({id,label})),[
     {id:'today',label:'1 Day'},
-    {id:'yesterday',label:'Previous Day'},
+    {id:'yesterday',label:'3 Days'},
     {id:'5d',label:'5 Days'},
     {id:'10d',label:'10 Days'},
   ])
@@ -26,7 +26,7 @@ test('exposes professional intensive-search cadence labels',()=>{
   assert.equal(freshnessRequestDays('10d'),10)
 })
 
-test('maps the existing 1 3 7 14 controls to the new semantics',()=>{
+test('maps the 1 3 5 10 controls to rolling freshness semantics',()=>{
   assert.equal(freshnessSelectionFromDays(1),'today')
   assert.equal(freshnessSelectionFromDays(3),'yesterday')
   assert.equal(freshnessSelectionFromDays(5),'5d')
@@ -43,14 +43,13 @@ test('Today keeps only the current Copenhagen calendar day',()=>{
   assert.deepEqual(ids(filterItemsByFreshnessSelection(jobs,'today',NOW)),['today-early'])
 })
 
-test('Yesterday keeps only the previous Copenhagen calendar day',()=>{
+test('3 day mode keeps jobs within a rolling three-day horizon',()=>{
   const jobs=[
     item('today','2026-09-03T06:00:00.000Z'),
-    item('yesterday-morning','2026-09-02T06:00:00.000Z'),
-    item('yesterday-late','2026-09-02T21:55:00.000Z'),
-    item('two-days-ago','2026-09-01T12:00:00.000Z'),
+    item('2d23h','2026-08-31T11:00:00.000Z'),
+    item('3d01h','2026-08-31T09:00:00.000Z'),
   ]
-  assert.deepEqual(ids(filterItemsByFreshnessSelection(jobs,'yesterday',NOW)),['yesterday-morning','yesterday-late'])
+  assert.deepEqual(ids(filterItemsByFreshnessSelection(jobs,'yesterday',NOW)),['today','2d23h'])
 })
 
 test('5 and 10 day modes cap visible results to their actual rolling horizon',()=>{
@@ -66,7 +65,7 @@ test('5 and 10 day modes cap visible results to their actual rolling horizon',()
 
 test('result labels use the same professional wording',()=>{
   assert.equal(freshnessResultLabel('today'),'1 Day')
-  assert.equal(freshnessResultLabel('yesterday'),'Previous Day')
+  assert.equal(freshnessResultLabel('yesterday'),'Newest 3 Days')
   assert.equal(freshnessResultLabel('5d'),'Newest 5 Days')
   assert.equal(freshnessResultLabel('10d'),'Newest 10 Days')
 })
