@@ -104,6 +104,7 @@ export default function Home(){
   const [editedCoverLetters,setEditedCoverLetters]=useState({})
   const [acceptedCoverLetters,setAcceptedCoverLetters]=useState({})
   const [coverLetterExportState,setCoverLetterExportState]=useState({loading:false,error:'',baselineKey:''})
+  const [coverLetterLanguages,setCoverLetterLanguages]=useState({})
   const visibleJobs=useMemo(()=>filterJobItemsByStatus(filterJobItems(jobs,selectedAreas,selectedWorkModels),jobStatuses,selectedStatuses),[jobs,selectedAreas,selectedWorkModels,jobStatuses,selectedStatuses])
   const active=visibleJobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||visibleJobs[0]||null
 
@@ -192,9 +193,11 @@ export default function Home(){
   const reviewedCount=activeAdaptationBaseline?reviewChanges.filter(change=>readAdaptationDecision(decisions,{jobId:activeAdaptationBaseline.jobId,cvId:activeAdaptationBaseline.cvId,sourceVersion:activeAdaptationBaseline.sourceVersion,blockId:change.blockId})).length:0
   const allReviewDecisionsMade=Boolean(currentAdaptationResult)&&reviewedCount===reviewChanges.length
   const selectedSourceDocx=activeAdaptationBaseline?sourceDocxFiles[activeAdaptationBaseline.sourceVersion]||null:null
-  const currentCoverLetter=activeBaselineKey?coverLetters[activeBaselineKey]||null:null
-  const editedCoverLetter=activeBaselineKey&&Object.prototype.hasOwnProperty.call(editedCoverLetters,activeBaselineKey)?editedCoverLetters[activeBaselineKey]:currentCoverLetter?.letter||''
-  const coverLetterAccepted=Boolean(activeBaselineKey&&acceptedCoverLetters[activeBaselineKey])
+  const coverLetterLanguage=activeBaselineKey?coverLetterLanguages[activeBaselineKey]||'same_as_job':'same_as_job'
+  const coverLetterKey=activeBaselineKey?activeBaselineKey+'|'+coverLetterLanguage:''
+  const currentCoverLetter=coverLetterKey?coverLetters[coverLetterKey]||null:null
+  const editedCoverLetter=coverLetterKey&&Object.prototype.hasOwnProperty.call(editedCoverLetters,coverLetterKey)?editedCoverLetters[coverLetterKey]:currentCoverLetter?.letter||''
+  const coverLetterAccepted=Boolean(coverLetterKey&&acceptedCoverLetters[coverLetterKey])
   const coverLetterReady=Boolean(currentCoverLetter&&coverLetterAccepted)
   const profileCompletion=useMemo(()=>{
     const fields=[resumeLoaded,draft.roles,(draftLocations.length&&draftWorkModels.length)]
@@ -725,9 +728,9 @@ export default function Home(){
 
   function attachSourceDocx(file){
     if(!file||!activeAdaptationBaseline) return
-    if(!String(file.name||'').toLowerCase().endsWith('.docx')){ setExportState({loading:false,error:'Please choose the matching source DOCX file.',baselineKey:activeBaselineKey}); return }
+    if(!String(file.name||'').toLowerCase().endsWith('.docx')){ setExportState({loading:false,error:'Please choose the matching source DOCX file.',baselineKey:coverLetterKey}); return }
     setSourceDocxFiles(current=>({...current,[activeAdaptationBaseline.sourceVersion]:file}))
-    setExportState({loading:false,error:'',baselineKey:activeBaselineKey})
+    setExportState({loading:false,error:'',baselineKey:coverLetterKey})
   }
 
   function finalCvBlocksForCoverLetter(){
@@ -740,7 +743,8 @@ export default function Home(){
 
   async function generateCoverLetter({force=false}={}){
     if(!active||!activeAdaptationBaseline||!allReviewDecisionsMade||coverLetterRun.loading) return
-    const key=activeBaselineKey
+    const key=coverLetterKey
+    if(!key) return
     if(currentCoverLetter&&!force){ setCoverLetterOpen(true); return }
     setCoverLetterOpen(true)
     setCoverLetterRun({loading:true,error:'',baselineKey:key})
@@ -750,7 +754,8 @@ export default function Home(){
       const result=await requestCoverLetter({
         baseline:activeAdaptationBaseline,
         job:active.job,
-        finalCvBlocks:finalCvBlocksForCoverLetter()
+        finalCvBlocks:finalCvBlocksForCoverLetter(),
+        languageMode:coverLetterLanguage
       })
       setCoverLetters(current=>({...current,[key]:result}))
       setEditedCoverLetters(current=>({...current,[key]:result.letter}))
@@ -761,16 +766,16 @@ export default function Home(){
   }
 
   function acceptCoverLetter(){
-    if(!activeBaselineKey||!currentCoverLetter||!String(editedCoverLetter||'').trim()) return
-    setAcceptedCoverLetters(current=>({...current,[activeBaselineKey]:true}))
+    if(!coverLetterKey||!currentCoverLetter||!String(editedCoverLetter||'').trim()) return
+    setAcceptedCoverLetters(current=>({...current,[coverLetterKey]:true}))
   }
 
   async function downloadCoverLetter(){
-    if(!active||!activeBaselineKey||!coverLetterAccepted||!String(editedCoverLetter||'').trim()||coverLetterExportState.loading) return
+    if(!active||!coverLetterKey||!coverLetterAccepted||!String(editedCoverLetter||'').trim()||coverLetterExportState.loading) return
     const company=String(active.job.company||'company').replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'')||'company'
     const role=String(active.job.title||'role').replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'')||'role'
     const outputName=`${company}_${role}_COVER_LETTER.docx`
-    setCoverLetterExportState({loading:true,error:'',baselineKey:activeBaselineKey})
+    setCoverLetterExportState({loading:true,error:'',baselineKey:coverLetterKey})
     try{
       const res=await fetch('/api/export-cover-letter',{
         method:'POST',
@@ -791,9 +796,9 @@ export default function Home(){
       anchor.click()
       anchor.remove()
       URL.revokeObjectURL(url)
-      setCoverLetterExportState({loading:false,error:'',baselineKey:activeBaselineKey})
+      setCoverLetterExportState({loading:false,error:'',baselineKey:coverLetterKey})
     }catch(error){
-      setCoverLetterExportState({loading:false,error:error.message||'Cover letter DOCX could not be created.',baselineKey:activeBaselineKey})
+      setCoverLetterExportState({loading:false,error:error.message||'Cover letter DOCX could not be created.',baselineKey:coverLetterKey})
     }
   }
 
@@ -805,7 +810,7 @@ export default function Home(){
     const company=String(active.job.company||'tailored').replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'')||'tailored'
     const base=String(activeAdaptationBaseline.fileName||'CV').replace(/\.docx$/i,'')
     const outputName=`${base}_${company}_TAILORED.docx`
-    setExportState({loading:true,error:'',baselineKey:activeBaselineKey})
+    setExportState({loading:true,error:'',baselineKey:coverLetterKey})
     try{
       const form=new FormData()
       form.append('file',selectedSourceDocx)
@@ -826,9 +831,9 @@ export default function Home(){
       anchor.click()
       anchor.remove()
       URL.revokeObjectURL(url)
-      setExportState({loading:false,error:'',baselineKey:activeBaselineKey})
+      setExportState({loading:false,error:'',baselineKey:coverLetterKey})
     }catch(error){
-      setExportState({loading:false,error:error.message||'Tailored DOCX could not be created.',baselineKey:activeBaselineKey})
+      setExportState({loading:false,error:error.message||'Tailored DOCX could not be created.',baselineKey:coverLetterKey})
     }
   }
 
@@ -935,7 +940,7 @@ export default function Home(){
 
           <div className="section coverLetterSection">
             <div className="coverLetterSectionHead"><div><p className="eyebrow">COVER LETTER</p><h3>{currentCoverLetter?'Review your tailored cover letter':'Create your tailored cover letter'}</h3><p>{allReviewDecisionsMade?'Built from the Full JD, selected CV and your reviewed CV update.':'Complete the CV update first so the cover letter uses your final application positioning.'}</p></div><span className={coverLetterReady?'ready coverLetterSectionStatus':'pending coverLetterSectionStatus'}>{coverLetterReady?'Ready':currentCoverLetter?'Review needed':allReviewDecisionsMade?'Ready to generate':'CV update required'}</span></div>
-            <button className="primary coverLetterSectionAction" onClick={()=>generateCoverLetter()} disabled={!allReviewDecisionsMade||coverLetterRun.loading}>{coverLetterRun.loading?'Generating cover letter…':currentCoverLetter?'View cover letter':'Generate cover letter'}</button>
+            <div className="coverLetterControls"><label className="coverLetterLanguageControl"><span>Language</span><select value={coverLetterLanguage} onChange={event=>setCoverLetterLanguages(current=>({...current,[coverLetterKey]:event.target.value}))} disabled={!activeBaselineKey||coverLetterRun.loading}><option value="same_as_job">Same as job description</option><option value="english">English</option></select></label><button className="primary coverLetterSectionAction" onClick={()=>generateCoverLetter()} disabled={!allReviewDecisionsMade||coverLetterRun.loading}>{coverLetterRun.loading?'Generating cover letter…':currentCoverLetter?'View cover letter':'Generate cover letter'}</button></div>
           </div>
 
           <div className="section"><h3>Application pack</h3><div className="docs"><div>{allReviewDecisionsMade?'✓':'○'} Tailored CV <span className={allReviewDecisionsMade?'ready':'pending'}>{allReviewDecisionsMade?'Ready':currentAdaptationResult?'Review needed':'Not generated yet'}</span></div><div><span>{coverLetterReady?'✓':'○'} Cover letter</span><span className={coverLetterReady?'ready':'pending'}>{coverLetterReady?'Ready':allReviewDecisionsMade?'Not generated yet':'Complete CV update first'}</span></div></div></div>
@@ -959,13 +964,13 @@ export default function Home(){
 
     {coverLetterOpen&&active&&activeAdaptationBaseline&&<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget&&!coverLetterRun.loading)setCoverLetterOpen(false)}}><div className="modal coverLetterModal">
       <div className="modalHead"><div><p className="eyebrow">COVER LETTER REVIEW</p><h2>{active.job.title}</h2><p className="muted">{active.job.company} · {active.job.location}</p><p className="reviewBaseline">CV {selectedAdaptationCvRecord?.slot} · {activeAdaptationBaseline.fileName}</p></div><button className="close" onClick={()=>setCoverLetterOpen(false)} disabled={coverLetterRun.loading}>×</button></div>
-      {coverLetterRun.loading&&coverLetterRun.baselineKey===activeBaselineKey&&<div className="adaptationLoading"><b>Writing cover letter…</b><span>Using the Full JD, selected Source CV and your reviewed CV positioning.</span></div>}
-      {coverLetterRun.error&&coverLetterRun.baselineKey===activeBaselineKey&&<div className="errorBox"><b>Cover letter generation failed safely</b><span>{coverLetterRun.error}</span></div>}
+      {coverLetterRun.loading&&coverLetterRun.baselineKey===coverLetterKey&&<div className="adaptationLoading"><b>Writing cover letter…</b><span>Using the Full JD, selected Source CV and your reviewed CV positioning.</span></div>}
+      {coverLetterRun.error&&coverLetterRun.baselineKey===coverLetterKey&&<div className="errorBox"><b>Cover letter generation failed safely</b><span>{coverLetterRun.error}</span></div>}
       {currentCoverLetter&&!coverLetterRun.loading&&<>
         <div className="coverLetterReviewStatus"><b>{coverLetterAccepted?'✓ Cover letter accepted':'Cover letter ready for review'}</b><span>Editable draft · factual claims must remain grounded in the selected Source CV.</span></div>
-        <label className="coverLetterEditorLabel">LETTER · EDITABLE<textarea className="coverLetterEditor" value={editedCoverLetter} onChange={event=>{setEditedCoverLetters(current=>({...current,[activeBaselineKey]:event.target.value}));setAcceptedCoverLetters(current=>({...current,[activeBaselineKey]:false}))}} rows="18"/></label>
+        <label className="coverLetterEditorLabel">LETTER · EDITABLE<textarea className="coverLetterEditor" value={editedCoverLetter} onChange={event=>{setEditedCoverLetters(current=>({...current,[coverLetterKey]:event.target.value}));setAcceptedCoverLetters(current=>({...current,[coverLetterKey]:false}))}} rows="18"/></label>
         {currentCoverLetter.focusPoints?.length>0&&<div className="coverLetterFocus"><small>WHY THIS LETTER FITS</small>{currentCoverLetter.focusPoints.map((item,index)=><p key={index}>• {item}</p>)}</div>}
-        {coverLetterExportState.error&&coverLetterExportState.baselineKey===activeBaselineKey&&<div className="errorBox"><b>DOCX export failed</b><span>{coverLetterExportState.error}</span></div>}
+        {coverLetterExportState.error&&coverLetterExportState.baselineKey===coverLetterKey&&<div className="errorBox"><b>DOCX export failed</b><span>{coverLetterExportState.error}</span></div>}
         <div className="coverLetterActions"><button className="secondary" onClick={()=>generateCoverLetter({force:true})} disabled={coverLetterRun.loading}>Regenerate</button><button className="primary" onClick={acceptCoverLetter} disabled={!String(editedCoverLetter||'').trim()}>{coverLetterAccepted?'✓ Accepted':'Accept'}</button></div>
       </>}
       <div className="reviewFooter"><button className="secondary" onClick={()=>setCoverLetterOpen(false)} disabled={coverLetterRun.loading||coverLetterExportState.loading}>Close review</button>{coverLetterAccepted&&<button className="primary" onClick={downloadCoverLetter} disabled={coverLetterExportState.loading}>{coverLetterExportState.loading?'Creating DOCX…':'Download cover letter DOCX'}</button>}</div>
