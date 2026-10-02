@@ -468,6 +468,29 @@ footer{padding-top:36px;color:#566271}
 .clientHeroFamily{
   position:absolute;
   left:40px;
+  bottom:10px;
+  z-index:4;
+  color:rgba(231,190,210,.56);
+  font-size:8px;
+  font-weight:650;
+  letter-spacing:.08em;
+  text-transform:none;
+  opacity:.72;
+}
+.clientHeroFamily:before{content:none}
+@media(max-width:780px){
+  .clientHeroFamily{
+    position:static;
+    margin-top:14px;
+    font-size:8px;
+    opacity:.68;
+  }
+}
+
+
+.clientHeroFamily{
+  position:absolute;
+  left:40px;
   bottom:18px;
   z-index:4;
   display:inline-flex;
