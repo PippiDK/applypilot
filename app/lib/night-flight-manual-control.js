@@ -65,9 +65,10 @@ export async function executeManualNightFlight({
   if(mode==='start'){
     // Deliberately invoke the existing per-user runner, not the time-gated scheduler.
     // It resumes today's existing target run instead of duplicating discovery.
-    const result=await startRun({supabase,userId,now})
+    const result=await startRun({supabase,userId,now,processMatchesInline:false})
     return {mode,runId:result.runId,targetDate:result.targetDate,resumed:result.resumed,status:result.status,
-      jobsReady:result.jobsReady,jobsFailed:result.jobsFailed,unfinished:result.unfinished}
+      jobsReady:result.jobsReady,jobsFailed:result.jobsFailed,unfinished:result.unfinished,
+      processingDeferred:result.processingDeferred===true}
   }
   if(mode!=='resume'&&mode!=='retry') throw new ManualNightFlightError('Unknown manual Night Flight mode')
   const run=await ownedRun(supabase,userId,runId)
