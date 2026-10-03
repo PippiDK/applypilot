@@ -46,6 +46,7 @@ test('manual start ignores the scheduler time gate but reuses its per-user runne
     now:new Date('2026-09-24T23:30:00Z'),
     startRun:async input=>{call=input;return {runId:RUN,targetDate:'2026-09-23',resumed:true,status:'RUNNING',jobsReady:1}}})
   assert.equal(call.userId,'u1')
+  assert.equal(call.processMatchesInline,false)
   assert.equal(result.resumed,true)
   assert.equal(result.runId,RUN)
 })
