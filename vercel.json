@@ -12,31 +12,31 @@
     },
     {
       "path": "/api/cron/night-flight",
-      "schedule": "30 9 * * *"
+      "schedule": "0 1 * * *"
     },
     {
       "path": "/api/cron/night-flight-worker",
-      "schedule": "35 9 * * *"
+      "schedule": "0 2 * * *"
     },
     {
       "path": "/api/cron/night-flight-worker",
-      "schedule": "40 9 * * *"
+      "schedule": "0 3 * * *"
     },
     {
       "path": "/api/cron/night-flight-worker",
-      "schedule": "45 9 * * *"
+      "schedule": "0 4 * * *"
     },
     {
       "path": "/api/cron/night-flight-worker",
-      "schedule": "50 9 * * *"
+      "schedule": "0 5 * * *"
     },
     {
       "path": "/api/cron/night-flight-worker",
-      "schedule": "55 9 * * *"
+      "schedule": "0 6 * * *"
     },
     {
       "path": "/api/cron/night-flight-worker",
-      "schedule": "59 9 * * *"
+      "schedule": "0 7 * * *"
     }
   ]
 }
