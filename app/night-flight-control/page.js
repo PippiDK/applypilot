@@ -9,6 +9,21 @@ const button={padding:'9px 14px',borderRadius:8,border:'1px solid #ab84cf',backg
 const muted={color:'#b2a8bb',fontSize:13}
 const rowStyle={padding:'10px 0',borderTop:'1px solid #44374f'}
 
+async function parseResponseBody(response){
+  const contentType=String(response.headers.get('content-type')||'').toLowerCase()
+  const text=await response.text()
+  if(contentType.includes('application/json')){
+    try{return text?JSON.parse(text):{}}
+    catch{return {error:'Night Flight returned an invalid JSON response.'}}
+  }
+  if(!response.ok){
+    const summary=text.replace(/\s+/g,' ').trim().slice(0,180)
+    return {error:summary||('Night Flight request failed with HTTP '+response.status+'.')}
+  }
+  try{return text?JSON.parse(text):{}}
+  catch{return {error:'Night Flight returned an unexpected response.'}}
+}
+
 function Progress({label,elapsed}){
   return <span className={styles.progress} role="status" aria-live="polite">
     <span className={styles.spinner} aria-hidden="true"/>
@@ -27,7 +42,7 @@ export default function NightFlightControl(){
   const refresh=useCallback(async()=>{
     try{
       const response=await fetch('/api/night-flight-manual',{cache:'no-store'})
-      const body=await response.json()
+      const body=await parseResponseBody(response)
       if(!response.ok) throw new Error(body.error||'Could not load Night Flight')
       setRuns(Array.isArray(body.runs)?body.runs:[])
     }catch(e){setError(e.message||'Could not load Night Flight')}
@@ -53,9 +68,10 @@ export default function NightFlightControl(){
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({mode,runId,jobKey}),cache:'no-store',
       })
-      const body=await response.json()
+      const body=await parseResponseBody(response)
       if(!response.ok) throw new Error(body.error||'Manual run failed')
-      setMessage(`${mode.toUpperCase()}: ${body.targetDate||''} · ${body.status||'finished'} · READY ${body.jobsReady??'—'} · FAILED ${body.jobsFailed??'—'}. Refresh or resume if processing remains.`)
+      const deferred=body.processingDeferred===true?' · processing continues via worker':''
+      setMessage(`${mode.toUpperCase()}: ${body.targetDate||''} · ${body.status||'finished'} · READY ${body.jobsReady??'—'} · FAILED ${body.jobsFailed??'—'}${deferred}. Refresh or resume if processing remains.`)
     }catch(e){setError(e.message||'Request failed; refresh to inspect current status')}
     finally{await refresh();setBusy(false);setActiveRequest(null)}
   }
