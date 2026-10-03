@@ -38,6 +38,7 @@ export async function runNightFlightForUser({
   discover=runNightFlightLastCompletedDayDiscovery,
   persist=persistNightFlightAreaScope,
   processMatches=processNightFlightRunMatches,
+  processMatchesInline=true,
 }={}){
   requireSupabase(supabase)
   const id=clean(userId)
@@ -54,6 +55,15 @@ export async function runNightFlightForUser({
 
   if(existingError) throw new Error(`Night Flight run lookup failed: ${existingError.message||'unknown Supabase error'}`)
   if(existing?.id){
+    if(!processMatchesInline){
+      return {
+        runId:existing.id,
+        targetDate,
+        resumed:true,
+        status:existing.status||'RUNNING',
+        processingDeferred:true,
+      }
+    }
     const processed=await processMatches({supabase,userId:id,runId:existing.id})
     return {
       ...processed,
@@ -67,6 +77,17 @@ export async function runNightFlightForUser({
   if(clean(batch?.targetDate)!==targetDate) throw new Error('Night Flight discovery target date mismatch')
   const persisted=await persist({supabase,userId:id,batch})
   if(!clean(persisted?.runId)) throw new Error('Night Flight persisted run is unavailable')
+  if(!processMatchesInline){
+    return {
+      ...persisted,
+      runId:persisted.runId,
+      targetDate,
+      resumed:false,
+      status:persisted.status||'RUNNING',
+      processingDeferred:true,
+    }
+  }
+
   const processed=await processMatches({supabase,userId:id,runId:persisted.runId})
 
   return {
@@ -124,7 +145,7 @@ export async function runNightFlightScheduler({
 
   for(const userId of userIds){
     try{
-      const result=await runUser({supabase,userId,now:current})
+      const result=await runUser({supabase,userId,now:current,processMatchesInline:false})
       results.push({userId,...(result||{})})
     }catch(error){
       failures.push({userId,error:safeErrorMessage(error)})
