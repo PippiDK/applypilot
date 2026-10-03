@@ -120,6 +120,21 @@ test('Task 8 processes both resumed and newly created Night Flight runs through 
   assert.equal(fresh.resumed,false)
 })
 
+test('scheduler defers Match processing so discovery can finish within the request budget',async()=>{
+  const mod=await loadScheduler()
+  assert.ok(mod,'night-flight-scheduler.js must exist')
+  const supabase=fakeSupabase({settings:[{user_id:'u1',enabled:true}]})
+  let received
+  const result=await mod.runNightFlightScheduler({
+    supabase,
+    now:new Date('2026-07-15T00:00:00.000Z'),
+    cleanup:async()=>({deletedRuns:0}),
+    runUser:async input=>{received=input;return {runId:'run-1',targetDate:'2026-07-14',status:'RUNNING',processingDeferred:true}},
+  })
+  assert.equal(received.processMatchesInline,false)
+  assert.equal(result.results[0].processingDeferred,true)
+})
+
 test('Task 7 isolates one user failure and continues the remaining enabled users',async()=>{
   const mod=await loadScheduler()
   assert.ok(mod,'night-flight-scheduler.js must exist')
