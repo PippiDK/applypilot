@@ -10,7 +10,7 @@ function job(jobKey,index){
     job:{
       title:`Project Manager ${index}`,
       company:'Acme',
-      description:`Lead end-to-end delivery for programme ${index}. Manage stakeholders and governance.`,
+      description:`Lead end-to-end delivery for programme ${index}. Manage stakeholders, governance, risks, dependencies, planning, implementation and go-live outcomes.`,
     },
   }
 }
