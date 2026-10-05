@@ -160,18 +160,16 @@ test('Task 7 isolates one user failure and continues the remaining enabled users
   assert.match(result.failures[0].error,/source failed/i)
 })
 
-test('Vercel config preserves discovery ticks and uses Hobby-safe hourly continuation jobs overnight',async()=>{
+test('Vercel config preserves discovery ticks and keeps Hobby-safe recovery available every hour',async()=>{
   const config=JSON.parse(await readFile(new URL('../../vercel.json',import.meta.url),'utf8'))
-  assert.deepEqual(config.crons,[
+  assert.deepEqual(config.crons.slice(0,2),[
     {path:'/api/cron/night-flight',schedule:'0 0 * * *'},
     {path:'/api/cron/night-flight',schedule:'0 1 * * *'},
-    {path:'/api/cron/night-flight-worker',schedule:'0 2 * * *'},
-    {path:'/api/cron/night-flight-worker',schedule:'0 3 * * *'},
-    {path:'/api/cron/night-flight-worker',schedule:'0 4 * * *'},
-    {path:'/api/cron/night-flight-worker',schedule:'0 5 * * *'},
-    {path:'/api/cron/night-flight-worker',schedule:'0 6 * * *'},
-    {path:'/api/cron/night-flight-worker',schedule:'0 7 * * *'},
   ])
+  assert.deepEqual(
+    config.crons.slice(2),
+    Array.from({length:24},(_,hour)=>({path:'/api/cron/night-flight-worker',schedule:`0 ${hour} * * *`})),
+  )
 })
 
 test('Task 7 cron route is protected by CRON_SECRET and uses server admin Supabase',async()=>{

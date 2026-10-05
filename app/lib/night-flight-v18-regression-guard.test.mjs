@@ -273,9 +273,9 @@ test('V18-15 cached Night Flight Match is reused by Manual Search with zero seco
   assert.equal(analyzeCalls,0)
 })
 
-test('V18-16 ordinary Search freshness remains Previous / 5 / 10',()=>{
+test('V18-16 ordinary Search freshness remains 3 / 5 / 10',()=>{
   const contract=FRESHNESS_OPTIONS.filter(option=>['yesterday','5d','10d'].includes(option.id)).map(option=>option.label)
-  assert.deepEqual(contract,['Previous Day','5 Days','10 Days'])
+  assert.deepEqual(contract,['3 Days','5 Days','10 Days'])
 })
 
 test('V18-17 LinkedIn / Jobindex / Jobnet existing search routes remain present',async()=>{
