@@ -64,3 +64,9 @@ test('NF-AA-6 renders Already Applied as a separate badge without replacing Nigh
   assert.match(component,/status==='QUEUED'[^\n]*tone:'pending'/)
   assert.doesNotMatch(component,/writeJobStatus|JOB_STATUS_STORAGE_KEY|localStorage/)
 })
+
+
+test('Night Flight job cards show published age with the same relative-date algorithm as main Search',()=>{
+  assert.match(component,/function dateText\(value\).*days===0\?'Today':days===1\?'1 day ago':`\$\{days\} days ago`/)
+  assert.match(component,/Published: \{dateText\(item\.job\?\.publishedAt\)\}/)
+})
