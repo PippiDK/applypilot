@@ -46,6 +46,65 @@ export function expertiseMatchCacheReference({
   return `expertise-match:${digest}`
 }
 
+export async function readExpertiseMatchCache({
+  supabase,
+  userId,
+  logicalJobKey,
+  profileFingerprint,
+  engineVersion=EXPERTISE_MATCH_ENGINE_VERSION,
+}={}){
+  requireSupabase(supabase)
+  const user=clean(userId)
+  const logicalKey=clean(logicalJobKey)
+  const profile=clean(profileFingerprint)
+  const engine=clean(engineVersion)
+  if(!user||!logicalKey||!profile||!engine) throw new Error('Expertise Match cache identity is incomplete')
+  const cacheKey=expertiseMatchCacheReference({userId:user,logicalJobKey:logicalKey,profileFingerprint:profile,engineVersion:engine})
+  const {data:cached,error}=await supabase
+    .from('expertise_match_cache')
+    .select('cache_key,analysis')
+    .eq('cache_key',cacheKey)
+    .eq('user_id',user)
+    .maybeSingle()
+  if(error) throw new Error(`Expertise Match cache read failed: ${error.message||'unknown Supabase error'}`)
+  return {
+    analysis:cached?.analysis&&typeof cached.analysis==='object'?cached.analysis:null,
+    matchCacheKey:cacheKey,
+    cacheHit:Boolean(cached?.analysis&&typeof cached.analysis==='object'),
+  }
+}
+
+export async function storeExpertiseMatchCache({
+  supabase,
+  userId,
+  logicalJobKey,
+  profileFingerprint,
+  analysis,
+  engineVersion=EXPERTISE_MATCH_ENGINE_VERSION,
+  now=new Date(),
+}={}){
+  requireSupabase(supabase)
+  const user=clean(userId)
+  const logicalKey=clean(logicalJobKey)
+  const profile=clean(profileFingerprint)
+  const engine=clean(engineVersion)
+  if(!user||!logicalKey||!profile||!engine) throw new Error('Expertise Match cache identity is incomplete')
+  if(!analysis||typeof analysis!=='object'||Array.isArray(analysis)) throw new Error('Expertise Match analysis is invalid')
+  const cacheKey=expertiseMatchCacheReference({userId:user,logicalJobKey:logicalKey,profileFingerprint:profile,engineVersion:engine})
+  const stamp=now instanceof Date?now.toISOString():new Date(now).toISOString()
+  const {error}=await supabase.from('expertise_match_cache').upsert({
+    cache_key:cacheKey,
+    user_id:user,
+    logical_job_key:logicalKey,
+    profile_fingerprint:profile,
+    engine_version:engine,
+    analysis,
+    updated_at:stamp,
+  })
+  if(error) throw new Error(`Expertise Match cache write failed: ${error.message||'unknown Supabase error'}`)
+  return {analysis,matchCacheKey:cacheKey,cacheHit:false}
+}
+
 export async function getOrCreateExpertiseMatch({
   supabase,
   userId,
@@ -64,34 +123,25 @@ export async function getOrCreateExpertiseMatch({
   const logicalKey=clean(logicalJobKey)||logicalExpertiseJobKey(job)
   const profile=clean(profileFingerprint)
   const engine=clean(engineVersion)
-  const cacheKey=expertiseMatchCacheReference({userId:user,logicalJobKey:logicalKey,profileFingerprint:profile,engineVersion:engine})
 
-  const {data:cached,error:readError}=await supabase
-    .from('expertise_match_cache')
-    .select('cache_key,analysis')
-    .eq('cache_key',cacheKey)
-    .eq('user_id',user)
-    .maybeSingle()
-  if(readError) throw new Error(`Expertise Match cache read failed: ${readError.message||'unknown Supabase error'}`)
-  if(cached?.analysis&&typeof cached.analysis==='object'){
-    return {analysis:cached.analysis,matchCacheKey:cacheKey,cacheHit:true}
-  }
+  const cached=await readExpertiseMatchCache({
+    supabase,
+    userId:user,
+    logicalJobKey:logicalKey,
+    profileFingerprint:profile,
+    engineVersion:engine,
+  })
+  if(cached.cacheHit) return cached
 
   const analysis=await analyze({job,cvText})
-  if(!analysis||typeof analysis!=='object') throw new Error('Expertise Match analysis is invalid')
-
-  const {error:writeError}=await supabase.from('expertise_match_cache').upsert({
-    cache_key:cacheKey,
-    user_id:user,
-    logical_job_key:logicalKey,
-    profile_fingerprint:profile,
-    engine_version:engine,
+  return storeExpertiseMatchCache({
+    supabase,
+    userId:user,
+    logicalJobKey:logicalKey,
+    profileFingerprint:profile,
+    engineVersion:engine,
     analysis,
-    updated_at:new Date().toISOString(),
   })
-  if(writeError) throw new Error(`Expertise Match cache write failed: ${writeError.message||'unknown Supabase error'}`)
-
-  return {analysis,matchCacheKey:cacheKey,cacheHit:false}
 }
 
 export async function resolveManualExpertiseMatch({
