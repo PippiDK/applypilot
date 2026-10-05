@@ -18,6 +18,8 @@ function jobBadge(status){
   return {label:'UNKNOWN',tone:'pending'}
 }
 
+function dateText(value){ if(!value) return 'Date unavailable'; const d=new Date(value); if(!Number.isFinite(d.getTime())) return 'Date unavailable'; const days=Math.max(0,Math.floor((Date.now()-d.getTime())/86400000)); return days===0?'Today':days===1?'1 day ago':`${days} days ago` }
+
 function formatDay(value){
   if(!value) return '—'
   const date=new Date(`${value}T12:00:00Z`)
@@ -199,6 +201,7 @@ export default function NightFlightMorningReview(){
                 {item.analysis?.expertiseMatch!=null&&<span className={styles.jobScore}>{item.analysis?.expertiseMatch}%</span>}
               </span>
               <span className={styles.jobMeta}>{item.job?.company||'Company unavailable'} · {item.job?.location||item.source||'Location unavailable'}</span>
+              <span className={styles.jobMeta}>Published: {dateText(item.job?.publishedAt)}</span>
               <span className={styles.jobBadges}>
                 <span className={styles[jobBadge(item.status).tone]}>{jobBadge(item.status).label}</span>
                 {item.alreadyApplied&&<span className={styles.alreadyApplied}>APPLIED</span>}
