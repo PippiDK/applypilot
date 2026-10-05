@@ -5,7 +5,7 @@ import {safeValidationDiagnosticCode} from './night-flight-validation-diagnostic
 
 export const DEFAULT_EXPERTISE_BATCH_MAX_JOBS=24
 export const DEFAULT_EXPERTISE_BATCH_MAX_INPUT_CHARS=180000
-export const DEFAULT_EXPERTISE_BATCH_MAX_OUTPUT_TOKENS=32000
+export const DEFAULT_EXPERTISE_BATCH_MAX_OUTPUT_TOKENS=90000
 
 const clean=value=>String(value??'').trim()
 const itemArraySchema=expertiseOnePassSchema.properties.items
