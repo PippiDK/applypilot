@@ -27,6 +27,7 @@ import AppliedJobsArchive from './components/applied-jobs-archive.js'
 import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
 import {writeSearchProfileStorage} from './lib/storage-housekeeping.js'
 import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
+import {runLabeledSearchTask} from './lib/search-task-label.js'
 import {freshnessSelectionFromDays,freshnessResultLabel} from './lib/freshness-selection.js'
 import {companyConnection,connectedCompanyNames,defaultCompanyWatch,readCompanyWatch,writeCompanyWatch,TARGET_COMPANIES} from './lib/company-watch.js'
 import {CONSULTANT_PORTALS,connectedConsultantPortalIds,defaultConsultantPortals,readConsultantPortals,writeConsultantPortals} from './lib/consultant-portals.js'
@@ -385,7 +386,7 @@ export default function Home(){
   try{
     const tasks=[]
 
-    if(selectedSources.includes('linkedin')) tasks.push((async()=>{
+    if(selectedSources.includes('linkedin')) tasks.push(runLabeledSearchTask('LinkedIn',async()=>{
       let res
       if(hasProfilePlan){
         const fingerprint=profile.unionSearchPlanFingerprint||profile.unionSearchPlan?.fingerprint
@@ -419,9 +420,9 @@ export default function Home(){
         })
       }
       return {source:'linkedin',data}
-    })())
+    }))
 
-    if(selectedSources.includes('jobindex')) tasks.push((async()=>{
+    if(selectedSources.includes('jobindex')) tasks.push(runLabeledSearchTask('Jobindex',async()=>{
       if(!hasProfilePlan) throw new Error('Jobindex requires a saved Search Profile.')
       const res=await fetch('/api/jobindex-profile-search',{
         method:'POST',
@@ -435,9 +436,9 @@ export default function Home(){
       const data=await res.json()
       if(!res.ok) throw new Error(data.error||'Jobindex search failed')
       return {source:'jobindex',data}
-    })())
+    }))
 
-    if(selectedSources.includes('jobnet')) tasks.push((async()=>{
+    if(selectedSources.includes('jobnet')) tasks.push(runLabeledSearchTask('Jobnet',async()=>{
       if(!hasProfilePlan) throw new Error('Jobnet requires a saved Search Profile.')
       const res=await fetch('/api/jobnet-profile-search',{
         method:'POST',
@@ -451,13 +452,13 @@ export default function Home(){
       const data=await res.json()
       if(!res.ok) throw new Error(data.error||'Jobnet search failed')
       return {source:'jobnet',data}
-    })())
+    }))
 
     if(activeCompanySites.length){
       if(!hasProfilePlan) throw new Error('Company Watch requires a saved Search Profile.')
       const companyChunks=[]
       for(let i=0;i<activeCompanySites.length;i+=4) companyChunks.push(activeCompanySites.slice(i,i+4))
-      companyChunks.forEach(companies=>tasks.push((async()=>{
+      companyChunks.forEach((companies,index)=>tasks.push(runLabeledSearchTask(`Company Watch batch ${index+1} (${companies.join(', ')})`,async()=>{
         const res=await fetch('/api/company-profile-search',{
           method:'POST',
           headers:{'Content-Type':'application/json'},
@@ -473,10 +474,10 @@ export default function Home(){
         try{data=raw?JSON.parse(raw):{}}catch{throw new Error(res.ok?'Company site search returned invalid response':`Company site search failed (HTTP ${res.status})`)}
         if(!res.ok) throw new Error(data.error||`Company site search failed (HTTP ${res.status})`)
         return {source:'company_site',data}
-      })()))
+      })))
     }
 
-    if(activeConsultantPortals.length) tasks.push((async()=>{
+    if(activeConsultantPortals.length) tasks.push(runLabeledSearchTask('Consultant portals',async()=>{
       if(!hasProfilePlan) throw new Error('Consultant Portals require a saved Search Profile.')
       const res=await fetch('/api/consultant-profile-search',{
         method:'POST',
@@ -491,7 +492,7 @@ export default function Home(){
       const data=await res.json()
       if(!res.ok) throw new Error(data.error||'Consultant portal search failed')
       return {source:'consultant_portal',data}
-    })())
+    }))
 
     const settled=await Promise.allSettled(tasks)
     const successful=settled.filter(item=>item.status==='fulfilled').map(item=>item.value)
