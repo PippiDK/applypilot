@@ -86,6 +86,35 @@ export function packExpertiseBatchJobs(entries=[],{
   return batches
 }
 
+function validateBatchResultWithLocalCvRepair(raw,jobDescription,sourceCv){
+  const items=Array.isArray(raw?.items)?raw.items.map(item=>({
+    ...item,
+    cvEvidence:Array.isArray(item?.cvEvidence)?[...item.cvEvidence]:item?.cvEvidence,
+  })):[]
+  const repairedIndexes=new Set()
+
+  while(true){
+    try{
+      return {
+        validated:validateExpertiseOnePass({items},jobDescription,sourceCv),
+        repairedCount:repairedIndexes.size,
+      }
+    }catch(error){
+      const diagnosticCode=safeValidationDiagnosticCode(error)
+      const itemIndex=Number.isInteger(error?.diagnosticIndex)?error.diagnosticIndex:-1
+      if(diagnosticCode!=='CV_EVIDENCE_NOT_IN_SOURCE'||itemIndex<0||itemIndex>=items.length||repairedIndexes.has(itemIndex)) throw error
+
+      repairedIndexes.add(itemIndex)
+      items[itemIndex]={
+        ...items[itemIndex],
+        status:'NOT_EVIDENCED',
+        cvEvidence:[],
+        reason:'No exact Source CV evidence validated.',
+      }
+    }
+  }
+}
+
 export async function analyzeExpertiseBatch({
   jobs=[],
   cvText,
@@ -138,9 +167,9 @@ export async function analyzeExpertiseBatch({
       continue
     }
     try{
-      const validated=validateExpertiseOnePass({items:raw.items},entry.job.description,sourceCv)
+      const {validated,repairedCount}=validateBatchResultWithLocalCvRepair(raw,entry.job.description,sourceCv)
       const analysis=evaluateExpertiseFromJudgements(validated.requirements,validated.evaluations)
-      results.push({jobKey:entry.jobKey,analysis})
+      results.push({jobKey:entry.jobKey,analysis,repairedCount})
     }catch(error){
       if(!error.code) error.code='AI_EXPERTISE_VALIDATION'
       error.diagnosticCode=safeValidationDiagnosticCode(error)
