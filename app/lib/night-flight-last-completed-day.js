@@ -1,7 +1,7 @@
 import {loadLatestNightFlightProfileState} from './night-flight-profile-store.js'
 import {loadNightFlightSettings} from './night-flight-settings-store.js'
 import {validateNightFlightSettings} from './night-flight-settings.js'
-import {filterItemsByFreshnessSelection,previousCopenhagenDateKey} from './freshness-selection.js'
+import {copenhagenDateKey,previousCopenhagenDateKey} from './freshness-selection.js'
 import {buildDiscoverySearchPlan} from './search-query-expansion-ai.js'
 import {createLinkedInStableFetcher} from './linkedin-stable-fetcher.js'
 import {searchLinkedInProfile} from './linkedin-profile-search.js'
@@ -10,7 +10,7 @@ import {searchJobnetSource} from './jobnet-source-adapter.js'
 import {evaluateProfileJob} from './job-profile-evaluator.js'
 import {jobnetRoleContextGuard} from './jobnet-role-context-guard.js'
 
-const PREVIOUS_DAY_REQUEST_DAYS=3
+const SOURCE_RETRIEVAL_DAYS=2
 const OFFICIAL_SOURCES=['linkedin','jobindex','jobnet']
 
 const clean=value=>String(value??'').replace(/\s+/g,' ').trim()
@@ -135,7 +135,7 @@ function evaluateOfficialSource(sourceResult,{searchPlan,exclusionRules,now,jobn
       job,
       foundBy:job.foundBy,
       exclusionRules,
-      freshnessDays:PREVIOUS_DAY_REQUEST_DAYS,
+      freshnessDays:SOURCE_RETRIEVAL_DAYS,
       now,
     })
     if(result.pass) jobs.push({job,evaluation:result.evaluation})
@@ -189,6 +189,18 @@ export function lastCompletedCopenhagenDate(now=new Date()){
   return target
 }
 
+export function filterNightFlightPreviousCopenhagenDay(items=[],now=new Date()){
+  const current=now instanceof Date?now:new Date(now)
+  if(!Number.isFinite(current.getTime())) return []
+  const targetDate=lastCompletedCopenhagenDate(current)
+  return (Array.isArray(items)?items:[]).filter(item=>{
+    const value=item?.job?.publishedAt??item?.publishedAt
+    if(!value) return false
+    const published=new Date(value)
+    return Number.isFinite(published.getTime())&&copenhagenDateKey(published)===targetDate
+  })
+}
+
 export async function runNightFlightLastCompletedDayDiscovery({
   supabase,
   userId,
@@ -220,7 +232,7 @@ export async function runNightFlightLastCompletedDayDiscovery({
     const runner=runners[source]
     if(typeof runner!=='function') throw new Error(`Night Flight source runner is not available: ${source}`)
     const result=await runner({
-      freshnessDays:PREVIOUS_DAY_REQUEST_DAYS,
+      freshnessDays:SOURCE_RETRIEVAL_DAYS,
       profile,
       searchProfile,
       discoverySearchPlan,
@@ -230,7 +242,7 @@ export async function runNightFlightLastCompletedDayDiscovery({
     sourceResults.push({
       ...(result&&typeof result==='object'?result:{}),
       source,
-      jobs:filterItemsByFreshnessSelection(result?.jobs||[],'yesterday',current),
+      jobs:filterNightFlightPreviousCopenhagenDay(result?.jobs||[],current),
     })
   }
 
