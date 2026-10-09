@@ -80,13 +80,13 @@ test('Task 4 calls only selected sources and performs a fresh discovery on every
 
   assert.deepEqual(calls.map(([source])=>source),['linkedin','jobnet','linkedin','jobnet'])
   for(const [,input] of calls){
-    assert.equal(input.freshnessDays,3,'Previous Day discovery must use the existing wider request window before exact filtering')
+    assert.equal(input.freshnessDays,2,'Night Flight retrieval must only use enough source lookback to cover the full previous Copenhagen calendar day')
     assert.equal(input.profile.profile_fingerprint,'profile-fp-2')
     assert.equal(input.searchProfile.unionSearchPlan.directions[0].role,'Senior Project Manager')
   }
 })
 
-test('Task 4 filters every source to exact Previous Day in Copenhagen before merge',async()=>{
+test('Task 4 filters every source to the exact previous Copenhagen calendar day before merge',async()=>{
   const mod=await loadModule()
   assert.ok(mod,'night-flight-last-completed-day.js must exist')
   const now=new Date('2026-09-05T10:00:00.000Z')
@@ -159,4 +159,36 @@ test('Task 8 freezes exact Search Profile and CV state into the discovery batch 
   assert.equal(batch.cvTextSnapshot,profile.cv_text)
   assert.equal(batch.cvSourceVersion,profile.cv_source_version)
   assert.equal(Object.isFrozen(batch.searchProfileSnapshot),true)
+})
+
+
+test('Night Flight exact-day filter excludes both older and current-day jobs around Copenhagen midnight',async()=>{
+  const mod=await loadModule()
+  assert.ok(mod)
+  const now=new Date('2026-10-07T00:15:00.000Z') // 02:15 Oct 7 in Copenhagen
+  const jobs=[
+    item({source:'linkedin',id:'before',publishedAt:'2026-10-05T21:59:59.999Z'}), // 23:59:59 Oct 5 CPH
+    item({source:'linkedin',id:'start',publishedAt:'2026-10-05T22:00:00.000Z'}),  // 00:00 Oct 6 CPH
+    item({source:'linkedin',id:'end',publishedAt:'2026-10-06T21:59:59.999Z'}),    // 23:59:59 Oct 6 CPH
+    item({source:'linkedin',id:'after',publishedAt:'2026-10-06T22:00:00.000Z'}), // 00:00 Oct 7 CPH
+  ]
+  assert.deepEqual(
+    mod.filterNightFlightPreviousCopenhagenDay(jobs,now).map(entry=>entry.job.sourceJobId),
+    ['start','end']
+  )
+})
+
+test('Night Flight exact-day filter follows Copenhagen DST calendar days',async()=>{
+  const mod=await loadModule()
+  assert.ok(mod)
+  const now=new Date('2026-10-26T01:30:00.000Z') // 02:30 Oct 26 CET; previous day was 25-hour Oct 25
+  const jobs=[
+    item({source:'linkedin',id:'start',publishedAt:'2026-10-24T22:00:00.000Z'}), // 00:00 Oct 25 CEST
+    item({source:'linkedin',id:'late',publishedAt:'2026-10-25T22:59:59.999Z'}),  // 23:59:59 Oct 25 CET
+    item({source:'linkedin',id:'next',publishedAt:'2026-10-25T23:00:00.000Z'}),  // 00:00 Oct 26 CET
+  ]
+  assert.deepEqual(
+    mod.filterNightFlightPreviousCopenhagenDay(jobs,now).map(entry=>entry.job.sourceJobId),
+    ['start','late']
+  )
 })
