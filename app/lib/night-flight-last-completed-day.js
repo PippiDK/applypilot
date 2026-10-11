@@ -1,7 +1,7 @@
 import {loadLatestNightFlightProfileState} from './night-flight-profile-store.js'
 import {loadNightFlightSettings} from './night-flight-settings-store.js'
 import {validateNightFlightSettings} from './night-flight-settings.js'
-import {copenhagenDateKey,previousCopenhagenDateKey} from './freshness-selection.js'
+import {previousCopenhagenDateKey} from './freshness-selection.js'
 import {buildDiscoverySearchPlan} from './search-query-expansion-ai.js'
 import {createNightFlightSourceRunners,nightFlightCopenhagenDateKey} from './night-flight-source-search.js'
 
