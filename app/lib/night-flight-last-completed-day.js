@@ -1,16 +1,10 @@
 import {loadLatestNightFlightProfileState} from './night-flight-profile-store.js'
 import {loadNightFlightSettings} from './night-flight-settings-store.js'
 import {validateNightFlightSettings} from './night-flight-settings.js'
-import {copenhagenDateKey,previousCopenhagenDateKey} from './freshness-selection.js'
+import {previousCopenhagenDateKey} from './freshness-selection.js'
 import {buildDiscoverySearchPlan} from './search-query-expansion-ai.js'
-import {createLinkedInStableFetcher} from './linkedin-stable-fetcher.js'
-import {searchLinkedInProfile} from './linkedin-profile-search.js'
-import {searchJobindexSource} from './jobindex-source-adapter.js'
-import {searchJobnetSource} from './jobnet-source-adapter.js'
-import {evaluateProfileJob} from './job-profile-evaluator.js'
-import {jobnetRoleContextGuard} from './jobnet-role-context-guard.js'
+import {createNightFlightSourceRunners,nightFlightCopenhagenDateKey} from './night-flight-source-search.js'
 
-const SOURCE_RETRIEVAL_DAYS=2
 const OFFICIAL_SOURCES=['linkedin','jobindex','jobnet']
 
 const clean=value=>String(value??'').replace(/\s+/g,' ').trim()
@@ -122,60 +116,6 @@ export function mergeNightFlightDiscovery(sourceResults=[]){
   return output
 }
 
-function limitedJob(job={}){
-  return (Array.isArray(job.sourceRecords)?job.sourceRecords:[]).some(record=>record?.limitedData===true)||!clean(job.fullJd||job.description)
-}
-
-function evaluateOfficialSource(sourceResult,{searchPlan,exclusionRules,now,jobnetGuard=false}={}){
-  const jobs=[]
-  for(const job of Array.isArray(sourceResult?.jobs)?sourceResult.jobs:[]){
-    if(limitedJob(job)) continue
-    if(jobnetGuard&&!jobnetRoleContextGuard(job).pass) continue
-    const result=evaluateProfileJob({
-      job,
-      foundBy:job.foundBy,
-      exclusionRules,
-      freshnessDays:SOURCE_RETRIEVAL_DAYS,
-      now,
-    })
-    if(result.pass) jobs.push({job,evaluation:result.evaluation})
-  }
-  jobs.sort((a,b)=>Number(b.evaluation?.score||0)-Number(a.evaluation?.score||0)||(new Date(b.job?.publishedAt||0)-new Date(a.job?.publishedAt||0)))
-  return {...sourceResult,jobs}
-}
-
-function defaultSourceRunners(){
-  return {
-    linkedin:async({freshnessDays,discoverySearchPlan,exclusionRules,now})=>searchLinkedInProfile({
-      freshnessDays,
-      unionSearchPlan:discoverySearchPlan,
-      exclusionRules,
-      previousCandidates:[],
-      previousVerifiedJobs:[],
-      fetcher:createLinkedInStableFetcher(),
-      now,
-    }),
-    jobindex:async({freshnessDays,discoverySearchPlan,exclusionRules,now})=>{
-      const result=await searchJobindexSource({
-        freshnessDays,
-        unionSearchPlan:discoverySearchPlan,
-        exclusionRules,
-        filters:{},
-        fetcher:globalThis.fetch,
-      })
-      return evaluateOfficialSource(result,{searchPlan:discoverySearchPlan,exclusionRules,now})
-    },
-    jobnet:async({freshnessDays,discoverySearchPlan,exclusionRules,now})=>{
-      const result=await searchJobnetSource({
-        freshnessDays,
-        unionSearchPlan:discoverySearchPlan,
-        fetcher:globalThis.fetch,
-      })
-      return evaluateOfficialSource(result,{searchPlan:discoverySearchPlan,exclusionRules,now,jobnetGuard:true})
-    },
-  }
-}
-
 function deepFreeze(value,seen=new WeakSet()){
   if(!value||typeof value!=='object'||seen.has(value)) return value
   seen.add(value)
@@ -197,7 +137,7 @@ export function filterNightFlightPreviousCopenhagenDay(items=[],now=new Date()){
     const value=item?.job?.publishedAt??item?.publishedAt
     if(!value) return false
     const published=new Date(value)
-    return Number.isFinite(published.getTime())&&copenhagenDateKey(published)===targetDate
+    return Number.isFinite(published.getTime())&&nightFlightCopenhagenDateKey(published)===targetDate
   })
 }
 
@@ -224,7 +164,7 @@ export async function runNightFlightLastCompletedDayDiscovery({
 
   const discoverySearchPlan=await buildDiscoverySearchPlan({unionSearchPlan})
   const exclusionRules=Array.isArray(searchProfile.exclusionRules)?searchProfile.exclusionRules:[]
-  const runners=sourceRunners||defaultSourceRunners()
+  const runners=sourceRunners||createNightFlightSourceRunners()
   const sourceResults=[]
 
   for(const source of settings.sources){
@@ -232,7 +172,7 @@ export async function runNightFlightLastCompletedDayDiscovery({
     const runner=runners[source]
     if(typeof runner!=='function') throw new Error(`Night Flight source runner is not available: ${source}`)
     const result=await runner({
-      freshnessDays:SOURCE_RETRIEVAL_DAYS,
+      targetDate:lastCompletedCopenhagenDate(current),
       profile,
       searchProfile,
       discoverySearchPlan,

@@ -80,7 +80,8 @@ test('Task 4 calls only selected sources and performs a fresh discovery on every
 
   assert.deepEqual(calls.map(([source])=>source),['linkedin','jobnet','linkedin','jobnet'])
   for(const [,input] of calls){
-    assert.equal(input.freshnessDays,2,'Night Flight retrieval must only use enough source lookback to cover the full previous Copenhagen calendar day')
+    assert.equal(input.targetDate,'2026-09-04','Night Flight search must receive the exact previous Copenhagen calendar date')
+    assert.equal('freshnessDays' in input,false,'Night Flight search must not receive normal Search freshness semantics')
     assert.equal(input.profile.profile_fingerprint,'profile-fp-2')
     assert.equal(input.searchProfile.unionSearchPlan.directions[0].role,'Senior Project Manager')
   }
