@@ -249,7 +249,23 @@ function mergeDiscoveryCandidates(current=[],previous=[],now=new Date()){
   }
   for(const candidate of Array.isArray(previous)?previous:[]) add(candidate,false)
   for(const candidate of Array.isArray(current)?current:[]) add(candidate,true)
-  return [...byId.values()]
+
+  // Preserve current-discovery data precedence, but process fresh discovery first.
+  // This keeps newly surfaced vacancies at the front of the detail-fetch queue
+  // while cached-only master-pool entries follow afterwards.
+  const currentIds=[]
+  const seenCurrent=new Set()
+  for(const candidate of Array.isArray(current)?current:[]){
+    const id=String(candidate?.jobId||'').trim()
+    if(id&&byId.has(id)&&!seenCurrent.has(id)){
+      seenCurrent.add(id)
+      currentIds.push(id)
+    }
+  }
+  return [
+    ...currentIds.map(id=>byId.get(id)),
+    ...[...byId.entries()].filter(([id])=>!seenCurrent.has(id)).map(([,candidate])=>candidate),
+  ]
 }
 
 export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},exclusionRules=[],previousCandidates=[],previousVerifiedJobs=[],fetcher,now=new Date()}={}){
