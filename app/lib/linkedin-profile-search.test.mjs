@@ -179,7 +179,7 @@ test('1/3/7/14-day views are local subsets over the same discovered jobs',async(
 })
 
 
-test('previous in-window candidate remains in the 14-day master pool when LinkedIn omits it on refresh',async()=>{
+test('previous in-window candidate remains in the rolling 10-day master pool when LinkedIn omits it on refresh',async()=>{
   const previous=[{jobId:'1717171717',url:'https://www.linkedin.com/jobs/view/1717171717/',title:'Senior IT Project Manager',company:'Remembered Co',location:'Copenhagen',publishedAt:'2026-08-25',foundBy:[]}]
   const fetcher=async url=>{
     if(url.includes('/seeMoreJobPostings/search')) return ''
@@ -193,11 +193,11 @@ test('previous in-window candidate remains in the 14-day master pool when Linked
   assert.equal(result.stats.masterPoolSize,1)
 })
 
-test('master pool drops a previous candidate once its known posting date is outside 14 days',async()=>{
+test('master pool drops a previous candidate once its known posting time is outside the rolling 10-day horizon',async()=>{
   let detailRequests=0
-  const previous=[{jobId:'1818181818',url:'https://www.linkedin.com/jobs/view/1818181818/',title:'Senior IT Project Manager',company:'Expired Co',location:'Copenhagen',publishedAt:'2026-08-01',foundBy:[]}]
+  const previous=[{jobId:'1818181818',url:'https://www.linkedin.com/jobs/view/1818181818/',title:'Senior IT Project Manager',company:'Expired Co',location:'Copenhagen',publishedAt:'2026-08-17T11:59:59Z',foundBy:[]}]
   const fetcher=async url=>{if(url.includes('/seeMoreJobPostings/search')) return '';detailRequests++;return detailHtml({title:'Senior IT Project Manager',company:'Expired Co'})}
-  const result=await searchLinkedInProfile({freshnessDays:14,unionSearchPlan:plan('Senior IT Project Manager'),previousCandidates:previous,fetcher,now:new Date('2026-08-27T12:00:00Z')})
+  const result=await searchLinkedInProfile({freshnessDays:10,unionSearchPlan:plan('Senior IT Project Manager'),previousCandidates:previous,fetcher,now:new Date('2026-08-27T12:00:00Z')})
   assert.deepEqual(result.masterCandidates,[])
   assert.equal(result.jobs.length,0)
   assert.equal(detailRequests,0)
