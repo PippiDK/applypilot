@@ -48,15 +48,17 @@ test('RED freshness: an exhausted LinkedIn discovery budget never reports comple
   assert.match(result.coverage.detail||'',/budget/i)
 })
 
-test('RED freshness: Master Pool capacity retains newly discovered candidates, not just oldest 500',()=>{
+test('RED freshness: rolling 10-day Master Pool keeps fresh candidates even beyond the old 500-record boundary',()=>{
   const storage=memoryStorage()
-  const old=Array.from({length:500},(_,i)=>({jobId:'old-'+String(i).padStart(3,'0')}))
-  const fresh=Array.from({length:6},(_,i)=>({jobId:'fresh-'+i}))
-  writeLinkedInMasterPool({storage,fingerprint:'superset-fixture',candidates:[...old,...fresh]})
-  const persisted=readLinkedInMasterPoolSnapshot({storage,fingerprint:'superset-fixture'})
+  const now=new Date('2026-09-18T12:00:00Z')
+  const retained=Array.from({length:500},(_,i)=>({jobId:'retained-'+String(i).padStart(3,'0'),publishedAt:'2026-09-10T12:00:00Z'}))
+  const fresh=Array.from({length:6},(_,i)=>({jobId:'fresh-'+i,publishedAt:'2026-09-18T10:00:00Z'}))
+  writeLinkedInMasterPool({storage,fingerprint:'superset-fixture',candidates:[...retained,...fresh],now})
+  const persisted=readLinkedInMasterPoolSnapshot({storage,fingerprint:'superset-fixture',now})
+  assert.equal(persisted.candidates.length,506)
   for(const row of fresh){
     assert.equal(persisted.candidates.some(candidate=>candidate.jobId===row.jobId),true,
-      `Freshly discovered ${row.jobId} must survive the 500-record cache boundary`)
+      `Freshly discovered ${row.jobId} must survive while it is inside the rolling 10-day pool`)
   }
 })
 
