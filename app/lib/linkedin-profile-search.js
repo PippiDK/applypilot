@@ -1,10 +1,10 @@
 import {parseDetailHtml} from './linkedin-search.js'
 import {searchLinkedInShadow} from './linkedin-shadow-discovery.js'
 import {createAuditRecord,updateAuditRecord,auditList} from './linkedin-search-audit.js'
+import {isWithinLinkedInMasterPoolRetention} from './linkedin-master-pool-cache.js'
 
 const LINKEDIN_JOB_DETAIL='https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/'
 const WINDOWS=new Set([1,3,5,7,10,14])
-const DISCOVERY_HORIZON_DAYS=14
 const GENERIC_ROLE_WORDS=new Set(['senior','sr','junior','jr','principal','global','regional','international','experienced','manager','lead','specialist','consultant','coordinator'])
 
 const clean=value=>String(value??'').toLowerCase().replace(/[–—_/&]+/g,' ').replace(/[^a-z0-9æøå+.# -]/g,' ').replace(/\s+/g,' ').trim()
@@ -238,7 +238,7 @@ function mergeDiscoveryCandidates(current=[],previous=[],now=new Date()){
   const add=(candidate,isCurrent=false)=>{
     const normalized=compactCandidate(candidate)
     if(!normalized) return
-    if(!isCurrent&&normalized.publishedAt&&!withinFreshness(normalized.publishedAt,DISCOVERY_HORIZON_DAYS,now)) return
+    if(!isCurrent&&!isWithinLinkedInMasterPoolRetention(normalized,now)) return
     const existing=byId.get(normalized.jobId)
     if(!existing){byId.set(normalized.jobId,normalized);return}
     byId.set(normalized.jobId,{
@@ -258,7 +258,7 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
   if(!Array.isArray(unionSearchPlan?.directions)||unionSearchPlan.directions.length===0) throw new Error('Search Profile requires at least one role direction.')
 
   // Every user-selected freshness window performs a fresh LinkedIn discovery.
-  // The persistent 14-day master pool is only a cache for already known jobs/JDs:
+  // The persistent master pool retains only the rolling 10-day Search horizon:
   // fresh discovery finds deltas, while verified JDs are reused by stable job ID.
   const discovery=await searchLinkedInShadow({freshnessDays:days,unionSearchPlan,fetcher})
   const masterCandidates=mergeDiscoveryCandidates(discovery.candidates,previousCandidates,now)
