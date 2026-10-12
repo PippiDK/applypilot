@@ -204,6 +204,30 @@ test('master pool drops a previous candidate once its known posting time is outs
 })
 
 
+test('fresh discovery candidates are placed before cached-only master-pool candidates for detail fetch',async()=>{
+  const detailOrder=[]
+  const previousCandidates=[
+    {jobId:'9100000001',url:'u1',title:'Senior IT Project Manager',company:'Old One',location:'Copenhagen',publishedAt:'2026-08-26T10:00:00Z',foundBy:[]},
+    {jobId:'9100000002',url:'u2',title:'Senior IT Project Manager',company:'Old Two',location:'Copenhagen',publishedAt:'2026-08-26T10:00:00Z',foundBy:[]},
+  ]
+  const fetcher=async url=>{
+    if(url.includes('/seeMoreJobPostings/search')) return card('9199999999','Senior IT Project Manager','Fresh Co')
+    const id=url.split('/').pop()
+    detailOrder.push(id)
+    return detailHtml({title:'Senior IT Project Manager',company:id==='9199999999'?'Fresh Co':'Old Co',description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies and governance. '.repeat(5)})
+  }
+  const result=await searchLinkedInProfile({
+    freshnessDays:3,
+    unionSearchPlan:plan('Senior IT Project Manager'),
+    previousCandidates,
+    fetcher,
+    now:new Date('2026-08-27T12:00:00Z'),
+  })
+  assert.equal(result.masterCandidates[0].jobId,'9199999999')
+  assert.equal(detailOrder[0],'9199999999')
+  assert.deepEqual(new Set(result.masterCandidates.map(item=>item.jobId)),new Set(['9199999999','9100000001','9100000002']))
+})
+
 test('cached verified JD is reused without another LinkedIn detail request',async()=>{
   let detailRequests=0
   const previousCandidates=[{jobId:'1919191919',url:'https://www.linkedin.com/jobs/view/1919191919/',title:'Senior IT Project Manager',company:'Cached Co',location:'Copenhagen',publishedAt:'2026-08-27',foundBy:[]}]
