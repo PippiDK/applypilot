@@ -165,6 +165,10 @@ export async function processNightFlightDiscoveryUnit({supabase,unit,owner,
      candidates.splice(0,candidates.length,...next)
      nextPage=page+1
      phase=result.hasMore?'DISCOVERY':'DETAIL'
+     if(result.limitReached){
+       error='PAGE_FAILED:'+page+':Source pagination limit reached before full coverage'
+       phase=candidates.length?'DETAIL':'DONE'
+     }
    }catch(e){
      const prior=clean(unit.last_error).match(/^PAGE_RETRY:(\d+):(\d+):/)
      const attempts=prior&&Number(prior[1])===page?Number(prior[2])+1:1
