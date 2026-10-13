@@ -11,6 +11,7 @@ create table if not exists public.night_flight_discovery_runs (
   sources text[] not null,
   areas text[] not null,
   expanded_plan jsonb not null,
+  initialized boolean not null default false,
   state text not null default 'DISCOVERING'
     check (state in ('DISCOVERING','FROZEN','FAILED')),
   frozen_run_id uuid references public.night_flight_runs(id) on delete set null,
@@ -62,7 +63,7 @@ begin
   select u.id into claimed_id
     from public.night_flight_discovery_units u
     join public.night_flight_discovery_runs r on r.id=u.discovery_run_id
-    where u.phase <> 'DONE' and r.state='DISCOVERING'
+    where u.phase <> 'DONE' and r.state='DISCOVERING' and r.initialized=true
       and (u.lease_until is null or u.lease_until < clock_timestamp())
     order by r.target_date asc,u.created_at asc,u.source,u.direction_index
     for update of u skip locked limit 1;
@@ -80,7 +81,7 @@ grant execute on function public.claim_night_flight_discovery_unit(uuid,integer)
 -- An expired claimant must never overwrite a newer claimant's checkpoint.
 create or replace function public.save_night_flight_discovery_unit(
  p_id uuid, p_owner uuid, p_phase text,p_page integer,p_detail integer,
- p_candidates jsonb,p_jobs jsonb,p_error text default null
+ p_candidates jsonb,p_jobs jsonb,p_error text default null,p_retry_seconds integer default 0
 ) returns boolean language plpgsql security definer set search_path = ''
 as $$
 declare affected integer;
@@ -92,13 +93,13 @@ begin
  update public.night_flight_discovery_units
  set phase=p_phase,next_page=p_page,next_detail=p_detail,
      candidates=p_candidates,verified_jobs=p_jobs,last_error=left(p_error,500),
-     lease_owner=null,lease_until=null,updated_at=clock_timestamp()
+     lease_owner=null,lease_until=case when p_retry_seconds>0 then clock_timestamp()+make_interval(secs=>least(p_retry_seconds,86400)) else null end,updated_at=clock_timestamp()
  where id=p_id and lease_owner=p_owner and lease_until>clock_timestamp();
  get diagnostics affected=row_count;
  return affected=1;
 end $$;
-revoke all on function public.save_night_flight_discovery_unit(uuid,uuid,text,integer,integer,jsonb,jsonb,text) from public,anon,authenticated;
-grant execute on function public.save_night_flight_discovery_unit(uuid,uuid,text,integer,integer,jsonb,jsonb,text) to service_role;
+revoke all on function public.save_night_flight_discovery_unit(uuid,uuid,text,integer,integer,jsonb,jsonb,text,integer) from public,anon,authenticated;
+grant execute on function public.save_night_flight_discovery_unit(uuid,uuid,text,integer,integer,jsonb,jsonb,text,integer) to service_role;
 
 -- Transactional freeze prevents exposing a partly written run to Match worker.
 create or replace function public.freeze_night_flight_discovery(
@@ -124,6 +125,7 @@ begin
  if header.state='FROZEN' and header.frozen_run_id is not null then
    return header.frozen_run_id;
  end if;
+ if not header.initialized then raise exception 'discovery not initialized'; end if;
  if header.state<>'DISCOVERING' then raise exception 'discovery not active'; end if;
  select id into existing_id from public.night_flight_runs
   where user_id=header.user_id and target_date=header.target_date;
