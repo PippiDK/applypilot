@@ -412,7 +412,7 @@ export default function Home(){
               previousVerifiedJobs:verifiedJobs,
               continuation,
               detailBatchStart,
-              detailBatchSize:25,
+              detailBatchSize:10,
             }),
           })
           data=await res.json()
