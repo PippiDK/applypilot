@@ -390,18 +390,65 @@ export default function Home(){
       let res
       if(hasProfilePlan){
         const fingerprint=profile.unionSearchPlanFingerprint||profile.unionSearchPlan?.fingerprint
-        const poolSnapshot=readLinkedInMasterPoolSnapshot({storage:localStorage,fingerprint})
-        res=await fetch('/api/linkedin-profile-search',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({
-            freshnessDays,
-            unionSearchPlan:profile.unionSearchPlan,
-            exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[],
-            previousCandidates:poolSnapshot.candidates,
-            previousVerifiedJobs:poolSnapshot.verifiedJobs,
-          }),
-        })
+        let poolSnapshot=readLinkedInMasterPoolSnapshot({storage:localStorage,fingerprint})
+        let continuation=false
+        let detailBatchStart=0
+        let continuationSearchPlan=profile.unionSearchPlan
+        let data=null
+        const auditById=new Map()
+        const cumulative={detailFailures:0,detail429Attempts:0,detail429Recovered:0,detail429Final:0,detailTimeouts:0,detailChallenges:0,detailBudgetFailures:0,detailOtherFailures:0,incompleteDetails:0}
+        while(true){
+          res=await fetch('/api/linkedin-profile-search',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({
+              freshnessDays,
+              unionSearchPlan:continuation?continuationSearchPlan:profile.unionSearchPlan,
+              exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[],
+              previousCandidates:poolSnapshot.candidates,
+              previousVerifiedJobs:poolSnapshot.verifiedJobs,
+              continuation,
+              detailBatchStart,
+              detailBatchSize:25,
+            }),
+          })
+          data=await res.json()
+          if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
+          continuationSearchPlan=data.continuationSearchPlan||continuationSearchPlan
+          for(const row of Array.isArray(data.audit)?data.audit:[]){
+            const id=String(row?.jobId||'')
+            if(!id) continue
+            const current=auditById.get(id)
+            if(row?.stage==='DISCOVERED'&&current&&current.stage!=='DISCOVERED') continue
+            auditById.set(id,row)
+          }
+          for(const key of Object.keys(cumulative)) cumulative[key]+=Number(data.stats?.[key]||0)
+          if(Array.isArray(data.masterCandidates)){
+            writeLinkedInMasterPool({
+              storage:localStorage,
+              fingerprint,
+              candidates:data.masterCandidates,
+              verifiedJobs:Array.isArray(data.masterVerifiedJobs)?data.masterVerifiedJobs:[],
+            })
+            poolSnapshot={candidates:data.masterCandidates,verifiedJobs:Array.isArray(data.masterVerifiedJobs)?data.masterVerifiedJobs:[]}
+          }
+          setJobs(Array.isArray(data.jobs)?data.jobs:[])
+          if(data.stats?.detailComplete===true) break
+          const next=Number(data.stats?.detailNextStart)
+          if(!Number.isFinite(next)||next<=detailBatchStart) throw new Error('LinkedIn detail continuation did not advance.')
+          detailBatchStart=next
+          continuation=true
+        }
+        data={
+          ...data,
+          audit:[...auditById.values()],
+          stats:{...data.stats,...cumulative},
+          coverage:{
+            ...data.coverage,
+            status:(cumulative.detailFailures+cumulative.incompleteDetails)>0?'ACCESS LIMITED':data.coverage?.status,
+          },
+        }
+        return {source:'linkedin',data}
       }else{
         res=await fetch('/api/linkedin-search',{
           method:'POST',
@@ -411,14 +458,6 @@ export default function Home(){
       }
       const data=await res.json()
       if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
-      if(hasProfilePlan&&Array.isArray(data.masterCandidates)){
-        writeLinkedInMasterPool({
-          storage:localStorage,
-          fingerprint:profile.unionSearchPlanFingerprint||profile.unionSearchPlan?.fingerprint,
-          candidates:data.masterCandidates,
-          verifiedJobs:Array.isArray(data.masterVerifiedJobs)?data.masterVerifiedJobs:[],
-        })
-      }
       return {source:'linkedin',data}
     }))
 
