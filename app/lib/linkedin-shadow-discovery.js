@@ -85,17 +85,26 @@ export async function searchLinkedInShadow({freshnessDays=7,unionSearchPlan={},f
   const byId=new Map()
   // Cover the current-day window first so wider retrieval cannot displace it.
   const windows=days===1?[1]:[1,days]
-  for(const windowDays of windows){
+  for(const [windowIndex,windowDays] of windows.entries()){
     let eligible=[...searchGroups]
     // LinkedIn page sizes may vary; track the offset independently per query.
     const offsets=new Map(searchGroups.map(group=>[group,0]))
     const lastPageSignatures=new Map()
     const repeatedPageCounts=new Map()
     for(let page=0;page<MAX_SEARCH_PAGES&&eligible.length;page++){
-      const remaining=MAX_SEARCH_REQUESTS-searchRequests
-      if(remaining<=0){requestBudgetReached=true;break}
+      // Preserve the initial page of every query in the selected wider window.
+      const reserved=windowIndex===0&&windows.length>1?searchGroups.length:0
+      const remaining=Math.max(0,MAX_SEARCH_REQUESTS-searchRequests-reserved)
+      if(remaining<=0){
+        if(reserved)pageLimitReached=true
+        else requestBudgetReached=true
+        break
+      }
       const scheduled=eligible.slice(0,remaining)
-      if(scheduled.length<eligible.length)requestBudgetReached=true
+      if(scheduled.length<eligible.length){
+        if(reserved)pageLimitReached=true
+        else requestBudgetReached=true
+      }
       const settled=await mapLimit(scheduled,4,async group=>{
         const start=offsets.get(group)
         const qs=new URLSearchParams({keywords:group.query,location:'Denmark',
