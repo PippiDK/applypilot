@@ -439,14 +439,16 @@ export async function nightFlightIncrementalDiscoverPage({
    const rows=parseSearchHtml(await read(`${LINKEDIN_SEARCH}?${qs}`))
    const candidates=rows.filter(row=>isNightFlightTargetDate(row?.publishedAt,targetDate))
        .filter(row=>clean(row?.jobId)).map(row=>({...row,foundBy:[selected]}))
-   return {candidates,hasMore:rows.length>=LINKEDIN_PAGE_SIZE&&page+1<LINKEDIN_MAX_PAGES,rawCount:rows.length}
+   return {candidates,hasMore:rows.length>=LINKEDIN_PAGE_SIZE&&page+1<LINKEDIN_MAX_PAGES,
+     limitReached:rows.length>=LINKEDIN_PAGE_SIZE&&page+1>=LINKEDIN_MAX_PAGES,rawCount:rows.length}
  }
  if(source==='jobindex'){
    const read=fetcher||globalThis.fetch
    const records=extractJobindexSearchRecords(await fetchText(read,jobindexSearchUrl(selected.query,page+1)))
    const candidates=records.filter(record=>clean(record?.jobId)&&titleRelevant(record,selected))
       .map(record=>({...record,foundBy:[selected]}))
-   return {candidates,hasMore:records.length>0&&page+1<3,rawCount:records.length}
+   return {candidates,hasMore:records.length>0&&page+1<3,
+     limitReached:records.length>0&&page+1>=3,rawCount:records.length}
  }
  if(source==='jobnet'){
    const read=fetcher||globalThis.fetch
@@ -463,7 +465,8 @@ export async function nightFlightIncrementalDiscoverPage({
      if(!titleRelevant(record,selected)) continue
      if(clean(record?.jobAdId)) candidates.push({jobAdId:record.jobAdId,record,foundBy:[selected]})
    }
-   return {candidates,hasMore:page+1<2&&rows.length>=20&&!(old>0&&onTarget===0),rawCount:rows.length}
+   return {candidates,hasMore:page+1<2&&rows.length>=20&&!(old>0&&onTarget===0),
+     limitReached:rows.length>=20&&page+1>=2,rawCount:rows.length}
  }
  throw new Error('Unsupported Night Pilot source')
 }
