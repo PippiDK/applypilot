@@ -215,10 +215,22 @@ export async function tryFreezeNightFlightDiscovery({supabase,discoveryRunId}={}
  * Runs bounded work only. A worker invocation may stop at any checkpoint,
  * and later workers resume via transactional claims.
  */
+function copenhagenHour(now){
+ const pieces=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Copenhagen',
+   hour:'2-digit',hourCycle:'h23'}).formatToParts(now)
+ return Number(pieces.find(item=>item.type==='hour')?.value)
+}
 export async function advanceNightFlightIncrementalDiscovery({supabase,now=new Date(),
  maxSteps=4,runStep=processNightFlightDiscoveryUnit}={}){
  if(!supabase) throw new Error('Night Pilot discovery worker requires database')
  const owner=randomUUID(),start=Date.now(),steps=[],errors=[]
+ let seeded=null
+ // If the 02:00 scheduler request failed, the next hourly worker must recover
+ // the missing exact-date checkpoint rather than waiting another calendar day.
+ if(copenhagenHour(now)>=2){
+  try{seeded=await seedNightFlightIncrementalScheduler({supabase,now})}
+  catch(error){errors.push({stage:'seed',error:clean(error?.message).slice(0,250)})}
+ }
  for(let i=0;i<Math.min(Math.max(maxSteps,1),8)&&Date.now()-start<MAX_TICK_MS-115000;i++){
   const claimed=requireSuccess(await supabase.rpc('claim_night_flight_discovery_unit',{
    p_owner:owner,p_lease_seconds:180
@@ -236,5 +248,5 @@ export async function advanceNightFlightIncrementalDiscovery({supabase,now=new D
   try{const outcome=await tryFreezeNightFlightDiscovery({supabase,discoveryRunId:item.id});if(outcome.frozen)frozen.push(outcome)}
   catch(e){errors.push({runId:item.id,error:clean(e?.message).slice(0,250)})}
  }
- return {steps,frozen,errors}
+ return {seeded,steps,frozen,errors}
 }
