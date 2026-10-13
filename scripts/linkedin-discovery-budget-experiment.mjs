@@ -44,6 +44,7 @@ for(const trial of [
   const buckets={'0-2':0,'3-5':0,'6-10':0,'over10':0,'unknown':0}
   const dates={}
   const ids=[]
+  const ageById={}
   for(const candidate of result.candidates){
    const age=dayAge(candidate.publishedAt)
    if(age===null) buckets.unknown++
@@ -54,9 +55,10 @@ for(const trial of [
    const day=candidate.publishedAt?dateKey(candidate.publishedAt):'unknown'
    dates[day]=(dates[day]||0)+1
    ids.push(candidate.jobId)
+   ageById[candidate.jobId]=age
   }
   all[trial.name]={...trial,durationSeconds:Math.round((Date.now()-started)/1000),stats:result.stats,
-   coverage:result.coverage,events,buckets,dates,ids}
+   coverage:result.coverage,events,buckets,dates,ids,ageById}
   console.log('EXPERIMENT_RESULT',JSON.stringify({...all[trial.name],ids:undefined}))
  }catch(e){
   all[trial.name]={...trial,durationSeconds:Math.round((Date.now()-started)/1000),error:String(e.message||e),events}
@@ -72,6 +74,6 @@ if(a?.ids&&b?.ids){
  const base=new Set(a.ids),extra=b.ids.filter(id=>!base.has(id))
  console.log('EXPERIMENT_COMPARISON',JSON.stringify({baseline:a.ids.length,expanded:b.ids.length,
   newUniqueIds:extra.length,newUniqueDates:b.dates,
-  new6to10:extra.filter(id=>{const d=b.ids.indexOf(id);return false}).length,
+  new6to10:extra.filter(id=>b.ageById[id]>=6&&b.ageById[id]<=10).length,
   baseCoverage:a.coverage.status,expandedCoverage:b.coverage.status}))
 }
