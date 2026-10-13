@@ -1,4 +1,4 @@
-import {runNightFlightForUser} from './night-flight-scheduler.js'
+import {runNightFlightIncrementalForUser} from './night-flight-incremental-pipeline.js'
 import {processNightFlightRunMatches} from './night-flight-match-processor.js'
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -59,12 +59,12 @@ export async function listManualNightFlights({supabase,userId}={}){
 
 export async function executeManualNightFlight({
   supabase,userId,mode,runId,jobKey,now=new Date(),
-  startRun=runNightFlightForUser,processMatches=processNightFlightRunMatches,
+  startRun=runNightFlightIncrementalForUser,processMatches=processNightFlightRunMatches,
 }={}){
   requireInputs({supabase,userId})
   if(mode==='start'){
-    // Deliberately invoke the existing per-user runner, not the time-gated scheduler.
-    // It resumes today's existing target run instead of duplicating discovery.
+    // Manual Start seeds the same durable exact-day Night Pilot pipeline.
+    // Discovery and Match run on separate cron worker invocations.
     const result=await startRun({supabase,userId,now,processMatchesInline:false})
     return {mode,runId:result.runId,targetDate:result.targetDate,resumed:result.resumed,status:result.status,
       jobsReady:result.jobsReady,jobsFailed:result.jobsFailed,unfinished:result.unfinished,
