@@ -16,7 +16,7 @@ export async function GET(request){
 
   try{
     const supabase=createAdminSupabaseClient()
-    const result=await runNightFlightScheduler({supabase})
+    const result=await runNightFlightScheduler({supabase,incremental:true})
     return NextResponse.json(result)
   }catch(error){
     console.error('[night-flight-cron] failed',clean(error?.message||error))
