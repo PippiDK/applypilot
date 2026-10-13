@@ -37,7 +37,7 @@ test('saved Union Search Plan drives profile LIVE while legacy fallback stays is
   assert.match(searchBlock,/previousVerifiedJobs:verifiedJobs/)
   assert.match(searchBlock,/continuation/)
   assert.match(searchBlock,/detailBatchStart/)
-  assert.match(searchBlock,/detailBatchSize:25/)
+  assert.match(searchBlock,/detailBatchSize:10/)
   assert.match(legacyBlock,/JSON\.stringify\(\{freshnessDays,cvText:cvData\.cvText\}\)/)
   assert.doesNotMatch(legacyBlock,/unionSearchPlan|primaryRoles|adjacentRoles|exclusionRules/)
 })
