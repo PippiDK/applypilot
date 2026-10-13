@@ -2,7 +2,6 @@ import {parseSearchHtml} from './linkedin-search.js'
 
 const LINKEDIN_SEARCH='https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search'
 const WINDOWS=new Set([1,3,5,7,10,14])
-const SEARCH_PAGE_SIZE=25
 const MAX_SEARCH_PAGES=4
 const MAX_SEARCH_REQUESTS=64
 const text=value=>String(value??'').replace(/\s+/g,' ').trim()
@@ -88,13 +87,17 @@ export async function searchLinkedInShadow({freshnessDays=7,unionSearchPlan={},f
   const windows=days===1?[1]:[1,days]
   for(const windowDays of windows){
     let eligible=[...searchGroups]
+    // LinkedIn page sizes may vary; track the offset independently per query.
+    const offsets=new Map(searchGroups.map(group=>[group,0]))
+    const lastPageSignatures=new Map()
+    const repeatedPageCounts=new Map()
     for(let page=0;page<MAX_SEARCH_PAGES&&eligible.length;page++){
       const remaining=MAX_SEARCH_REQUESTS-searchRequests
       if(remaining<=0){requestBudgetReached=true;break}
       const scheduled=eligible.slice(0,remaining)
       if(scheduled.length<eligible.length)requestBudgetReached=true
-      const start=page*SEARCH_PAGE_SIZE
       const settled=await mapLimit(scheduled,4,async group=>{
+        const start=offsets.get(group)
         const qs=new URLSearchParams({keywords:group.query,location:'Denmark',
           f_TPR:`r${windowDays*86400}`,sortBy:'DD',start:String(start)})
         const html=await fetcher(`${LINKEDIN_SEARCH}?${qs}`)
@@ -123,7 +126,17 @@ export async function searchLinkedInShadow({freshnessDays=7,unionSearchPlan={},f
             candidate.foundBy.push(direction)
           }
         }
-        if(rows.length>=SEARCH_PAGE_SIZE)next.push(group)
+        if(rows.length){
+          offsets.set(group,offsets.get(group)+rows.length)
+          // Tolerate one repeated page, but guard against ignored offsets.
+          const signature=rows.map(row=>text(row?.jobId)).join('|')
+          const repeated=signature===lastPageSignatures.get(group)
+            ?(repeatedPageCounts.get(group)||0)+1:0
+          lastPageSignatures.set(group,signature)
+          repeatedPageCounts.set(group,repeated)
+          if(repeated<2)next.push(group)
+          else pageLimitReached=true // Pagination may remain incomplete.
+        }
       }
       if(page===MAX_SEARCH_PAGES-1&&next.length)pageLimitReached=true
       eligible=next
