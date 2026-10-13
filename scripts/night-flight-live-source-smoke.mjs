@@ -5,6 +5,7 @@ const targetDate=lastCompletedCopenhagenDate(new Date())
 const direction={tier:'primary',role:'Senior IT Project Manager',query:'Senior IT Project Manager'}
 const results=[]
 for(const source of ['linkedin','jobindex','jobnet']){
+ let candidateInfo=null
  try{
   const result=await nightFlightIncrementalDiscoverPage({
    source,direction,targetDate,page:0,now:new Date()
@@ -13,14 +14,15 @@ for(const source of ['linkedin','jobindex','jobnet']){
    throw new Error('Invalid source page contract')
   let detail='NO_TARGET_CANDIDATE'
   if(result.candidates.length){
+   candidateInfo={jobAdId:result.candidates[0].jobAdId||null,isExternal:result.candidates[0].record?.isExternal??null}
    const outcome=await nightFlightIncrementalResolveDetail({
     source,candidate:result.candidates[0],targetDate,exclusionRules:[],now:new Date()
    })
    detail=outcome?.job?'VERIFIED_AND_MATCHED':'VERIFIED_OR_FILTERED'
   }
-  results.push({source,ok:true,candidates:result.candidates.length,rawCount:result.rawCount,detail})
+  results.push({source,ok:true,candidates:result.candidates.length,rawCount:result.rawCount,detail,candidateInfo})
  }catch(error){
-  results.push({source,ok:false,error:String(error?.message||error).slice(0,180)})
+  results.push({source,ok:false,error:String(error?.message||error).slice(0,180),candidateInfo})
  }
 }
 console.log(JSON.stringify({targetDate,results}))
