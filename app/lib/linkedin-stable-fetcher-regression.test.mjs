@@ -130,3 +130,47 @@ test('explicit concurrency greater than one is still respected exactly',async()=
   ])
   assert.equal(peak,2)
 })
+
+
+test('bounded detail policy stops after the configured second 429 instead of exhausting the global budget',async()=>{
+  let clock=0
+  let calls=0
+  const events=[]
+  const fetcher=createLinkedInStableFetcher({
+    request:async()=>{calls++;return htmlResponse(429)},
+    minIntervalMs:0,
+    maxAttempts:2,
+    baseBackoffMs:6,
+    maxBackoffMs:6,
+    totalBudgetMs:1000,
+    now:()=>clock,
+    sleep:async ms=>{clock+=ms},
+    onEvent:event=>events.push(event),
+  })
+  await assert.rejects(()=>fetcher('https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4290000001'),/LinkedIn HTTP 429/)
+  assert.equal(calls,2)
+  assert.equal(events.filter(event=>event.type==='response_error'&&event.status===429).length,2)
+  assert.equal(events.filter(event=>event.type==='retry').length,1)
+})
+
+test('429 followed by 200 emits recovery evidence and returns the HTML',async()=>{
+  let clock=0
+  let calls=0
+  const events=[]
+  const fetcher=createLinkedInStableFetcher({
+    request:async()=>{calls++;return calls===1?htmlResponse(429):htmlResponse(200)},
+    minIntervalMs:0,
+    maxAttempts:2,
+    baseBackoffMs:6,
+    maxBackoffMs:6,
+    totalBudgetMs:1000,
+    now:()=>clock,
+    sleep:async ms=>{clock+=ms},
+    onEvent:event=>events.push(event),
+  })
+  const html=await fetcher('https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4290000002')
+  assert.match(html,/ok/)
+  assert.equal(calls,2)
+  assert.equal(events.some(event=>event.type==='response_error'&&event.status===429),true)
+  assert.equal(events.some(event=>event.type==='success'&&event.attempt===2),true)
+})
