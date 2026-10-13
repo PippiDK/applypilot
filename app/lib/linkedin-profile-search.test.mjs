@@ -364,3 +364,62 @@ test('discovery and detail transports are independent',async()=>{
   assert.equal(detailCalls,1)
   assert.equal(result.jobs.length,1)
 })
+
+
+test('batched detail retrieval processes only the selected slice and reports continuation cursor',async()=>{
+  const ids=['3100000001','3100000002','3100000003','3100000004']
+  const searchHtml=ids.map((id,index)=>card(id,'Senior IT Project Manager',`Batch Co ${index+1}`)).join('')
+  const detailCalls=[]
+  const fetcher=async url=>{
+    if(url.includes('/seeMoreJobPostings/search')) return searchHtml
+    const id=url.split('/').pop()
+    detailCalls.push(id)
+    return detailHtml({title:'Senior IT Project Manager',company:`Batch Co ${ids.indexOf(id)+1}`,description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies and governance. '.repeat(5)})
+  }
+  const result=await searchLinkedInProfile({
+    freshnessDays:3,
+    unionSearchPlan:plan('Senior IT Project Manager'),
+    discoveryFetcher:fetcher,
+    detailFetcher:fetcher,
+    detailBatchStart:0,
+    detailBatchSize:2,
+    now:new Date('2026-08-27T12:00:00Z'),
+  })
+  assert.deepEqual(detailCalls,ids.slice(0,2))
+  assert.equal(result.stats.detailRequests,2)
+  assert.equal(result.stats.detailNextStart,2)
+  assert.equal(result.stats.detailPending,2)
+  assert.equal(result.stats.detailComplete,false)
+  assert.equal(result.jobs.length,2)
+  assert.equal(result.audit.filter(row=>row.stage==='DISCOVERED').length,2)
+})
+
+test('continuation skips discovery and reuses verified jobs from previous batches',async()=>{
+  const ids=['3200000001','3200000002','3200000003','3200000004']
+  const previousCandidates=ids.map((id,index)=>({jobId:id,url:'https://www.linkedin.com/jobs/view/'+id+'/',title:'Senior IT Project Manager',company:`Continue Co ${index+1}`,location:'Copenhagen',publishedAt:'2026-08-27',foundBy:[]}))
+  const mk=(id,index)=>({source:'LinkedIn Jobs',sourceJobId:id,originalUrl:'https://www.linkedin.com/jobs/view/'+id+'/',officialUrl:null,title:'Senior IT Project Manager',company:`Continue Co ${index+1}`,location:'Copenhagen',country:'Denmark',description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies and governance. '.repeat(5),publishedAt:'2026-08-27',deadline:'2026-09-30T00:00:00.000Z',remoteType:'unknown',remoteEligibility:'UNVERIFIED',employmentType:'permanent',salaryMinDkkMonth:null,salaryMaxDkkMonth:null,vacancyStatus:'ACTIVE VIA THIRD PARTY',fullJdVerified:true})
+  let discoveryCalls=0
+  const detailCalls=[]
+  const result=await searchLinkedInProfile({
+    freshnessDays:3,
+    unionSearchPlan:plan('Senior IT Project Manager'),
+    previousCandidates,
+    previousVerifiedJobs:[mk(ids[0],0),mk(ids[1],1)],
+    continuation:true,
+    discoveryFetcher:async()=>{discoveryCalls++;throw new Error('continuation must not discover')},
+    detailFetcher:async url=>{
+      const id=url.split('/').pop()
+      detailCalls.push(id)
+      return detailHtml({title:'Senior IT Project Manager',company:`Continue Co ${ids.indexOf(id)+1}`,description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies and governance. '.repeat(5)})
+    },
+    detailBatchStart:2,
+    detailBatchSize:2,
+    now:new Date('2026-08-27T12:00:00Z'),
+  })
+  assert.equal(discoveryCalls,0)
+  assert.deepEqual(detailCalls,ids.slice(2))
+  assert.equal(result.stats.cachedJdUsed,2)
+  assert.equal(result.stats.detailComplete,true)
+  assert.equal(result.stats.detailPending,0)
+  assert.equal(result.jobs.length,4)
+})

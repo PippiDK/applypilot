@@ -17,8 +17,8 @@ test('custom exclusions are compiled only on Save profile and then passed to pro
   assert.doesNotMatch(page,/onChange=\{[^}]*requestSearchProfileExclusions/s)
   assert.match(page,/unionSearchPlan:profile\.unionSearchPlan/)
   assert.match(page,/exclusionRules:Array\.isArray\(profile\.exclusionRules\)\?profile\.exclusionRules:\[\]/)
-  assert.match(page,/previousCandidates:poolSnapshot\.candidates/)
-  assert.match(page,/previousVerifiedJobs:poolSnapshot\.verifiedJobs/)
+  assert.match(page,/previousCandidates:continuation\?frozenCandidates:poolSnapshot\.candidates/)
+  assert.match(page,/previousVerifiedJobs:verifiedJobs/)
   assert.match(page,/JSON\.stringify\(\{freshnessDays,cvText:cvData\.cvText\}\)/)
 })
 
