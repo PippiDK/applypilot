@@ -1,3 +1,4 @@
+import {seedNightFlightIncrementalScheduler} from './night-flight-incremental-pipeline.js'
 import {lastCompletedCopenhagenDate,runNightFlightLastCompletedDayDiscovery} from './night-flight-last-completed-day.js'
 import {persistNightFlightAreaScope} from './night-flight-area-scope.js'
 import {processNightFlightRunMatches} from './night-flight-match-processor.js'
@@ -108,6 +109,7 @@ export async function runNightFlightScheduler({
   now=new Date(),
   runUser=runNightFlightForUser,
   cleanup=cleanupNightFlightRuns,
+  incremental=false,
 }={}){
   requireSupabase(supabase)
   const current=resolveNow(now)
@@ -121,6 +123,8 @@ export async function runNightFlightScheduler({
       failures:[],
     }
   }
+
+  if(incremental) return seedNightFlightIncrementalScheduler({supabase,now:current})
 
   let cleanupResult
   try{
