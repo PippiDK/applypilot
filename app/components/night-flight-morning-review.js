@@ -64,6 +64,7 @@ export default function NightFlightMorningReview(){
   const [host,setHost]=useState(null)
   const [review,setReview]=useState(null)
   const [progress,setProgress]=useState(null)
+  const [discoveryStatus,setDiscoveryStatus]=useState(null)
   const [loading,setLoading]=useState(false)
   const [error,setError]=useState('')
   const [open,setOpen]=useState(false)
@@ -136,10 +137,30 @@ export default function NightFlightMorningReview(){
     }
   },[host,review?.run?.id,review?.run?.status])
 
+
+  // Discovery happens before the frozen Match run exists. Show durable progress
+  // independently of the existing Morning Review Match polling.
+  useEffect(()=>{
+    if(!host) return
+    let active=true
+    const read=async()=>{
+      try{
+        const response=await fetch('/api/night-flight-discovery-status',{cache:'no-store'})
+        if(!response.ok) return
+        const payload=await response.json()
+        if(active) setDiscoveryStatus(payload?.discovery||null)
+      }catch{}
+    }
+    void read()
+    const timer=setInterval(read,POLL_INTERVAL_MS)
+    return ()=>{active=false;clearInterval(timer)}
+  },[host])
+
   if(!host) return null
 
   const counts=review?.counts||{ready:0,failed:0}
   const activeRun=ACTIVE_RUN_STATUSES.has(review?.run?.status)
+  const discovering=discoveryStatus?.state==='DISCOVERING'&&(!review?.run?.targetDate||discoveryStatus.targetDate>review.run.targetDate)
   const visibleProgress=progress||progressFromReview(review)
   const selected=review?.jobs?.find(item=>item.key===selectedKey)||review?.jobs?.[0]||null
   const analysis=selected?.analysis||null
@@ -176,7 +197,8 @@ export default function NightFlightMorningReview(){
       <div>
         <div className={styles.eyebrow}>NIGHT FLIGHT</div>
         <div className={styles.meta}>
-          <span>Last completed day · {formatDay(review?.run?.targetDate)}</span>
+          <span>{discovering?`Discovering · ${formatDay(discoveryStatus.targetDate)}`:`Last completed day · ${formatDay(review?.run?.targetDate)}`}</span>
+          {discovering&&<span className={styles.counts}>{discoveryStatus.completedUnits} / {discoveryStatus.totalUnits} discovery units · {discoveryStatus.detailedJobs} JDs examined{discoveryStatus.errors?` · ${discoveryStatus.errors} retrying`:''}</span>}
           <span className={styles.counts}>{activeRun?`${visibleProgress.ready} / ${visibleProgress.total} ready`:`${counts.ready} READY · ${counts.failed} FAILED`}</span>
           {error&&<span className={styles.error}>{error}</span>}
         </div>
