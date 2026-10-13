@@ -1,0 +1,22 @@
+name: LinkedIn Discovery Budget Experiment
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/linkedin-discovery-budget-experiment.mjs'
+      - '.github/workflows/linkedin-discovery-budget-experiment.yml'
+      - 'app/lib/linkedin-shadow-discovery.js'
+jobs:
+  read-only-ab:
+    if: github.event.pull_request.head.ref == 'experiment/linkedin-expanded-discovery-limits'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: A/B live LinkedIn discovery (no writes, no AI, no JD fetch)
+        run: node scripts/linkedin-discovery-budget-experiment.mjs
+      - name: Regression tests
+        run: npm test
