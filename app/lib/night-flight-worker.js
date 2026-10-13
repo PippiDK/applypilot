@@ -21,6 +21,7 @@ export async function runNightFlightWorker({
 }={}){
   requireSupabase(supabase)
   if(typeof processMatches!=='function') throw new Error('Night Flight worker processor is invalid')
+  const invocationStartedAt=Date.now()
   let discovery=null
   if(incremental){
     try{discovery=await advanceNightFlightIncrementalDiscovery({supabase})}
@@ -28,6 +29,11 @@ export async function runNightFlightWorker({
       console.error('[night-flight-incremental] worker failed',String(error?.message||error))
       discovery={errors:[{error:'Night Pilot discovery worker failed'}]}
     }
+  }
+  // Do not begin an expensive AI Match batch after a long discovery tick.
+  // The next hourly cron can resume Match from the frozen durable queue.
+  if(incremental&&Date.now()-invocationStartedAt>120000){
+    return {idle:false,discovery,matchDeferred:true,candidatesScanned:0,failures:[]}
   }
   const limit=Number.isInteger(Number(runScanLimit))&&Number(runScanLimit)>0?Number(runScanLimit):DEFAULT_NIGHT_FLIGHT_WORKER_RUN_SCAN_LIMIT
 
