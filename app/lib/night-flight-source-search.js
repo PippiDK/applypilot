@@ -419,3 +419,173 @@ export function createNightFlightSourceRunners({
     jobnet:input=>searchNightFlightJobnet({...input,fetcher:jobnetFetcher}),
   }
 }
+
+/**
+ * Independent Night Pilot discovery cursor adapter. One page or one JD is
+ * executed per call; no normal Search business logic is used.
+ * The checkpoint service persists the result before issuing another call.
+ */
+export async function nightFlightIncrementalDiscoverPage({
+ source,direction,targetDate,page=0,now=new Date(),fetcher,
+}={}){
+ const selected=directions({directions:[direction]})[0]
+ if(!selected) throw new Error('Night Pilot direction required')
+ if(!Number.isInteger(page)||page<0) throw new Error('Invalid Night Pilot discovery page')
+ if(source==='linkedin'){
+   const read=fetcher||createLinkedInStableFetcher({maxAttempts:2,totalBudgetMs:60000,requestTimeoutMs:12000})
+   const qs=new URLSearchParams({keywords:selected.query,location:'Denmark',
+      f_TPR:`r${nightFlightLinkedInTransportSeconds({targetDate,now})}`,sortBy:'DD',
+      start:String(page*LINKEDIN_PAGE_SIZE)})
+   const rows=parseSearchHtml(await read(`${LINKEDIN_SEARCH}?${qs}`))
+   const candidates=rows.filter(row=>isNightFlightTargetDate(row?.publishedAt,targetDate))
+       .filter(row=>clean(row?.jobId)).map(row=>({...row,foundBy:[selected]}))
+   return {candidates,hasMore:rows.length>=LINKEDIN_PAGE_SIZE&&page+1<LINKEDIN_MAX_PAGES,rawCount:rows.length}
+ }
+ if(source==='jobindex'){
+   const read=fetcher||globalThis.fetch
+   const records=extractJobindexSearchRecords(await fetchText(read,jobindexSearchUrl(selected.query,page+1)))
+   const candidates=records.filter(record=>clean(record?.jobId)&&titleRelevant(record,selected))
+      .map(record=>({...record,foundBy:[selected]}))
+   return {candidates,hasMore:records.length>0&&page+1<3,rawCount:records.length}
+ }
+ if(source==='jobnet'){
+   const read=fetcher||globalThis.fetch
+   const data=await jobnetApiFetch(read,JOBNET_SEARCH,{
+     searchString:selected.query,resultsPerPage:20,pageNumber:page+1,orderType:'PublicationDate'})
+   const rows=Array.isArray(data?.jobAds)?data.jobAds:[]
+   let old=0,onTarget=0
+   const candidates=[]
+   for(const record of rows){
+     const key=nightFlightCopenhagenDateKey(record?.publicationDate)
+     if(key&&key<targetDate){old++;continue}
+     if(key!==targetDate) continue
+     onTarget++
+     if(!titleRelevant(record,selected)) continue
+     if(clean(record?.jobAdId)) candidates.push({jobAdId:record.jobAdId,record,foundBy:[selected]})
+   }
+   return {candidates,hasMore:page+1<2&&rows.length>=20&&!(old>0&&onTarget===0),rawCount:rows.length}
+ }
+ throw new Error('Unsupported Night Pilot source')
+}
+
+async function resolveNightFlightIncrementalJobindex({candidate,targetDate,exclusionRules,fetcher},metrics){
+
+    metrics.detailRequests++
+    const detailUrl=candidate.detailUrl||jobindexDetailUrl(candidate.jobId)
+    const html=await fetchText(fetcher,detailUrl)
+    const detail=extractJobindexDetail(html,{jobId:candidate.jobId})
+    if(!isNightFlightTargetDate(detail.postedDate,targetDate)) return null
+    const applicationUrl=detail.applicationUrl||jobindexApplyTrackerUrl(html)
+    let fullJd=detail.fullJd||'',externalDetail=null
+    const adoptDetail=parsed=>{if(!usableFullJd(parsed?.fullJd)) return false;fullJd=parsed.fullJd;externalDetail=parsed;return true}
+    if(!usableFullJd(fullJd)){
+      const canonicalUrl=jobindexCanonicalFullJdUrl(html)
+      if(canonicalUrl&&canonicalUrl!==detailUrl){
+        try{
+          const canonicalPage=await fetchPage(fetcher,canonicalUrl)
+          let canonicalJd=jobindexCanonicalFullJd(canonicalPage.text)
+          if(!usableFullJd(canonicalJd)) canonicalJd=recoverJobindexCanonicalFullJd(canonicalPage.text,canonicalPage.url)
+          if(usableFullJd(canonicalJd)) fullJd=canonicalJd
+        }catch{}
+      }
+    }
+    let externalPage=null
+    if(!usableFullJd(fullJd)&&applicationUrl){
+      metrics.externalDetailRequests++
+      try{
+        externalPage=await fetchPage(fetcher,applicationUrl)
+        const parsed=extractJobindexExternalDetail(externalPage.text,{url:externalPage.url})
+        const recovered=recoverExternalFullJd(externalPage.text,externalPage.url)
+        if(!adoptDetail(parsed)&&!adoptDetail({fullJd:recovered})) metrics.externalParseMisses++
+      }catch{metrics.externalFetchFailures++}
+      if(!usableFullJd(fullJd)&&externalPage){
+        const mindkeyUrl=ennovaMindkeyDetailUrl(applicationUrl,externalPage.text)
+        if(mindkeyUrl){metrics.externalDetailRequests++;try{const page=await fetchPage(fetcher,mindkeyUrl);adoptDetail(extractJobindexExternalDetail(page.text,{url:page.url}))||adoptDetail({fullJd:recoverExternalFullJd(page.text,page.url)})}catch{metrics.externalFetchFailures++}}
+      }
+      if(!usableFullJd(fullJd)&&externalPage){
+        const advertisementUrl=hrManagerAdvertisementUrl(externalPage.url)
+        if(advertisementUrl){try{const page=await fetchPage(fetcher,advertisementUrl);adoptDetail(extractJobindexExternalDetail(page.text,{url:page.url}))}catch{metrics.externalFetchFailures++}}
+      }
+      if(!usableFullJd(fullJd)&&externalPage){
+        const embedded=embeddedHrOnDescriptor(applicationUrl,externalPage.text)
+        if(embedded){try{
+          const [hrScript,customerScript]=await Promise.all([fetchText(fetcher,embedded.hrScriptUrl),fetchText(fetcher,embedded.customerScriptUrl)])
+          const frameUrl=hrOnFrameUrl({root:hrOnRootFromScript(hrScript),companyId:hrOnCompanyIdFromScript(customerScript),jobId:embedded.jobId,locale:embedded.locale})
+          if(frameUrl){const page=await fetchPage(fetcher,frameUrl);adoptDetail(extractJobindexExternalDetail(page.text,{url:page.url}))}
+        }catch{metrics.externalFetchFailures++}}
+      }
+      if(!usableFullJd(fullJd)&&isDsvCareersUrl(applicationUrl)){try{
+        const page=await fetchPage(fetcher,dsvSearchUrl(detail.title||candidate.title))
+        const directUrl=exactTitleJobHref(page.text,detail.title||candidate.title,'https://jobs.dsv.com/')
+        if(directUrl){const direct=await fetchPage(fetcher,directUrl);adoptDetail(extractJobindexExternalDetail(direct.text,{url:direct.url}))}
+      }catch{metrics.externalFetchFailures++}}
+      if(!usableFullJd(fullJd)&&isDsbCareersUrl(applicationUrl)){try{
+        const page=await fetchPage(fetcher,DSB_CURRENT_JOBS_URL)
+        const directUrl=dsbAppliedUrlForTitle(page.text,detail.title||candidate.title)
+        if(directUrl){const direct=await fetchPage(fetcher,directUrl);adoptDetail(extractJobindexExternalDetail(direct.text,{url:direct.url}))}
+      }catch{metrics.externalFetchFailures++}}
+      if(!usableFullJd(fullJd)){
+        const oracle=oracleCandidateExperienceRequest(applicationUrl)
+        if(oracle){metrics.oracleDetailRequests++;try{
+          const payload=await fetchText(fetcher,oracle.url,{headers:{Accept:'application/json','Ora-Irc-Language':oracle.language}})
+          if(adoptDetail(extractOracleCandidateExperienceDetail(payload,{url:applicationUrl}))) metrics.oracleDetailVerified++;else metrics.oracleDetailFailures++
+        }catch{metrics.oracleDetailFailures++}}
+      }
+      if(!usableFullJd(fullJd)) metrics.externalDetailFailures++
+    }
+    const verified=usableFullJd(fullJd)
+    if(verified) metrics.fullJdVerified++
+    const postedDate=detail.postedDate||externalDetail?.postedDate||null
+    if(!isNightFlightTargetDate(postedDate,targetDate)) return null
+    const job=normalizeJob({...detail,applicationUrl,title:detail.title||externalDetail?.title||candidate.title||'',company:detail.company||externalDetail?.company||'',location:detail.location||externalDetail?.location||'',country:detail.country||externalDetail?.country||'',remoteType:detail.remoteType||externalDetail?.remoteType||'',postedDate,sourceJobId:candidate.jobId,publishedAt:postedDate,fullJd:verified?fullJd:'',description:verified?fullJd:'',foundBy:candidate.foundBy,sourceRecords:[{source:'jobindex',sourceJobId:candidate.jobId,detailUrl:detail.detailUrl||detailUrl,applicationUrl,fullJd:verified?fullJd:'',limitedData:!verified}]})
+    if(!verified) return {job,evaluation:null,limited:true}
+    const evaluated=evaluateNightFlightProfileJob({job,foundBy:candidate.foundBy,exclusionRules})
+    return evaluated.pass?{job,evaluation:evaluated.evaluation}:null
+}
+async function resolveNightFlightIncrementalJobnet({candidate,targetDate,exclusionRules,fetcher},metrics){
+
+    metrics.detailRequests++
+    const detail=await jobnetApiFetch(fetcher,JOBNET_DETAIL+encodeURIComponent(candidate.jobAdId),{incrementViews:'false'})
+    const fullJd=plain(detail?.body||'')
+    const address=detail?.job?.address||{}
+    const location=clean(address.city||address.municipality||candidate.record?.postalDistrictName||candidate.record?.municipality||'')
+    const applicationUrl=clean(detail?.application?.url||'')
+    const originalUrl=`https://jobnet.dk/find-job/${candidate.jobAdId}`
+    const publishedAt=detail?.publicationDateTime||candidate.record?.publicationDate||null
+    if(!isNightFlightTargetDate(publishedAt,targetDate)) return null
+    const deadline=detail?.application?.deadlineDate||candidate.record?.applicationDeadline||null
+    const vacancyStatus=deadline&&new Date(deadline).getTime()<Date.now()?'CLOSED':'OPEN'
+    const verified=fullJd.length>=JOBNET_FULL_JD_MIN_LENGTH
+    if(verified) metrics.fullJdVerified++
+    const job=normalizeJob({source:'jobnet',sourceJobId:candidate.jobAdId,jobId:`jobnet:${candidate.jobAdId}`,title:clean(detail?.title||candidate.record?.title),company:clean(detail?.employer?.name||candidate.record?.hiringOrgName),location,country:clean(address.countryName||candidate.record?.country||'Danmark'),publishedAt,postedDate:publishedAt,applicationDeadline:deadline,vacancyStatus,employmentType:detail?.job?.isLimitedPeriod?'Temporary':'Permanent',fullJd:verified?fullJd:'',description:verified?fullJd:'',originalUrl,detailUrl:originalUrl,applicationUrl:applicationUrl||originalUrl,foundBy:candidate.foundBy,sourceRecords:[{source:'jobnet',sourceJobId:candidate.jobAdId,detailUrl:originalUrl,applicationUrl:applicationUrl||originalUrl,fullJd:verified?fullJd:'',limitedData:!verified}]})
+    if(!verified||!jobnetRoleContextGuard(job).pass) return null
+    const evaluated=evaluateNightFlightProfileJob({job,foundBy:candidate.foundBy,exclusionRules})
+    return evaluated.pass?{job,evaluation:evaluated.evaluation}:null
+}
+
+/** Resolve exactly one candidate. Throw on failed/unverified JD so the durable
+ * claimant may retry and record the failure rather than silently discarding it. */
+export async function nightFlightIncrementalResolveDetail({
+ source,candidate,targetDate,exclusionRules=[],now=new Date(),fetcher,
+}={}){
+ const metrics={detailRequests:0,externalDetailRequests:0,externalDetailFailures:0,
+  externalFetchFailures:0,externalParseMisses:0,oracleDetailRequests:0,
+  oracleDetailFailures:0,oracleDetailVerified:0,fullJdVerified:0}
+ let result
+ if(source==='linkedin'){
+   const read=fetcher||createLinkedInStableFetcher({maxAttempts:2,totalBudgetMs:60000,requestTimeoutMs:12000})
+   const job=parseDetailHtml(candidate,await read(LINKEDIN_DETAIL+candidate.jobId),now)
+   if(!job) throw new Error('Night Pilot LinkedIn JD unverified')
+   if(!isNightFlightTargetDate(job.publishedAt,targetDate)) return null
+   const evaluated=evaluateNightFlightProfileJob({job,foundBy:candidate.foundBy,exclusionRules})
+   result=evaluated.pass?{job,evaluation:evaluated.evaluation}:null
+ }else if(source==='jobindex'){
+   result=await resolveNightFlightIncrementalJobindex({
+     candidate,targetDate,exclusionRules,fetcher:fetcher||globalThis.fetch},metrics)
+   if(result?.limited) throw new Error('Night Pilot Jobindex JD unverified')
+ }else if(source==='jobnet'){
+   result=await resolveNightFlightIncrementalJobnet({
+     candidate,targetDate,exclusionRules,fetcher:fetcher||globalThis.fetch},metrics)
+ }else throw new Error('Unsupported Night Pilot source')
+ return result
+}
