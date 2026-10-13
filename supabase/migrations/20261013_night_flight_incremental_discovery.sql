@@ -81,7 +81,7 @@ grant execute on function public.claim_night_flight_discovery_unit(uuid,integer)
 -- An expired claimant must never overwrite a newer claimant's checkpoint.
 create or replace function public.save_night_flight_discovery_unit(
  p_id uuid, p_owner uuid, p_phase text,p_page integer,p_detail integer,
- p_candidates jsonb,p_jobs jsonb,p_error text default null,p_retry_seconds integer default 0
+ p_candidates jsonb,p_jobs jsonb,p_error text default null,p_retry_seconds integer default 0,p_release boolean default true
 ) returns boolean language plpgsql security definer set search_path = ''
 as $$
 declare affected integer;
@@ -93,13 +93,15 @@ begin
  update public.night_flight_discovery_units
  set phase=p_phase,next_page=p_page,next_detail=p_detail,
      candidates=p_candidates,verified_jobs=p_jobs,last_error=left(p_error,500),
-     lease_owner=null,lease_until=case when p_retry_seconds>0 then clock_timestamp()+make_interval(secs=>least(p_retry_seconds,86400)) else null end,updated_at=clock_timestamp()
+     lease_owner=case when p_release then null else lease_owner end,
+     lease_until=case when not p_release then lease_until when p_retry_seconds>0 then clock_timestamp()+make_interval(secs=>least(p_retry_seconds,86400)) else null end,
+     updated_at=clock_timestamp()
  where id=p_id and lease_owner=p_owner and lease_until>clock_timestamp();
  get diagnostics affected=row_count;
  return affected=1;
 end $$;
-revoke all on function public.save_night_flight_discovery_unit(uuid,uuid,text,integer,integer,jsonb,jsonb,text,integer) from public,anon,authenticated;
-grant execute on function public.save_night_flight_discovery_unit(uuid,uuid,text,integer,integer,jsonb,jsonb,text,integer) to service_role;
+revoke all on function public.save_night_flight_discovery_unit(uuid,uuid,text,integer,integer,jsonb,jsonb,text,integer,boolean) from public,anon,authenticated;
+grant execute on function public.save_night_flight_discovery_unit(uuid,uuid,text,integer,integer,jsonb,jsonb,text,integer,boolean) to service_role;
 
 -- Transactional freeze prevents exposing a partly written run to Match worker.
 create or replace function public.freeze_night_flight_discovery(
