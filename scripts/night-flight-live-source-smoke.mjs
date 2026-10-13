@@ -1,6 +1,6 @@
 // Opt-in real network smoke: deliberately not part of npm test.
 import {lastCompletedCopenhagenDate} from '../app/lib/night-flight-last-completed-day.js'
-import {nightFlightIncrementalDiscoverPage} from '../app/lib/night-flight-source-search.js'
+import {nightFlightIncrementalDiscoverPage,nightFlightIncrementalResolveDetail} from '../app/lib/night-flight-source-search.js'
 const targetDate=lastCompletedCopenhagenDate(new Date())
 const direction={tier:'primary',role:'Senior IT Project Manager',query:'Senior IT Project Manager'}
 const results=[]
@@ -11,7 +11,14 @@ for(const source of ['linkedin','jobindex','jobnet']){
   })
   if(!Array.isArray(result.candidates)||typeof result.hasMore!=='boolean')
    throw new Error('Invalid source page contract')
-  results.push({source,ok:true,candidates:result.candidates.length,rawCount:result.rawCount})
+  let detail='NO_TARGET_CANDIDATE'
+  if(result.candidates.length){
+   const outcome=await nightFlightIncrementalResolveDetail({
+    source,candidate:result.candidates[0],targetDate,exclusionRules:[],now:new Date()
+   })
+   detail=outcome?.job?'VERIFIED_AND_MATCHED':'VERIFIED_OR_FILTERED'
+  }
+  results.push({source,ok:true,candidates:result.candidates.length,rawCount:result.rawCount,detail})
  }catch(error){
   results.push({source,ok:false,error:String(error?.message||error).slice(0,180)})
  }
