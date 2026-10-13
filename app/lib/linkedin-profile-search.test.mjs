@@ -314,3 +314,53 @@ test('specialist adjacent Implementation Manager remains visible but payroll con
   assert.ok(result.jobs[0].evaluation.score<9)
   assert.ok(result.jobs[0].evaluation.breakdown.domainContextPenalty>=.5)
 })
+
+test('a final detail 429 is isolated and later candidates are still evaluated',async()=>{
+  const ids=['3000000001','3000000002','3000000003','3000000004']
+  const searchHtml=ids.map((id,index)=>card(id,'Senior IT Project Manager',`Co ${index+1}`)).join('')
+  const discoveryFetcher=async url=>url.includes('/seeMoreJobPostings/search')?searchHtml:''
+  const detailCalls=[]
+  const detailFetcher=async url=>{
+    const id=url.split('/').pop()
+    detailCalls.push(id)
+    if(id==='3000000002') throw new Error('LinkedIn HTTP 429')
+    return detailHtml({title:'Senior IT Project Manager',company:`Co ${ids.indexOf(id)+1}`,description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies and governance. '.repeat(5)})
+  }
+  const result=await searchLinkedInProfile({
+    freshnessDays:3,
+    unionSearchPlan:plan('Senior IT Project Manager'),
+    discoveryFetcher,
+    detailFetcher,
+    now:new Date('2026-08-27T12:00:00Z'),
+  })
+  assert.equal(result.stats.detailFailures,1)
+  assert.equal(result.stats.detail429Final,1)
+  assert.equal(result.stats.fullJdVerified,3)
+  assert.deepEqual(new Set(result.jobs.map(item=>item.job.company)),new Set(['Co 1','Co 3','Co 4']))
+  assert.deepEqual(new Set(detailCalls),new Set(ids))
+})
+
+test('discovery and detail transports are independent',async()=>{
+  let discoveryCalls=0
+  let detailCalls=0
+  const discoveryFetcher=async url=>{
+    discoveryCalls++
+    assert.ok(url.includes('/seeMoreJobPostings/search'))
+    return card('3000000010','Senior IT Project Manager','Independent Co')
+  }
+  const detailFetcher=async url=>{
+    detailCalls++
+    assert.ok(url.includes('/jobPosting/3000000010'))
+    return detailHtml({title:'Senior IT Project Manager',company:'Independent Co',description:'Lead enterprise IT projects from planning through implementation and go-live. Own scope, timeline, risks, dependencies and governance. '.repeat(5)})
+  }
+  const result=await searchLinkedInProfile({
+    freshnessDays:3,
+    unionSearchPlan:plan('Senior IT Project Manager'),
+    discoveryFetcher,
+    detailFetcher,
+    now:new Date('2026-08-27T12:00:00Z'),
+  })
+  assert.ok(discoveryCalls>0)
+  assert.equal(detailCalls,1)
+  assert.equal(result.jobs.length,1)
+})
