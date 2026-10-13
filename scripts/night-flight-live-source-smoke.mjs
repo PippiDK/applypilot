@@ -15,10 +15,19 @@ for(const source of ['linkedin','jobindex','jobnet']){
   let detail='NO_TARGET_CANDIDATE'
   if(result.candidates.length){
    candidateInfo={jobAdId:result.candidates[0].jobAdId||null,isExternal:result.candidates[0].record?.isExternal??null}
-   const outcome=await nightFlightIncrementalResolveDetail({
-    source,candidate:result.candidates[0],targetDate,exclusionRules:[],now:new Date()
-   })
-   detail=outcome?.job?'VERIFIED_AND_MATCHED':'VERIFIED_OR_FILTERED'
+   try{
+    const outcome=await nightFlightIncrementalResolveDetail({
+     source,candidate:result.candidates[0],targetDate,exclusionRules:[],now:new Date()
+    })
+    detail=outcome?.job?'VERIFIED_AND_MATCHED':'VERIFIED_OR_FILTERED'
+   }catch(error){
+    // An external Jobnet card may not expose its full JD through Jobnet's
+    // internal detail endpoint. Record it as unverified; never fabricate JD.
+    if(source==='jobnet'&&candidateInfo?.isExternal===true&&
+       /Jobnet HTTP 404/.test(String(error?.message||error))){
+      detail='UNVERIFIED_EXTERNAL_404'
+    }else throw error
+   }
   }
   results.push({source,ok:true,candidates:result.candidates.length,rawCount:result.rawCount,detail,candidateInfo})
  }catch(error){
