@@ -137,3 +137,15 @@ test('Cron routes opt into independent incremental pipeline',async()=>{
  const code=await readFile(new URL('./night-flight-incremental-pipeline.js',import.meta.url),'utf8')
  assert.doesNotMatch(code,/linkedin-profile-search|searchLinkedInProfile|searchLinkedInShadow|freshnessDays/)
 })
+
+test('After the final JD retry the cursor advances and records its failure',async()=>{
+ const db=fakeCheckpointDB()
+ const previous={...candidate,_nightPilotDetailAttempts:2}
+ const result=await processNightFlightDiscoveryUnit({
+  supabase:db,unit:unit('DETAIL',[previous]),owner:'test-owner',
+  detailRunner:async()=>{throw Error('Request unavailable')},
+ })
+ assert.equal(result.phase,'DONE')
+ assert.equal(result.detail,1)
+ assert.match(db.writes[0].p_candidates[0]._nightPilotTerminalFailure,/unavailable/)
+})
