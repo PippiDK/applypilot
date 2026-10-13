@@ -26,8 +26,8 @@ export async function seedNightFlightIncrementalDay({supabase,userId,targetDate,
   expand=buildDiscoverySearchPlan}={}){
  if(!supabase||!userId||!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) throw new Error('Night Pilot seed inputs invalid')
  const existing=requireSuccess(await supabase.from('night_flight_runs')
-  .select('id').eq('user_id',userId).eq('target_date',targetDate).maybeSingle(),'existing run read')
- if(existing?.id) return {targetDate,existingRunId:existing.id}
+  .select('id,status').eq('user_id',userId).eq('target_date',targetDate).maybeSingle(),'existing run read')
+ if(existing?.id) return {targetDate,existingRunId:existing.id,status:existing.status}
  let header=requireSuccess(await supabase.from('night_flight_discovery_runs')
    .select('id,initialized,expanded_plan,sources,state').eq('user_id',userId)
    .eq('target_date',targetDate).maybeSingle(),'discovery checkpoint read')
@@ -68,6 +68,21 @@ export async function seedNightFlightIncrementalDay({supabase,userId,targetDate,
  requireSuccess(await supabase.from('night_flight_discovery_runs').update({initialized:true})
    .eq('id',header.id).eq('state','DISCOVERING'),'mark initialized')
  return {targetDate,discoveryRunId:header.id,initialized:true,units:units.length}
+}
+
+/**
+ * Manual Start seeds the same durable checkpoint. It never calls the legacy
+ * monolithic discovery or drives another user's work through service_role.
+ */
+export async function runNightFlightIncrementalForUser({supabase,userId,now=new Date()}={}){
+ const targetDate=lastCompletedCopenhagenDate(now)
+ const seeded=await seedNightFlightIncrementalDay({supabase,userId,targetDate,now})
+ if(seeded.existingRunId) return {
+   runId:seeded.existingRunId,targetDate,resumed:true,
+   status:seeded.status||'RUNNING',processingDeferred:true
+ }
+ return {runId:seeded.discoveryRunId,targetDate,
+   resumed:!seeded.units,status:'DISCOVERING',processingDeferred:true}
 }
 
 export async function seedNightFlightIncrementalScheduler({supabase,now=new Date(),lookbackDays=2,
