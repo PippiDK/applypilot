@@ -99,3 +99,67 @@ begin
 end $$;
 revoke all on function public.save_night_flight_discovery_unit(uuid,uuid,text,integer,integer,jsonb,jsonb,text) from public,anon,authenticated;
 grant execute on function public.save_night_flight_discovery_unit(uuid,uuid,text,integer,integer,jsonb,jsonb,text) to service_role;
+
+-- Transactional freeze prevents exposing a partly written run to Match worker.
+create or replace function public.freeze_night_flight_discovery(
+ p_discovery_run_id uuid, p_rows jsonb
+) returns uuid language plpgsql security definer set search_path = ''
+as $$
+declare
+ header public.night_flight_discovery_runs%rowtype;
+ result_id uuid;
+ existing_id uuid;
+ discovered integer;
+ queued integer;
+ skipped integer;
+begin
+ if jsonb_typeof(p_rows)<>'array' then raise exception 'invalid frozen jobs'; end if;
+ select * into header from public.night_flight_discovery_runs
+  where id=p_discovery_run_id for update;
+ if not found then raise exception 'discovery run not found'; end if;
+ if exists(select 1 from public.night_flight_discovery_units
+   where discovery_run_id=p_discovery_run_id and phase<>'DONE') then
+   raise exception 'discovery cannot freeze while work remains';
+ end if;
+ if header.state='FROZEN' and header.frozen_run_id is not null then
+   return header.frozen_run_id;
+ end if;
+ if header.state<>'DISCOVERING' then raise exception 'discovery not active'; end if;
+ select id into existing_id from public.night_flight_runs
+  where user_id=header.user_id and target_date=header.target_date;
+ if existing_id is not null then
+   update public.night_flight_discovery_runs
+    set state='FROZEN',frozen_run_id=existing_id,updated_at=clock_timestamp()
+    where id=header.id;
+   return existing_id;
+ end if;
+ select count(*),count(*) filter(where status='QUEUED'),
+  count(*) filter(where status='SKIPPED_AREA')
+ into discovered,queued,skipped
+ from jsonb_to_recordset(p_rows) as x(
+  job_key text,source text,job_snapshot jsonb,area text,status text);
+ if exists(select 1 from jsonb_to_recordset(p_rows) as x(
+   job_key text,source text,job_snapshot jsonb,area text,status text)
+   where nullif(x.job_key,'') is null or x.source not in ('linkedin','jobindex','jobnet')
+     or x.status not in ('QUEUED','SKIPPED_AREA') or x.job_snapshot is null)
+ then raise exception 'invalid frozen job row'; end if;
+ insert into public.night_flight_runs(user_id,target_date,profile_fingerprint,
+  search_profile_snapshot,cv_text_snapshot,cv_source_version,sources,areas,
+  status,jobs_discovered,jobs_queued,jobs_skipped,started_at)
+ values(header.user_id,header.target_date,header.profile_fingerprint,
+  header.search_profile_snapshot,header.cv_text_snapshot,header.cv_source_version,
+  header.sources,header.areas,
+  case when discovered=0 then 'NO_JOBS' else 'RUNNING' end,
+  discovered,queued,skipped,clock_timestamp())
+ returning id into result_id;
+ insert into public.night_flight_jobs(run_id,job_key,source,job_snapshot,area,status)
+ select result_id,x.job_key,x.source,x.job_snapshot,x.area,x.status
+ from jsonb_to_recordset(p_rows) as x(
+  job_key text,source text,job_snapshot jsonb,area text,status text);
+ update public.night_flight_discovery_runs
+   set state='FROZEN',frozen_run_id=result_id,updated_at=clock_timestamp()
+   where id=p_discovery_run_id;
+ return result_id;
+end $$;
+revoke all on function public.freeze_night_flight_discovery(uuid,jsonb) from public,anon,authenticated;
+grant execute on function public.freeze_night_flight_discovery(uuid,jsonb) to service_role;
