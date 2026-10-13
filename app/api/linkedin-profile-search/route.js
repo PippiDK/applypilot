@@ -22,7 +22,7 @@ export async function POST(request){
     const previousVerifiedJobs=Array.isArray(body?.previousVerifiedJobs)?body.previousVerifiedJobs.slice(0,500):[]
     const continuation=body?.continuation===true
     const detailBatchStart=Math.max(0,Math.floor(Number(body?.detailBatchStart)||0))
-    const requestedBatchSize=Math.floor(Number(body?.detailBatchSize)||25)
+    const requestedBatchSize=Math.floor(Number(body?.detailBatchSize)||10)
     const detailBatchSize=Math.max(1,Math.min(40,requestedBatchSize))
     if(!Array.isArray(unionSearchPlan?.directions)||unionSearchPlan.directions.length===0){
       return NextResponse.json({error:'Search Profile is not configured.'},{status:400})
