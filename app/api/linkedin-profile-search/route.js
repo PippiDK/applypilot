@@ -24,7 +24,28 @@ export async function POST(request){
       return NextResponse.json({error:'Search Profile is not configured.'},{status:400})
     }
     const discoverySearchPlan=await buildDiscoverySearchPlan({unionSearchPlan})
-    const result=await searchLinkedInProfile({freshnessDays,unionSearchPlan:discoverySearchPlan,exclusionRules,previousCandidates,previousVerifiedJobs,fetcher:createLinkedInStableFetcher()})
+    const detail429Urls=new Set()
+    let detail429Attempts=0
+    let detail429Recovered=0
+    const discoveryFetcher=createLinkedInStableFetcher({totalBudgetMs:85000})
+    const detailFetcher=createLinkedInStableFetcher({
+      minIntervalMs:1800,
+      maxAttempts:2,
+      baseBackoffMs:6000,
+      maxBackoffMs:6000,
+      totalBudgetMs:170000,
+      onEvent:event=>{
+        if(event?.type==='response_error'&&Number(event?.status)===429){
+          detail429Attempts++
+          detail429Urls.add(String(event?.url||''))
+        }
+        if(event?.type==='success'&&detail429Urls.has(String(event?.url||''))){
+          detail429Recovered++
+          detail429Urls.delete(String(event?.url||''))
+        }
+      },
+    })
+    const result=await searchLinkedInProfile({freshnessDays,unionSearchPlan:discoverySearchPlan,exclusionRules,previousCandidates,previousVerifiedJobs,discoveryFetcher,detailFetcher})
     const now=new Date()
     const freshnessSelection=freshnessSelectionFromDays(freshnessDays)
     const jobs=filterItemsByFreshnessSelection(result.jobs,freshnessSelection,now)
@@ -32,7 +53,7 @@ export async function POST(request){
     return NextResponse.json({
       ...result,
       jobs,
-      stats:{...result?.stats,returned:jobs.length},
+      stats:{...result?.stats,detail429Attempts,detail429Recovered,returned:jobs.length},
       coverage:{...result?.coverage,freshnessDays,freshnessSelection,status:accessLimited?'ACCESS LIMITED':jobs.length?'SEARCHED':'NO RELEVANT RESULTS'},
       fetchedAt:now.toISOString(),
     })

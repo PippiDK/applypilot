@@ -268,15 +268,24 @@ function mergeDiscoveryCandidates(current=[],previous=[],now=new Date()){
   ]
 }
 
-export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},exclusionRules=[],previousCandidates=[],previousVerifiedJobs=[],fetcher,now=new Date()}={}){
+function classifyDetailFailure(error){
+  const message=String(error?.message||error||'').toLowerCase()
+  if(/http 429/.test(message)) return '429'
+  if(/timeout|aborted|aborterror/.test(message)) return 'timeout'
+  if(/access wall|challenge|captcha|authwall/.test(message)) return 'challenge'
+  if(/retry budget exhausted/.test(message)) return 'budget'
+  return 'other'
+}
+
+export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},exclusionRules=[],previousCandidates=[],previousVerifiedJobs=[],fetcher,discoveryFetcher=fetcher,detailFetcher=fetcher,now=new Date()}={}){
   const days=WINDOWS.has(Number(freshnessDays))?Number(freshnessDays):7
-  if(typeof fetcher!=='function') throw new Error('Profile-driven LinkedIn fetcher is required.')
+  if(typeof discoveryFetcher!=='function'||typeof detailFetcher!=='function') throw new Error('Profile-driven LinkedIn fetchers are required.')
   if(!Array.isArray(unionSearchPlan?.directions)||unionSearchPlan.directions.length===0) throw new Error('Search Profile requires at least one role direction.')
 
   // Every user-selected freshness window performs a fresh LinkedIn discovery.
   // The persistent master pool retains only the rolling 10-day Search horizon:
   // fresh discovery finds deltas, while verified JDs are reused by stable job ID.
-  const discovery=await searchLinkedInShadow({freshnessDays:days,unionSearchPlan,fetcher})
+  const discovery=await searchLinkedInShadow({freshnessDays:days,unionSearchPlan,fetcher:discoveryFetcher})
   const masterCandidates=mergeDiscoveryCandidates(discovery.candidates,previousCandidates,now)
   const auditMap=new Map(masterCandidates.map(candidate=>[String(candidate.jobId),createAuditRecord(candidate)]))
   let detailRequests=0
@@ -285,6 +294,11 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
   let fullJdVerified=0
   let evaluated=0
   let cachedJdUsed=0
+  let detail429Final=0
+  let detailTimeouts=0
+  let detailChallenges=0
+  let detailBudgetFailures=0
+  let detailOtherFailures=0
   const cachedById=new Map()
   for(const job of Array.isArray(previousVerifiedJobs)?previousVerifiedJobs:[]){
     const id=String(job?.sourceJobId||'').trim()
@@ -298,7 +312,7 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
       return {candidate,job:cachedJob,cached:true}
     }
     detailRequests++
-    const html=await fetcher(LINKEDIN_JOB_DETAIL+candidate.jobId)
+    const html=await detailFetcher(LINKEDIN_JOB_DETAIL+candidate.jobId)
     const job=parseDetailHtml(candidate,html,now)
     return {candidate,job,cached:false}
   })
@@ -310,6 +324,12 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
     if(item.status==='rejected'){
       detailFailures++
       const candidate=item.item||{}
+      const failureKind=classifyDetailFailure(item.reason)
+      if(failureKind==='429') detail429Final++
+      else if(failureKind==='timeout') detailTimeouts++
+      else if(failureKind==='challenge') detailChallenges++
+      else if(failureKind==='budget') detailBudgetFailures++
+      else detailOtherFailures++
       detailErrors.push(String(item.reason?.message||item.reason||'LinkedIn detail request failed'))
       updateAuditRecord(auditMap,candidate.jobId,{stage:'DETAIL_FETCH_FAILED',decision:'UNVERIFIED',reason:'Full Job Description could not be retrieved'})
       continue
@@ -369,6 +389,11 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
       detailRequests,
       cachedJdUsed,
       detailFailures,
+      detail429Final,
+      detailTimeouts,
+      detailChallenges,
+      detailBudgetFailures,
+      detailOtherFailures,
       incompleteDetails,
       fullJdVerified,
       evaluated,
