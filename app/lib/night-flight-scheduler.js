@@ -124,7 +124,12 @@ export async function runNightFlightScheduler({
     }
   }
 
-  if(incremental) return seedNightFlightIncrementalScheduler({supabase,now:current})
+  if(incremental){
+    let retention
+    try{retention=await cleanup({supabase,now:current})}
+    catch(error){console.error('[night-flight-retention] cleanup failed',safeErrorMessage(error))}
+    return {...await seedNightFlightIncrementalScheduler({supabase,now:current}),retention}
+  }
 
   let cleanupResult
   try{
