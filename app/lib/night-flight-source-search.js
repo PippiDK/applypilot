@@ -558,7 +558,8 @@ async function resolveNightFlightIncrementalJobnet({candidate,targetDate,exclusi
     const verified=fullJd.length>=JOBNET_FULL_JD_MIN_LENGTH
     if(verified) metrics.fullJdVerified++
     const job=normalizeJob({source:'jobnet',sourceJobId:candidate.jobAdId,jobId:`jobnet:${candidate.jobAdId}`,title:clean(detail?.title||candidate.record?.title),company:clean(detail?.employer?.name||candidate.record?.hiringOrgName),location,country:clean(address.countryName||candidate.record?.country||'Danmark'),publishedAt,postedDate:publishedAt,applicationDeadline:deadline,vacancyStatus,employmentType:detail?.job?.isLimitedPeriod?'Temporary':'Permanent',fullJd:verified?fullJd:'',description:verified?fullJd:'',originalUrl,detailUrl:originalUrl,applicationUrl:applicationUrl||originalUrl,foundBy:candidate.foundBy,sourceRecords:[{source:'jobnet',sourceJobId:candidate.jobAdId,detailUrl:originalUrl,applicationUrl:applicationUrl||originalUrl,fullJd:verified?fullJd:'',limitedData:!verified}]})
-    if(!verified||!jobnetRoleContextGuard(job).pass) return null
+    if(!verified) throw new Error('Night Pilot Jobnet JD unverified')
+    if(!jobnetRoleContextGuard(job).pass) return null
     const evaluated=evaluateNightFlightProfileJob({job,foundBy:candidate.foundBy,exclusionRules})
     return evaluated.pass?{job,evaluation:evaluated.evaluation}:null
 }
