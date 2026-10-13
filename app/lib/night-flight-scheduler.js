@@ -1,3 +1,4 @@
+import {cleanupNightFlightDiscoveryCheckpoints} from './night-flight-retention.js'
 import {seedNightFlightIncrementalScheduler} from './night-flight-incremental-pipeline.js'
 import {lastCompletedCopenhagenDate,runNightFlightLastCompletedDayDiscovery} from './night-flight-last-completed-day.js'
 import {persistNightFlightAreaScope} from './night-flight-area-scope.js'
@@ -128,7 +129,10 @@ export async function runNightFlightScheduler({
     let retention
     try{retention=await cleanup({supabase,now:current})}
     catch(error){console.error('[night-flight-retention] cleanup failed',safeErrorMessage(error))}
-    return {...await seedNightFlightIncrementalScheduler({supabase,now:current}),retention}
+    let discoveryRetention
+    try{discoveryRetention=await cleanupNightFlightDiscoveryCheckpoints({supabase,now:current})}
+    catch(error){console.error('[night-flight-discovery-retention] cleanup failed',safeErrorMessage(error))}
+    return {...await seedNightFlightIncrementalScheduler({supabase,now:current}),retention,discoveryRetention}
   }
 
   let cleanupResult
