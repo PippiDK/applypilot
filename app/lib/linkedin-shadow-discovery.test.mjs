@@ -177,3 +177,24 @@ test('ignored LinkedIn offsets terminate after bounded repeated pages',async()=>
   assert.equal(result.candidates.length,1)
   assert.equal(result.coverage.status,'ACCESS LIMITED')
 })
+
+test('wide date windows retain first-page coverage across 30 queries under 64-request budget',async()=>{
+  const widePlan={directions:Array.from({length:30},(_,i)=>({
+    key:`query-${i}`,role:`Role ${i}`,tier:'primary',origin:'cv',cvSlots:[1]
+  }))}
+  const calls=[]
+  const result=await searchLinkedInShadow({freshnessDays:3,unionSearchPlan:widePlan,fetcher:async url=>{
+    const u=new URL(url)
+    const keywords=u.searchParams.get('keywords')
+    const window=u.searchParams.get('f_TPR')
+    const offset=Number(u.searchParams.get('start'))
+    calls.push({keywords,window,offset})
+    const id=Number(keywords.split(' ').at(-1))
+    return Array.from({length:10},(_,j)=>card(String(4480000000+id*100+j))).join('')
+  }})
+  assert.equal(result.stats.searchRequests,64)
+  assert.equal(calls.filter(x=>x.window==='r86400'&&x.offset===0).length,30)
+  assert.equal(calls.filter(x=>x.window==='r259200'&&x.offset===0).length,30)
+  assert.equal(calls.filter(x=>x.window==='r86400'&&x.offset>0).length,4)
+  assert.equal(result.coverage.status,'ACCESS LIMITED')
+})
