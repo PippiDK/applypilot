@@ -444,13 +444,63 @@ export default function Home(){
           detailBatchStart=next
           continuation=true
         }
+        const failedIds=new Set([...auditById.values()].filter(row=>row?.stage==='DETAIL_FETCH_FAILED').map(row=>String(row?.jobId||'')).filter(Boolean))
+        const recoveryStarts=[...new Set(frozenCandidates.map((candidate,index)=>failedIds.has(String(candidate?.jobId||''))?Math.floor(index/10)*10:null).filter(value=>Number.isFinite(value)))]
+        for(const recoveryStart of recoveryStarts){
+          res=await fetch('/api/linkedin-profile-search',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({
+              freshnessDays,
+              unionSearchPlan:continuationSearchPlan,
+              exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[],
+              previousCandidates:frozenCandidates,
+              previousVerifiedJobs:verifiedJobs,
+              continuation:true,
+              detailBatchStart:recoveryStart,
+              detailBatchSize:10,
+            }),
+          })
+          const recoveryData=await res.json()
+          if(!res.ok) throw new Error(recoveryData.error||'LinkedIn recovery batch failed')
+          for(const row of Array.isArray(recoveryData.audit)?recoveryData.audit:[]){
+            const id=String(row?.jobId||'')
+            if(!id) continue
+            const current=auditById.get(id)
+            if(row?.stage==='DISCOVERED'&&current&&current.stage!=='DISCOVERED') continue
+            auditById.set(id,row)
+          }
+          for(const key of Object.keys(cumulative)) cumulative[key]+=Number(recoveryData.stats?.[key]||0)
+          if(Array.isArray(recoveryData.masterVerifiedJobs)) verifiedJobs=recoveryData.masterVerifiedJobs
+          if(Array.isArray(recoveryData.masterCandidates)){
+            writeLinkedInMasterPool({
+              storage:localStorage,
+              fingerprint,
+              candidates:frozenCandidates,
+              verifiedJobs,
+            })
+          }
+          data=recoveryData
+          setJobs(Array.isArray(recoveryData.jobs)?recoveryData.jobs:[])
+        }
+        const finalAudit=[...auditById.values()]
+        const finalDetailFailures=finalAudit.filter(row=>row?.stage==='DETAIL_FETCH_FAILED').length
         data={
           ...data,
-          audit:[...auditById.values()],
-          stats:{...data.stats,...(initialDiscoveryStats?{searchRequests:initialDiscoveryStats.searchRequests,searchFailures:initialDiscoveryStats.searchFailures,searchRows:initialDiscoveryStats.searchRows,discovered:initialDiscoveryStats.discovered,newlyDiscovered:initialDiscoveryStats.newlyDiscovered}:{}),...cumulative},
+          audit:finalAudit,
+          stats:{
+            ...data.stats,
+            ...(initialDiscoveryStats?{searchRequests:initialDiscoveryStats.searchRequests,searchFailures:initialDiscoveryStats.searchFailures,searchRows:initialDiscoveryStats.searchRows,discovered:initialDiscoveryStats.discovered,newlyDiscovered:initialDiscoveryStats.newlyDiscovered}:{}),
+            ...cumulative,
+            detailFailureAttempts:cumulative.detailFailures,
+            detailFailures:finalDetailFailures,
+            detailNextStart:frozenCandidates.length,
+            detailPending:0,
+            detailComplete:true,
+          },
           coverage:{
             ...data.coverage,
-            status:(cumulative.detailFailures+cumulative.incompleteDetails)>0?'ACCESS LIMITED':data.coverage?.status,
+            status:(finalDetailFailures+cumulative.incompleteDetails)>0?'ACCESS LIMITED':data.coverage?.status,
           },
         }
         return {source:'linkedin',data}
