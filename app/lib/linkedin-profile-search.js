@@ -277,16 +277,26 @@ function classifyDetailFailure(error){
   return 'other'
 }
 
-export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},exclusionRules=[],previousCandidates=[],previousVerifiedJobs=[],fetcher,discoveryFetcher=fetcher,detailFetcher=fetcher,now=new Date()}={}){
+export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},exclusionRules=[],previousCandidates=[],previousVerifiedJobs=[],fetcher,discoveryFetcher=fetcher,detailFetcher=fetcher,continuation=false,detailBatchStart=0,detailBatchSize=null,now=new Date()}={}){
   const days=WINDOWS.has(Number(freshnessDays))?Number(freshnessDays):7
-  if(typeof discoveryFetcher!=='function'||typeof detailFetcher!=='function') throw new Error('Profile-driven LinkedIn fetchers are required.')
+  if((!continuation&&typeof discoveryFetcher!=='function')||typeof detailFetcher!=='function') throw new Error('Profile-driven LinkedIn fetchers are required.')
   if(!Array.isArray(unionSearchPlan?.directions)||unionSearchPlan.directions.length===0) throw new Error('Search Profile requires at least one role direction.')
 
   // Every user-selected freshness window performs a fresh LinkedIn discovery.
   // The persistent master pool retains only the rolling 10-day Search horizon:
   // fresh discovery finds deltas, while verified JDs are reused by stable job ID.
-  const discovery=await searchLinkedInShadow({freshnessDays:days,unionSearchPlan,fetcher:discoveryFetcher})
+  const discovery=continuation
+    ?{
+      candidates:[],
+      stats:{directions:unionSearchPlan.directions.length,primaryDirections:unionSearchPlan.directions.filter(item=>item?.tier==='primary').length,adjacentDirections:unionSearchPlan.directions.filter(item=>item?.tier!=='primary').length,searchRequests:0,searchFailures:0,searchRows:0,discovered:Array.isArray(previousCandidates)?previousCandidates.length:0,continuation:true,requestBudgetReached:false},
+      coverage:{status:'SEARCHED',detail:null},
+    }
+    :await searchLinkedInShadow({freshnessDays:days,unionSearchPlan,fetcher:discoveryFetcher})
   const masterCandidates=mergeDiscoveryCandidates(discovery.candidates,previousCandidates,now)
+  const batchStart=Math.max(0,Math.floor(Number(detailBatchStart)||0))
+  const configuredBatchSize=Number(detailBatchSize)
+  const batchSize=Number.isFinite(configuredBatchSize)&&configuredBatchSize>0?Math.max(1,Math.floor(configuredBatchSize)):masterCandidates.length
+  const batchEnd=Math.min(masterCandidates.length,batchStart+batchSize)
   const auditMap=new Map(masterCandidates.map(candidate=>[String(candidate.jobId),createAuditRecord(candidate)]))
   let detailRequests=0
   let detailFailures=0
@@ -305,16 +315,17 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
     if(id) cachedById.set(id,job)
   }
 
-  const settled=await mapLimit(masterCandidates,4,async candidate=>{
+  const settled=await mapLimit(masterCandidates,4,async (candidate,index)=>{
     const cachedJob=cachedById.get(String(candidate.jobId))
     if(cachedJob){
       cachedJdUsed++
-      return {candidate,job:cachedJob,cached:true}
+      return {candidate,job:cachedJob,cached:true,pending:false}
     }
+    if(index<batchStart||index>=batchEnd) return {candidate,job:null,cached:false,pending:true}
     detailRequests++
     const html=await detailFetcher(LINKEDIN_JOB_DETAIL+candidate.jobId)
     const job=parseDetailHtml(candidate,html,now)
-    return {candidate,job,cached:false}
+    return {candidate,job,cached:false,pending:false}
   })
 
   const jobs=[]
@@ -335,7 +346,8 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
       continue
     }
 
-    const {candidate,job}=item.value
+    const {candidate,job,pending}=item.value
+    if(pending) continue
     if(!job){
       incompleteDetails++
       updateAuditRecord(auditMap,candidate.jobId,{stage:'FULL_JD_UNVERIFIED',decision:'REJECT',reason:'Full Job Description could not be verified'})
@@ -400,6 +412,11 @@ export async function searchLinkedInProfile({freshnessDays=7,unionSearchPlan={},
       masterPoolSize:masterCandidates.length,
       newlyDiscovered:Math.max(0,masterCandidates.length-(Array.isArray(previousCandidates)?previousCandidates.length:0)),
       returned:jobs.length,
+      detailBatchStart:batchStart,
+      detailBatchSize:batchSize,
+      detailNextStart:batchEnd,
+      detailPending:Math.max(0,masterCandidates.length-batchEnd),
+      detailComplete:batchEnd>=masterCandidates.length,
     },
     coverage:{source:'LinkedIn Jobs',freshnessDays:days,status,detail},
   }
