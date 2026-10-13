@@ -156,18 +156,32 @@ export async function processNightFlightDiscoveryUnit({supabase,unit,owner,
  const page=Number(unit.next_page)||0
  let detail=Number(unit.next_detail)||0
  let phase=unit.phase,nextPage=page,error=null
+ const priorPageFailure=clean(unit.last_error).startsWith('PAGE_FAILED:')?clean(unit.last_error):null
  if(phase==='DISCOVERY'){
+   let retry=0
    try{
      const result=await pageRunner({source:unit.source,direction,targetDate:header.target_date,page,now,fetcher})
      const next=mergeCandidates(unit.source,candidates,result.candidates||[])
      candidates.splice(0,candidates.length,...next)
      nextPage=page+1
      phase=result.hasMore?'DISCOVERY':'DETAIL'
-   }catch(e){error=clean(e?.message||e).slice(0,400)}
-   await checkpoint(supabase,unit,owner,phase,nextPage,detail,candidates,jobs,error,error?1800:0)
+   }catch(e){
+     const prior=clean(unit.last_error).match(/^PAGE_RETRY:(\d+):(\d+):/)
+     const attempts=prior&&Number(prior[1])===page?Number(prior[2])+1:1
+     const reason=clean(e?.message||e).slice(0,250)
+     if(attempts>=3){
+       // Stop looping on an inaccessible page, retain earlier candidates,
+       // and surface explicit partial-source coverage at freeze.
+       error='PAGE_FAILED:'+page+':'+reason
+       phase=candidates.length?'DETAIL':'DONE'
+     }else{
+       error='PAGE_RETRY:'+page+':'+attempts+':'+reason
+       retry=1800
+     }
+   }
+   await checkpoint(supabase,unit,owner,phase,nextPage,detail,candidates,jobs,error,retry)
  }else if(phase==='DETAIL'){
-   // The durable cursor is committed after EVERY successful JD. If a later
-   // request fails or the function dies, the verified prefix is not lost.
+   // Every verified JD is committed under the same lease before the next fetch.
    let resolved=0
    while(detail<candidates.length&&resolved<20&&Date.now()+18000<deadline){
      const candidate=candidates[detail]
@@ -176,20 +190,32 @@ export async function processNightFlightDiscoveryUnit({supabase,unit,owner,
        outcome=await detailRunner({source:unit.source,candidate,targetDate:header.target_date,
          exclusionRules:header.search_profile_snapshot.exclusionRules||[],now,fetcher})
      }catch(e){
-       error=clean(e?.message||e).slice(0,400)
-       await checkpoint(supabase,unit,owner,'DETAIL',nextPage,detail,candidates,jobs,error,1800,true)
-       return {unitId:unit.id,source:unit.source,directionIndex:unit.direction_index,
-         phase:'DETAIL',page:nextPage,detail,candidates:candidates.length,verifiedJobs:jobs.length,error}
+       const attempts=Number(candidate._nightPilotDetailAttempts||0)+1
+       const reason=clean(e?.message||e).slice(0,250)
+       candidates[detail]={...candidate,_nightPilotDetailAttempts:attempts}
+       if(attempts<3){
+         error='DETAIL_RETRY:'+detail+':'+attempts+':'+reason
+         await checkpoint(supabase,unit,owner,'DETAIL',nextPage,detail,candidates,jobs,error,1800,true)
+         return {unitId:unit.id,source:unit.source,directionIndex:unit.direction_index,
+           phase:'DETAIL',page:nextPage,detail,candidates:candidates.length,verifiedJobs:jobs.length,error}
+       }
+       // Bounded retries: retain an explicit failure record in the frozen
+       // candidate checkpoint, then continue processing other JDs.
+       candidates[detail]._nightPilotTerminalFailure=reason
+       detail+=1
+       resolved+=1
+       await checkpoint(supabase,unit,owner,'DETAIL',nextPage,detail,candidates,jobs,priorPageFailure,0,false)
+       continue
      }
      if(outcome?.job&&nightFlightCopenhagenDateKey(outcome.job.publishedAt)===header.target_date){
        jobs.push(outcome)
      }
      detail+=1
      resolved+=1
-     await checkpoint(supabase,unit,owner,'DETAIL',nextPage,detail,candidates,jobs,null,0,false)
+     await checkpoint(supabase,unit,owner,'DETAIL',nextPage,detail,candidates,jobs,priorPageFailure,0,false)
    }
    phase=detail>=candidates.length?'DONE':'DETAIL'
-   await checkpoint(supabase,unit,owner,phase,nextPage,detail,candidates,jobs)
+   await checkpoint(supabase,unit,owner,phase,nextPage,detail,candidates,jobs,priorPageFailure)
  }else throw new Error('Unexpected Night Pilot checkpoint phase')
  return {unitId:unit.id,source:unit.source,directionIndex:unit.direction_index,
   phase,page:nextPage,detail,candidates:candidates.length,verifiedJobs:jobs.length,error}
@@ -212,19 +238,20 @@ export async function tryFreezeNightFlightDiscovery({supabase,discoveryRunId}={}
  if(header.state==='FROZEN') return {frozen:true,runId:header.frozen_run_id}
  if(!header.initialized||header.state!=='DISCOVERING') return {frozen:false}
  const units=requireSuccess(await supabase.from('night_flight_discovery_units')
-  .select('phase,verified_jobs,last_error,source').eq('discovery_run_id',discoveryRunId),'read final checkpoints')
+  .select('phase,verified_jobs,last_error,source,candidates').eq('discovery_run_id',discoveryRunId),'read final checkpoints')
  if(!units?.length||units.some(unit=>unit.phase!=='DONE')) return {frozen:false}
- // Prevent silently passing partial/failed descriptions to Matching.
- if(units.some(unit=>unit.last_error)) return {frozen:false,errors:units.filter(unit=>unit.last_error).length}
+ const failureCount=units.reduce((sum,unit)=>sum+
+   (clean(unit.last_error).startsWith('PAGE_FAILED:')?1:0)+
+   (Array.isArray(unit.candidates)?unit.candidates.filter(c=>c?._nightPilotTerminalFailure).length:0),0)
  const sourceResults=SOURCES.map(source=>({source,jobs:units.filter(unit=>unit.source===source)
   .flatMap(unit=>Array.isArray(unit.verified_jobs)?unit.verified_jobs:[])}))
  const items=mergeNightFlightDiscovery(sourceResults).filter(item=>
    nightFlightCopenhagenDateKey(item.job?.publishedAt)===header.target_date)
  const rows=frozenRows(items,header.areas,header.target_date)
- const runId=requireSuccess(await supabase.rpc('freeze_night_flight_discovery',{
-   p_discovery_run_id:discoveryRunId,p_rows:rows
+ const runId=requireSuccess(await supabase.rpc('freeze_night_flight_discovery_with_failures',{
+   p_discovery_run_id:discoveryRunId,p_rows:rows,p_failures:failureCount
  }),'atomic freeze')
- return {frozen:true,runId,jobs:rows.length}
+ return {frozen:true,runId,jobs:rows.length,discoveryFailures:failureCount}
 }
 /**
  * Runs bounded work only. A worker invocation may stop at any checkpoint,
