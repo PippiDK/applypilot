@@ -390,12 +390,15 @@ export default function Home(){
       let res
       if(hasProfilePlan){
         const fingerprint=profile.unionSearchPlanFingerprint||profile.unionSearchPlan?.fingerprint
-        let poolSnapshot=readLinkedInMasterPoolSnapshot({storage:localStorage,fingerprint})
+        const poolSnapshot=readLinkedInMasterPoolSnapshot({storage:localStorage,fingerprint})
+        let frozenCandidates=poolSnapshot.candidates
+        let verifiedJobs=poolSnapshot.verifiedJobs
         let continuation=false
         let detailBatchStart=0
         let continuationSearchPlan=profile.unionSearchPlan
         let data=null
         const auditById=new Map()
+        let initialDiscoveryStats=null
         const cumulative={detailFailures:0,detail429Attempts:0,detail429Recovered:0,detail429Final:0,detailTimeouts:0,detailChallenges:0,detailBudgetFailures:0,detailOtherFailures:0,incompleteDetails:0}
         while(true){
           res=await fetch('/api/linkedin-profile-search',{
@@ -405,8 +408,8 @@ export default function Home(){
               freshnessDays,
               unionSearchPlan:continuation?continuationSearchPlan:profile.unionSearchPlan,
               exclusionRules:Array.isArray(profile.exclusionRules)?profile.exclusionRules:[],
-              previousCandidates:poolSnapshot.candidates,
-              previousVerifiedJobs:poolSnapshot.verifiedJobs,
+              previousCandidates:continuation?frozenCandidates:poolSnapshot.candidates,
+              previousVerifiedJobs:verifiedJobs,
               continuation,
               detailBatchStart,
               detailBatchSize:25,
@@ -415,6 +418,9 @@ export default function Home(){
           data=await res.json()
           if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
           continuationSearchPlan=data.continuationSearchPlan||continuationSearchPlan
+          if(!continuation) initialDiscoveryStats={...data.stats}
+          if(Array.isArray(data.masterCandidates)) frozenCandidates=data.masterCandidates
+          if(Array.isArray(data.masterVerifiedJobs)) verifiedJobs=data.masterVerifiedJobs
           for(const row of Array.isArray(data.audit)?data.audit:[]){
             const id=String(row?.jobId||'')
             if(!id) continue
@@ -430,7 +436,6 @@ export default function Home(){
               candidates:data.masterCandidates,
               verifiedJobs:Array.isArray(data.masterVerifiedJobs)?data.masterVerifiedJobs:[],
             })
-            poolSnapshot={candidates:data.masterCandidates,verifiedJobs:Array.isArray(data.masterVerifiedJobs)?data.masterVerifiedJobs:[]}
           }
           setJobs(Array.isArray(data.jobs)?data.jobs:[])
           if(data.stats?.detailComplete===true) break
@@ -442,7 +447,7 @@ export default function Home(){
         data={
           ...data,
           audit:[...auditById.values()],
-          stats:{...data.stats,...cumulative},
+          stats:{...data.stats,...(initialDiscoveryStats?{searchRequests:initialDiscoveryStats.searchRequests,searchFailures:initialDiscoveryStats.searchFailures,searchRows:initialDiscoveryStats.searchRows,discovered:initialDiscoveryStats.discovered,newlyDiscovered:initialDiscoveryStats.newlyDiscovered}:{}),...cumulative},
           coverage:{
             ...data.coverage,
             status:(cumulative.detailFailures+cumulative.incompleteDetails)>0?'ACCESS LIMITED':data.coverage?.status,
