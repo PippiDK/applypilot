@@ -34,8 +34,10 @@ export function createLinkedInStableFetcher({
   baseBackoffMs=10000,
   maxBackoffMs=45000,
   totalBudgetMs=270000,
+  onEvent=null,
 }={}){
   if(typeof request!=='function') throw new Error('A fetch implementation is required')
+  const emit=event=>{try{if(typeof onEvent==='function') onEvent(event)}catch{}}
 
   const startedAt=now()
   const deadline=startedAt+Math.max(1000,Number(totalBudgetMs)||270000)
@@ -115,13 +117,16 @@ export function createLinkedInStableFetcher({
         })
       }catch(error){
         lastError=error
+        emit({type:'network_error',url,attempt,error:String(error?.message||error||'LinkedIn request failed')})
       }finally{
         release()
       }
 
       if(response?.ok){
         const text=await response.text()
-        return validateHtml(text,response.headers?.get?.('content-type')||'')
+        const validated=validateHtml(text,response.headers?.get?.('content-type')||'')
+        emit({type:'success',url,attempt,status:Number(response.status)||200})
+        return validated
       }
 
       let status=null
@@ -129,6 +134,7 @@ export function createLinkedInStableFetcher({
       if(response){
         status=Number(response.status)
         lastError=new Error(`LinkedIn HTTP ${response.status}`)
+        emit({type:'response_error',url,attempt,status})
         if(!RETRYABLE_STATUS.has(status)) throw lastError
         retryAfter=retryAfterMs(response,now())
       }
@@ -136,6 +142,7 @@ export function createLinkedInStableFetcher({
       if(attempt===attemptLimit) break
 
       const delay=backoffFor(attempt,status,retryAfter)
+      emit({type:'retry',url,attempt,status,delayMs:delay})
       blockedUntil=Math.max(blockedUntil,now()+delay)
       if(blockedUntil>=deadline) throw new Error('LinkedIn retry budget exhausted before full source coverage was completed')
     }
