@@ -21,7 +21,14 @@ export async function runNightFlightWorker({
 }={}){
   requireSupabase(supabase)
   if(typeof processMatches!=='function') throw new Error('Night Flight worker processor is invalid')
-  const discovery=incremental?await advanceNightFlightIncrementalDiscovery({supabase}):null
+  let discovery=null
+  if(incremental){
+    try{discovery=await advanceNightFlightIncrementalDiscovery({supabase})}
+    catch(error){
+      console.error('[night-flight-incremental] worker failed',String(error?.message||error))
+      discovery={errors:[{error:'Night Pilot discovery worker failed'}]}
+    }
+  }
   const limit=Number.isInteger(Number(runScanLimit))&&Number(runScanLimit)>0?Number(runScanLimit):DEFAULT_NIGHT_FLIGHT_WORKER_RUN_SCAN_LIMIT
 
   const {data,error}=await supabase
