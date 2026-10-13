@@ -118,10 +118,10 @@ function sourceFetcher(source,deadline){
  })
  return boundedRequest(deadline)
 }
-async function checkpoint(supabase,unit,owner,phase,page,detail,candidates,jobs,error=null,retry=0){
+async function checkpoint(supabase,unit,owner,phase,page,detail,candidates,jobs,error=null,retry=0,release=true){
  const result=requireSuccess(await supabase.rpc('save_night_flight_discovery_unit',{
   p_id:unit.id,p_owner:owner,p_phase:phase,p_page:page,p_detail:detail,
-  p_candidates:candidates,p_jobs:jobs,p_error:error,p_retry_seconds:retry,
+  p_candidates:candidates,p_jobs:jobs,p_error:error,p_retry_seconds:retry,p_release:release,
  }),'save Night Pilot checkpoint')
  if(result!==true) throw new Error('Night Pilot stale lease; checkpoint was rejected')
 }
@@ -138,38 +138,48 @@ export async function processNightFlightDiscoveryUnit({supabase,unit,owner,
  const fetcher=sourceFetcher(unit.source,deadline)
  const candidates=Array.isArray(unit.candidates)?[...unit.candidates]:[]
  const jobs=Array.isArray(unit.verified_jobs)?[...unit.verified_jobs]:[]
- const page=Number(unit.next_page)||0,detail=Number(unit.next_detail)||0
- let phase=unit.phase,nextPage=page,nextDetail=detail,error=null,retrySeconds=0
- try{
-  if(phase==='DISCOVERY'){
-   const result=await pageRunner({source:unit.source,direction,targetDate:header.target_date,page,now,fetcher})
-   const next=mergeCandidates(unit.source,candidates,result.candidates||[])
-   candidates.splice(0,candidates.length,...next)
-   nextPage=page+1
-   phase=result.hasMore?'DISCOVERY':'DETAIL'
-  }else if(phase==='DETAIL'){
-   if(detail>=candidates.length){phase='DONE'}
-   else{
-    const candidate={...candidates[detail]}
-    const outcome=await detailRunner({source:unit.source,candidate,targetDate:header.target_date,
-      exclusionRules:header.search_profile_snapshot.exclusionRules||[],now,fetcher})
-    if(outcome?.job&&nightFlightCopenhagenDateKey(outcome.job.publishedAt)===header.target_date){
-     jobs.push(outcome)
-    }
-    nextDetail=detail+1
-    if(nextDetail>=candidates.length) phase='DONE'
+ const page=Number(unit.next_page)||0
+ let detail=Number(unit.next_detail)||0
+ let phase=unit.phase,nextPage=page,error=null
+ if(phase==='DISCOVERY'){
+   try{
+     const result=await pageRunner({source:unit.source,direction,targetDate:header.target_date,page,now,fetcher})
+     const next=mergeCandidates(unit.source,candidates,result.candidates||[])
+     candidates.splice(0,candidates.length,...next)
+     nextPage=page+1
+     phase=result.hasMore?'DISCOVERY':'DETAIL'
+   }catch(e){error=clean(e?.message||e).slice(0,400)}
+   await checkpoint(supabase,unit,owner,phase,nextPage,detail,candidates,jobs,error,error?1800:0)
+ }else if(phase==='DETAIL'){
+   // The durable cursor is committed after EVERY successful JD. If a later
+   // request fails or the function dies, the verified prefix is not lost.
+   let resolved=0
+   while(detail<candidates.length&&resolved<20&&Date.now()+18000<deadline){
+     const candidate=candidates[detail]
+     let outcome
+     try{
+       outcome=await detailRunner({source:unit.source,candidate,targetDate:header.target_date,
+         exclusionRules:header.search_profile_snapshot.exclusionRules||[],now,fetcher})
+     }catch(e){
+       error=clean(e?.message||e).slice(0,400)
+       await checkpoint(supabase,unit,owner,'DETAIL',nextPage,detail,candidates,jobs,error,1800,true)
+       return {unitId:unit.id,source:unit.source,directionIndex:unit.direction_index,
+         phase:'DETAIL',page:nextPage,detail,candidates:candidates.length,verifiedJobs:jobs.length,error}
+     }
+     if(outcome?.job&&nightFlightCopenhagenDateKey(outcome.job.publishedAt)===header.target_date){
+       jobs.push(outcome)
+     }
+     detail+=1
+     resolved+=1
+     await checkpoint(supabase,unit,owner,'DETAIL',nextPage,detail,candidates,jobs,null,0,false)
    }
-  }
- }catch(e){
-  const message=clean(e?.message||e).slice(0,400)
-  // Unverified JD is not silently declared complete. Retry the same cursor.
-  error=message
-  retrySeconds=1800
- }
- await checkpoint(supabase,unit,owner,phase,nextPage,nextDetail,candidates,jobs,error,retrySeconds)
+   phase=detail>=candidates.length?'DONE':'DETAIL'
+   await checkpoint(supabase,unit,owner,phase,nextPage,detail,candidates,jobs)
+ }else throw new Error('Unexpected Night Pilot checkpoint phase')
  return {unitId:unit.id,source:unit.source,directionIndex:unit.direction_index,
-  phase,page:nextPage,detail:nextDetail,candidates:candidates.length,verifiedJobs:jobs.length,error}
+  phase,page:nextPage,detail,candidates:candidates.length,verifiedJobs:jobs.length,error}
 }
+
 function frozenRows(items,areas,targetDate){
  const planned=planNightFlightAreaScope({targetDate,areasSnapshot:areas,jobs:items})
  return planned.map((entry,i)=>{
