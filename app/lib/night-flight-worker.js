@@ -1,3 +1,4 @@
+import {advanceNightFlightIncrementalDiscovery} from './night-flight-incremental-pipeline.js'
 import {processNightFlightRunMatches} from './night-flight-match-processor.js'
 
 export const DEFAULT_NIGHT_FLIGHT_WORKER_RUN_SCAN_LIMIT=5
@@ -16,9 +17,11 @@ export async function runNightFlightWorker({
   supabase,
   processMatches=processNightFlightRunMatches,
   runScanLimit=DEFAULT_NIGHT_FLIGHT_WORKER_RUN_SCAN_LIMIT,
+  incremental=false,
 }={}){
   requireSupabase(supabase)
   if(typeof processMatches!=='function') throw new Error('Night Flight worker processor is invalid')
+  const discovery=incremental?await advanceNightFlightIncrementalDiscovery({supabase}):null
   const limit=Number.isInteger(Number(runScanLimit))&&Number(runScanLimit)>0?Number(runScanLimit):DEFAULT_NIGHT_FLIGHT_WORKER_RUN_SCAN_LIMIT
 
   const {data,error}=await supabase
@@ -45,6 +48,7 @@ export async function runNightFlightWorker({
       if(processed>0||clean(result?.status)!=='RUNNING'){
         return {
           idle:false,
+          ...(incremental?{discovery}:{}),
           candidatesScanned:scanned,
           runId,
           targetDate:run?.target_date||null,
@@ -58,5 +62,5 @@ export async function runNightFlightWorker({
     }
   }
 
-  return {idle:true,candidatesScanned:scanned,failures}
+  return {idle:true,candidatesScanned:scanned,failures,...(incremental?{discovery}:{})}
 }
