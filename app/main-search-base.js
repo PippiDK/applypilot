@@ -32,7 +32,8 @@ import {freshnessSelectionFromDays,freshnessResultLabel} from './lib/freshness-s
 import {companyConnection,connectedCompanyNames,defaultCompanyWatch,readCompanyWatch,writeCompanyWatch,TARGET_COMPANIES} from './lib/company-watch.js'
 import {CONSULTANT_PORTALS,connectedConsultantPortalIds,defaultConsultantPortals,readConsultantPortals,writeConsultantPortals} from './lib/consultant-portals.js'
 import LinkedInJsonImport from './components/linkedin-json-import.js'
-import {V20_LIVE_IMPORT_KEY,mergeImportedSourceJobs,importedJobsToLiveItems,combineImportedAndSearchItems} from './lib/v20-live-matches.js'
+import {V20_LIVE_IMPORT_KEY,mergeImportedSourceJobs,importedJobsToLiveItems} from './lib/v20-live-matches.js'
+import {mergeLivePool,readLivePool,writeLivePool,livePoolItems} from './lib/v20-live-pool.js'
 import SearchAudit from './components/search-audit.js'
 import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
@@ -63,6 +64,8 @@ export default function Home(){
   const [jobs,setJobs]=useState([])
   const importedLinkedInRef=useRef([])
   const searchResultsRef=useRef([])
+  const livePoolRef=useRef([])
+  const [livePoolSaveError,setLivePoolSaveError]=useState('')
   const [selectedSources,setSelectedSources]=useState(()=>[...DEFAULT_SEARCH_SOURCES])
   const [companyWatch,setCompanyWatch]=useState(()=>defaultCompanyWatch())
   const [companyWatchOpen,setCompanyWatchOpen]=useState(false)
@@ -138,7 +141,10 @@ export default function Home(){
         const saved=JSON.parse(localStorage.getItem(V20_LIVE_IMPORT_KEY)||'[]')
         if(Array.isArray(saved)){
           importedLinkedInRef.current=saved
-          setJobs(combineImportedAndSearchItems(importedJobsToLiveItems(saved,hydrated,freshnessDays),searchResultsRef.current))
+          const mergedPool=mergeLivePool(readLivePool(localStorage),importedJobsToLiveItems(saved,hydrated,freshnessDays))
+          livePoolRef.current=mergedPool
+          setJobs(livePoolItems(mergedPool))
+          try{writeLivePool(localStorage,mergedPool)}catch{setLivePoolSaveError('Browser storage is full. Save a JSON backup before closing this page.')}
         }
       }catch{}
     }catch{}
@@ -380,13 +386,22 @@ export default function Home(){
     })
   }
 
+  function publishLiveMatches(items){
+    const next=mergeLivePool(livePoolRef.current,items)
+    livePoolRef.current=next
+    setJobs(livePoolItems(next))
+    try{writeLivePool(localStorage,next);setLivePoolSaveError('')}
+    catch{setLivePoolSaveError('Browser storage is full. Save a JSON backup before closing this page.')}
+    return next
+  }
+
   async function importLinkedInJobs(incoming){
     const merged=mergeImportedSourceJobs(importedLinkedInRef.current,incoming)
     const added=merged.length-importedLinkedInRef.current.length
     localStorage.setItem(V20_LIVE_IMPORT_KEY,JSON.stringify(merged))
     importedLinkedInRef.current=merged
     const imported=importedJobsToLiveItems(merged,profile,freshnessDays)
-    setJobs(combineImportedAndSearchItems(imported,searchResultsRef.current))
+    publishLiveMatches(imported)
     return {added,total:merged.length}
   }
 
@@ -402,7 +417,7 @@ export default function Home(){
     return
   }
   searchResultsRef.current=[]
-  setJobs(importedJobsToLiveItems(importedLinkedInRef.current,profile,freshnessDays)); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
+  publishLiveMatches([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
   setShadowState({status:'skipped',error:'',stats:null,coverage:null,comparison:null})
   const hasProfilePlan=Array.isArray(profile?.unionSearchPlan?.directions)&&profile.unionSearchPlan.directions.length>0
   try{
@@ -459,7 +474,7 @@ export default function Home(){
               verifiedJobs:Array.isArray(data.masterVerifiedJobs)?data.masterVerifiedJobs:[],
             })
           }
-          setJobs(Array.isArray(data.jobs)?data.jobs:[])
+          publishLiveMatches(Array.isArray(data.jobs)?data.jobs:[])
           if(data.stats?.detailComplete===true) break
           const next=Number(data.stats?.detailNextStart)
           if(!Number.isFinite(next)||next<=detailBatchStart) throw new Error('LinkedIn detail continuation did not advance.')
@@ -503,7 +518,7 @@ export default function Home(){
             })
           }
           data=recoveryData
-          setJobs(Array.isArray(recoveryData.jobs)?recoveryData.jobs:[])
+          publishLiveMatches(Array.isArray(recoveryData.jobs)?recoveryData.jobs:[])
         }
         const finalAudit=[...auditById.values()]
         const finalDetailFailures=finalAudit.filter(row=>row?.stage==='DETAIL_FETCH_FAILED').length
@@ -617,8 +632,7 @@ export default function Home(){
 
     const mergedJobs=mergeSourceItems(successful.map(result=>Array.isArray(result.data.jobs)?result.data.jobs:[]))
     searchResultsRef.current=mergedJobs
-    const combinedJobs=combineImportedAndSearchItems(importedJobsToLiveItems(importedLinkedInRef.current,profile,freshnessDays),mergedJobs)
-    setJobs(combinedJobs)
+    publishLiveMatches(mergedJobs)
     const nextAppliedJobs=syncAppliedArchive({archive:appliedJobsRef.current,items:mergedJobs,statuses:jobStatusesRef.current})
     if(JSON.stringify(nextAppliedJobs)!==JSON.stringify(appliedJobsRef.current)) persistAppliedArchive(nextAppliedJobs)
     else setAppliedJobs(nextAppliedJobs)
@@ -915,6 +929,7 @@ export default function Home(){
       </div>}
     </section>
 
+    {livePoolSaveError&&<div className="warningBox" role="alert">{livePoolSaveError}</div>}
     {state.error&&<div className="errorBox"><b>{state.error==='Please Upload Your CV'?'Please Upload Your CV':'Search failed'}</b>{state.error!=='Please Upload Your CV'&&<span>{state.error}</span>}</div>}
     {state.stats&&<div className="searchMeta"><span><b>{state.stats.masterPoolSize??state.stats.discovered}</b> jobs discovered</span><span><b>{state.stats.fullJdVerified}</b> full JDs read</span><span><b>{state.stats.returned??jobs.length}</b> worthwhile after evaluation</span><span>Coverage: <b>{state.coverage?.status}</b></span></div>}
     {state.coverage?.detail&&<div className="warningBox">Partial source access: {state.coverage.detail}</div>}
@@ -931,7 +946,7 @@ export default function Home(){
             <div className={filterStyles.group}><small className={filterStyles.groupTitle}>STATUS</small>{JOB_STATUS_FILTERS.map(status=><label className={filterStyles.option} key={status.id}><input type="checkbox" checked={selectedStatuses.includes(status.id)} onChange={()=>toggleJobFilter(setSelectedStatuses,status.id)}/><span>{status.label}</span><b>{statusCounts[status.id]||0}</b></label>)}</div>
           </div>
         </details>}
-        {!state.loading&&!state.error&&!state.stats&&<div className="empty">Run search to find matching vacancies from the selected sources.</div>}
+        {!state.loading&&!state.error&&!state.stats&&jobs.length===0&&<div className="empty">Run search to find matching vacancies from the selected sources.</div>}
         {state.loading&&<div className="empty">Searching selected sources and reading full job descriptions…</div>}
         {!state.loading&&state.stats&&jobs.length===0&&<div className="empty">NO STRONG NEW MATCHES FOUND.</div>}
         {!state.loading&&state.stats&&jobs.length>0&&visibleJobs.length===0&&<div className="empty">NO MATCHES IN SELECTED FILTERS.</div>}
