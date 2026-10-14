@@ -459,7 +459,7 @@ export default function Home(){
               verifiedJobs:Array.isArray(data.masterVerifiedJobs)?data.masterVerifiedJobs:[],
             })
           }
-          setJobs(combineImportedAndSearchItems(importedJobsToLiveItems(importedLinkedInRef.current,profile,freshnessDays),Array.isArray(data.jobs)?data.jobs:[]))
+          setJobs(Array.isArray(data.jobs)?data.jobs:[])
           if(data.stats?.detailComplete===true) break
           const next=Number(data.stats?.detailNextStart)
           if(!Number.isFinite(next)||next<=detailBatchStart) throw new Error('LinkedIn detail continuation did not advance.')
@@ -503,7 +503,7 @@ export default function Home(){
             })
           }
           data=recoveryData
-          setJobs(combineImportedAndSearchItems(importedJobsToLiveItems(importedLinkedInRef.current,profile,freshnessDays),Array.isArray(recoveryData.jobs)?recoveryData.jobs:[]))
+          setJobs(Array.isArray(recoveryData.jobs)?recoveryData.jobs:[])
         }
         const finalAudit=[...auditById.values()]
         const finalDetailFailures=finalAudit.filter(row=>row?.stage==='DETAIL_FETCH_FAILED').length
