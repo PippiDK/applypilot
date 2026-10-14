@@ -39,6 +39,7 @@ import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
 import SearchProfileRolesStep from './components/search-profile-roles-step.js'
 import SearchPlanPreview from './components/search-plan-preview.js'
+import {rolesToLinkedInOrQuery} from './lib/v20-linkedin-or-query.js'
 import BestCvPanel from './components/best-cv-panel.js'
 import filterStyles from './components/job-filters.module.css'
 
@@ -95,6 +96,7 @@ export default function Home(){
   const [profileRoleState,setProfileRoleState]=useState(EMPTY_ROLE_STATE)
   const [pendingRoleReanalysisCvIds,setPendingRoleReanalysisCvIds]=useState([])
   const [profileSaveState,setProfileSaveState]=useState({loading:false,error:''})
+  const [rolesCopyStatus,setRolesCopyStatus]=useState('')
   const [nightFlightSyncWarning,setNightFlightSyncWarning]=useState('')
   const [reviewOpen,setReviewOpen]=useState(false)
   const [adaptationSelections,setAdaptationSelections]=useState({})
@@ -891,6 +893,16 @@ export default function Home(){
     }
   }
 
+  async function copyTargetRolesOrQuery(){
+    const query=rolesToLinkedInOrQuery(draft.roles)
+    if(!query){setRolesCopyStatus('No target roles to copy');return}
+    try{
+      if(!navigator.clipboard?.writeText)throw new Error('Clipboard unavailable')
+      await navigator.clipboard.writeText(query)
+      setRolesCopyStatus('Copied ✓')
+    }catch{setRolesCopyStatus('Copy failed — check browser clipboard permission')}
+  }
+
   return <main>
     <header><div><div className="brand">ApplyPilot</div><div className="tag">Search less. Apply better.</div></div><div className="headerActions"><div className={`sourceBadge profileStatus ${resumeLoaded?'statusReady':'statusEmpty'}`}>{resumeLoaded?'Profile ready':'Profile empty'}</div><div className="sourceBadge">MULTI-SOURCE + COMPANY WATCH · TEST</div></div></header>
 
@@ -1029,7 +1041,7 @@ export default function Home(){
       {profileStep===1&&<CvLibraryStep library={cvLibrary} loadingSlot={cvState.loadingSlot} error={cvState.error} primarySkills={draft.skills} onUpload={parseCv} onRemove={removeCv}/>} 
       {profileStep===2&&<SearchProfileRolesStep primaryRoles={draftPrimaryRoles} adjacentRoles={draftAdjacentRoles} status={profileRoleState.status} error={profileRoleState.error} source={profileRoleState.source} totalCount={profileRoleState.totalCount||cvReadyCount} analysedCount={profileRoleState.analysedCount} failedCvs={profileRoleState.failedCvs} onPrimaryChange={roles=>updateDraftRoles('primaryRoles',roles)} onAdjacentChange={roles=>updateDraftRoles('adjacentRoles',roles)} onRetry={()=>buildProfileRoles({forceCvIds:(profileRoleState.failedCvs||[]).map(cv=>cv.cvId)})}/>} 
       {profileStep===3&&<div className="wizard"><h3>What should ApplyPilot exclude?</h3><p>Optional. Write any hard no-go roles, industries, languages or working conditions. ApplyPilot interprets this text only when you save the profile.</p><textarea value={draft.exclusions} onChange={event=>setDraft(current=>({...current,exclusions:event.target.value}))} rows="6"/></div>}
-      {profileStep===4&&<div className="wizard review"><h3>Confirm your search profile</h3><p>This saves your Search Profile and activates profile-driven LinkedIn discovery for future searches.</p><div className="reviewRow"><span>CV library</span><b>{readyCvs.length?readyCvs.map(cv=>`CV ${cv.slot} · ${cv.fileName}`).join(' · '):'No CVs uploaded'}</b></div><div className="reviewRow"><span>CV preparation</span><b>{cvReadyCount?`Ready — ${cvReadyCount} complete Source CV${cvReadyCount===1?'':'s'} prepared`:'CV not ready'}</b></div><div className="reviewRow"><span>Role profiles</span><b>{cvReadyCount?`${analysedRoleProfileCount}/${cvReadyCount} CVs analysed`:'Not generated'}</b></div><div className="reviewRow"><span>Target roles</span><b>{draft.roles||'Not set'}</b></div><div className="reviewRow"><span>Exclude</span><b>{draft.exclusions||'None'}</b></div><SearchPlanPreview plan={draftUnionSearchPlan}/>{profileSaveState.error&&<div className="errorBox"><b>Search Profile save failed</b><span>{profileSaveState.error}</span></div>}<div className="truth"><b>Truth rule</b><span>ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.</span></div></div>}
+      {profileStep===4&&<div className="wizard review"><h3>Confirm your search profile</h3><p>This saves your Search Profile and activates profile-driven LinkedIn discovery for future searches.</p><div className="reviewRow"><span>CV library</span><b>{readyCvs.length?readyCvs.map(cv=>`CV ${cv.slot} · ${cv.fileName}`).join(' · '):'No CVs uploaded'}</b></div><div className="reviewRow"><span>CV preparation</span><b>{cvReadyCount?`Ready — ${cvReadyCount} complete Source CV${cvReadyCount===1?'':'s'} prepared`:'CV not ready'}</b></div><div className="reviewRow"><span>Role profiles</span><b>{cvReadyCount?`${analysedRoleProfileCount}/${cvReadyCount} CVs analysed`:'Not generated'}</b></div><div className="reviewRow"><span className="targetRolesLabel">Target roles <button type="button" className="targetRolesCopyButton" onClick={copyTargetRolesOrQuery} disabled={!draft.roles?.trim()} title="Copy quoted target roles joined by OR for manual LinkedIn search" aria-label="Copy target roles as LinkedIn OR search">Copy OR</button><small className="targetRolesCopyStatus" role="status" aria-live="polite">{rolesCopyStatus}</small></span><b>{draft.roles||'Not set'}</b></div><div className="reviewRow"><span>Exclude</span><b>{draft.exclusions||'None'}</b></div><SearchPlanPreview plan={draftUnionSearchPlan}/>{profileSaveState.error&&<div className="errorBox"><b>Search Profile save failed</b><span>{profileSaveState.error}</span></div>}<div className="truth"><b>Truth rule</b><span>ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.</span></div></div>}
       <div className="modalActions"><button className="secondary" disabled={profileSaveState.loading} onClick={()=>profileStep===1?closeProfile():setProfileStep(step=>step-1)}>{profileStep===1?'Cancel':'Back'}</button>{profileStep<4?<button className="primary" disabled={(profileStep===1&&(Boolean(cvState.loadingSlot)||cvReadyCount===0))||(profileStep===2&&profileRoleState.status==='loading')} onClick={nextProfileStep}>Continue</button>:<button className="primary" disabled={profileSaveState.loading} onClick={saveProfile}>{profileSaveState.loading?'Saving profile…':'Save profile'}</button>}</div>
     </div></div>}
 
