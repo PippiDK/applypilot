@@ -14,7 +14,7 @@ function timestampOrNull(value){
   return Number.isFinite(date.getTime())?date.toISOString():null
 }
 export function collectorRecordToApplyPilotJob(record={}){
-  const clean=normalizeBrowserRecord(record)
+  const clean=normalizeBrowserRecord({...record,url:record?.url||record?.originalUrl||record?.detailUrl})
   const original=record&&typeof record==='object'?record:{}
   const publishedAt=timestampOrNull(original.publishedAt)
   const remoteType=workModelFromLocation(clean.location)
