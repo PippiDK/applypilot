@@ -32,6 +32,7 @@ import {freshnessSelectionFromDays,freshnessResultLabel} from './lib/freshness-s
 import {companyConnection,connectedCompanyNames,defaultCompanyWatch,readCompanyWatch,writeCompanyWatch,TARGET_COMPANIES} from './lib/company-watch.js'
 import {CONSULTANT_PORTALS,connectedConsultantPortalIds,defaultConsultantPortals,readConsultantPortals,writeConsultantPortals} from './lib/consultant-portals.js'
 import LinkedInJsonImport from './components/linkedin-json-import.js'
+import {V20_LIVE_IMPORT_KEY,mergeImportedSourceJobs,importedJobsToLiveItems,combineImportedAndSearchItems} from './lib/v20-live-matches.js'
 import SearchAudit from './components/search-audit.js'
 import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
@@ -53,13 +54,15 @@ function legacyRoles(value=''){return String(value??'').split(',').map(item=>ite
 function combinedRoles(primary=[],adjacent=[]){return [...roleList(primary),...roleList(adjacent)].join(', ')}
 function resetRoleDraft(value={}){return {...value,primaryRoles:[],adjacentRoles:[],roles:'',cvRoleProfiles:[],roleSources:[],rolesLibraryFingerprint:'',rolesSourceVersion:'',rolesBuilderVersion:''}}
 function workModelText(values=[]){return values.map(value=>value==='onsite'?'On-site':value==='hybrid'?'Hybrid':'Remote').join(' · ')}
-function jobSourceLabel(job={}){const source=String(job?.source||job?.sourceRecords?.[0]?.source||'').toLowerCase();if(source==='consultant_portal')return `Consultant portal · ${job?.consultantPortal?.name||job?.company||'Consultant'}`;if(source==='company_site')return `Company site · ${job?.company||'Official'}`;if(source==='jobindex')return 'Jobindex';if(source==='jobnet')return 'Jobnet';if(source==='linkedin')return 'LinkedIn';const url=String(job?.originalUrl||'');if(url.includes('jobnet.dk'))return 'Jobnet';if(url.includes('linkedin.com'))return 'LinkedIn';return 'Source'}
+function jobSourceLabel(job={}){const source=String(job?.source||job?.sourceRecords?.[0]?.source||'').toLowerCase();if(source==='consultant_portal')return `Consultant portal · ${job?.consultantPortal?.name||job?.company||'Consultant'}`;if(source==='company_site')return `Company site · ${job?.company||'Official'}`;if(source==='jobindex')return 'Jobindex';if(source==='jobnet')return 'Jobnet';if(job?.importSource==='linkedin-json')return 'LinkedIn Import';if(source==='linkedin')return 'LinkedIn';const url=String(job?.originalUrl||'');if(url.includes('jobnet.dk'))return 'Jobnet';if(url.includes('linkedin.com'))return 'LinkedIn';return 'Source'}
 function sourceDedupeKey(job={}){const company=String(job.company||'').toLowerCase().replace(/\b(a\/s|as)\b/g,'as').replace(/[.,]/g,'').trim();const title=String(job.title||'').toLowerCase().replace(/\s+/g,' ').trim();const location=String(job.location||'').toLowerCase().replace(/\s+/g,' ').trim();return company&&title?company+'|'+title+'|'+location:''}
 function mergeSourceItems(groups=[]){const out=[];const byKey=new Map();for(const item of groups.flat()){const key=sourceDedupeKey(item?.job);if(key&&byKey.has(key)){const index=byKey.get(key);const current=out[index];const currentOfficial=String(current?.job?.source||'')==='company_site';const itemOfficial=String(item?.job?.source||'')==='company_site';if(itemOfficial&&!currentOfficial){out[index]=item;continue}if(currentOfficial&&!itemOfficial)continue;const richer=String(item?.job?.description||item?.job?.fullJd||'').length>String(current?.job?.description||current?.job?.fullJd||'').length?item:current;out[index]=richer;continue}if(key)byKey.set(key,out.length);out.push(item)}return out}
 
 export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(5)
   const [jobs,setJobs]=useState([])
+  const importedLinkedInRef=useRef([])
+  const searchResultsRef=useRef([])
   const [selectedSources,setSelectedSources]=useState(()=>[...DEFAULT_SEARCH_SOURCES])
   const [companyWatch,setCompanyWatch]=useState(()=>defaultCompanyWatch())
   const [companyWatchOpen,setCompanyWatchOpen]=useState(false)
@@ -131,6 +134,13 @@ export default function Home(){
       }
       setProfile(hydrated)
       setDraft(hydrated)
+      try{
+        const saved=JSON.parse(localStorage.getItem(V20_LIVE_IMPORT_KEY)||'[]')
+        if(Array.isArray(saved)){
+          importedLinkedInRef.current=saved
+          setJobs(combineImportedAndSearchItems(importedJobsToLiveItems(saved,hydrated,freshnessDays),searchResultsRef.current))
+        }
+      }catch{}
     }catch{}
   },[])
 
@@ -370,24 +380,36 @@ export default function Home(){
     })
   }
 
+  async function importLinkedInJobs(incoming){
+    const merged=mergeImportedSourceJobs(importedLinkedInRef.current,incoming)
+    const added=merged.length-importedLinkedInRef.current.length
+    localStorage.setItem(V20_LIVE_IMPORT_KEY,JSON.stringify(merged))
+    importedLinkedInRef.current=merged
+    const imported=importedJobsToLiveItems(merged,profile,freshnessDays)
+    setJobs(combineImportedAndSearchItems(imported,searchResultsRef.current))
+    return {added,total:merged.length}
+  }
+
   async function search(){
   if(!resumeLoaded){
     setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
   }
+  const automatedSources=selectedSources.filter(source=>source!=='linkedin')
   const activeCompanySites=companyWatch.enabled?companyWatch.selected.filter(name=>connectedCompanyNames().includes(name)):[]
   const activeConsultantPortals=consultantPortals.enabled?consultantPortals.selected.filter(id=>connectedConsultantPortalIds().includes(id)):[]
-  if(!selectedSources.length&&!activeCompanySites.length&&!activeConsultantPortals.length){
+  if(!automatedSources.length&&!activeCompanySites.length&&!activeConsultantPortals.length){
     setState({loading:false,error:'Select at least one search source.',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
   }
-  setJobs([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
+  searchResultsRef.current=[]
+  setJobs(importedJobsToLiveItems(importedLinkedInRef.current,profile,freshnessDays)); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
   setShadowState({status:'skipped',error:'',stats:null,coverage:null,comparison:null})
   const hasProfilePlan=Array.isArray(profile?.unionSearchPlan?.directions)&&profile.unionSearchPlan.directions.length>0
   try{
     const tasks=[]
 
-    if(selectedSources.includes('linkedin')) tasks.push(runLabeledSearchTask('LinkedIn',async()=>{
+    if(automatedSources.includes('linkedin')) tasks.push(runLabeledSearchTask('LinkedIn',async()=>{
       let res
       if(hasProfilePlan){
         const fingerprint=profile.unionSearchPlanFingerprint||profile.unionSearchPlan?.fingerprint
@@ -438,7 +460,7 @@ export default function Home(){
               verifiedJobs:Array.isArray(data.masterVerifiedJobs)?data.masterVerifiedJobs:[],
             })
           }
-          setJobs(Array.isArray(data.jobs)?data.jobs:[])
+          setJobs(combineImportedAndSearchItems(importedJobsToLiveItems(importedLinkedInRef.current,profile,freshnessDays),Array.isArray(data.jobs)?data.jobs:[]))
           if(data.stats?.detailComplete===true) break
           const next=Number(data.stats?.detailNextStart)
           if(!Number.isFinite(next)||next<=detailBatchStart) throw new Error('LinkedIn detail continuation did not advance.')
@@ -482,7 +504,7 @@ export default function Home(){
             })
           }
           data=recoveryData
-          setJobs(Array.isArray(recoveryData.jobs)?recoveryData.jobs:[])
+          setJobs(combineImportedAndSearchItems(importedJobsToLiveItems(importedLinkedInRef.current,profile,freshnessDays),Array.isArray(recoveryData.jobs)?recoveryData.jobs:[]))
         }
         const finalAudit=[...auditById.values()]
         const finalDetailFailures=finalAudit.filter(row=>row?.stage==='DETAIL_FETCH_FAILED').length
@@ -517,7 +539,7 @@ export default function Home(){
       return {source:'linkedin',data}
     }))
 
-    if(selectedSources.includes('jobindex')) tasks.push(runLabeledSearchTask('Jobindex',async()=>{
+    if(automatedSources.includes('jobindex')) tasks.push(runLabeledSearchTask('Jobindex',async()=>{
       if(!hasProfilePlan) throw new Error('Jobindex requires a saved Search Profile.')
       const res=await fetch('/api/jobindex-profile-search',{
         method:'POST',
@@ -533,7 +555,7 @@ export default function Home(){
       return {source:'jobindex',data}
     }))
 
-    if(selectedSources.includes('jobnet')) tasks.push(runLabeledSearchTask('Jobnet',async()=>{
+    if(automatedSources.includes('jobnet')) tasks.push(runLabeledSearchTask('Jobnet',async()=>{
       if(!hasProfilePlan) throw new Error('Jobnet requires a saved Search Profile.')
       const res=await fetch('/api/jobnet-profile-search',{
         method:'POST',
@@ -595,7 +617,9 @@ export default function Home(){
     if(!successful.length) throw failed[0]?.reason||new Error('Search failed')
 
     const mergedJobs=mergeSourceItems(successful.map(result=>Array.isArray(result.data.jobs)?result.data.jobs:[]))
-    setJobs(mergedJobs)
+    searchResultsRef.current=mergedJobs
+    const combinedJobs=combineImportedAndSearchItems(importedJobsToLiveItems(importedLinkedInRef.current,profile,freshnessDays),mergedJobs)
+    setJobs(combinedJobs)
     const nextAppliedJobs=syncAppliedArchive({archive:appliedJobsRef.current,items:mergedJobs,statuses:jobStatusesRef.current})
     if(JSON.stringify(nextAppliedJobs)!==JSON.stringify(appliedJobsRef.current)) persistAppliedArchive(nextAppliedJobs)
     else setAppliedJobs(nextAppliedJobs)
@@ -610,7 +634,7 @@ export default function Home(){
     setState({
       loading:false,
       error:'',
-      coverage:{source:[...selectedSources,...(activeCompanySites.length?['company-sites']:[]),...(activeConsultantPortals.length?['consultant-portals']:[])].join('+'),freshnessDays,status:limited?'ACCESS LIMITED':mergedJobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:failed[0]?.reason?.message||null},
+      coverage:{source:[...automatedSources,...(activeCompanySites.length?['company-sites']:[]),...(activeConsultantPortals.length?['consultant-portals']:[])].join('+'),freshnessDays,status:limited?'ACCESS LIMITED':mergedJobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:failed[0]?.reason?.message||null},
       stats,
       fetchedAt:new Date().toISOString(),
       audit,
@@ -870,7 +894,7 @@ export default function Home(){
       <button className="primary" onClick={search} disabled={state.loading}>{state.loading?'Searching…':'Search'}</button>
     </section>
 
-    <LinkedInJsonImport />
+    <LinkedInJsonImport onImported={importLinkedInJobs}/>
 
     <section className="companyWatch">
       <div className="companyWatchMain">
@@ -912,10 +936,10 @@ export default function Home(){
         {state.loading&&<div className="empty">Searching selected sources and reading full job descriptions…</div>}
         {!state.loading&&state.stats&&jobs.length===0&&<div className="empty">NO STRONG NEW MATCHES FOUND.</div>}
         {!state.loading&&state.stats&&jobs.length>0&&visibleJobs.length===0&&<div className="empty">NO MATCHES IN SELECTED FILTERS.</div>}
-        {visibleJobs.map(item=>{const {job,evaluation}=item; const score=Math.round(evaluation.score*10); const manualStatus=jobStatuses[job.sourceJobId]||''; return <div className="jobWrap" key={job.sourceJobId}>
+        {visibleJobs.map(item=>{const {job,evaluation}=item; const score=Number.isFinite(evaluation?.score)?Math.round(evaluation.score*10):null; const manualStatus=jobStatuses[job.sourceJobId]||''; return <div className="jobWrap" key={job.sourceJobId}>
           <button onClick={()=>setSelected(item)} className={'job '+(active?.job.sourceJobId===job.sourceJobId?'active':'')}>
-            <span className="score">{fitLabel(score)}</span>
-            <span><b>{job.title}</b><small>{job.company} · {job.location}</small><small className="sourceLine">{jobSourceLabel(job)} · {dateText(job.publishedAt)}</small></span>
+            <span className="score">{score===null?'N/A':fitLabel(score)}</span>
+            <span><b>{job.title}</b><small>{job.company} · {job.location}</small><small className="sourceLine">{jobSourceLabel(job)} · {job.publishedAt?dateText(job.publishedAt):(job.publishedText||'Date unavailable')}{job.needsJdReview?' · Incomplete JD':''}</small></span>
             <span>→</span>
           </button>
           <select aria-label={`Status for ${job.title}`} className={`jobStatusSelect status-${manualStatus||'none'}`} value={manualStatus} onChange={event=>changeJobStatus(job.sourceJobId,event.target.value)}>
@@ -926,7 +950,7 @@ export default function Home(){
 
       <div className="panel">
         {active?(()=>{const {job}=active; const expertise=expertiseState.jobKey===jobKey?expertiseState.analysis:null; return <>
-          <div className="panelTop expertiseHeader"><div><h2>{job.title}</h2><p>{job.company} · {job.location}</p><small className="sourceLine">Source: {jobSourceLabel(job)} · {dateText(job.publishedAt)}</small></div></div>
+          <div className="panelTop expertiseHeader"><div><h2>{job.title}</h2><p>{job.company} · {job.location}</p><small className="sourceLine">Source: {jobSourceLabel(job)} · {job.publishedAt?dateText(job.publishedAt):(job.publishedText||'Date unavailable')}{job.needsJdReview?' · Incomplete JD':''}</small></div></div>
 
           <div className="conditionGrid">
             <div className="conditionCard"><small>Area</small><b>{conditionScore(jobConditions?.area.score)}</b><span>{jobConditions?.area.value||'Not stated'}</span></div>
