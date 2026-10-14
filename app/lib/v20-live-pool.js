@@ -8,7 +8,8 @@ const text=value=>String(value??'').trim()
 function identity(item){
   const job=item?.job
   if(!job||!text(job.title)||!text(job.company))return ''
-  const source=text(job.source||job.sourceRecords?.[0]?.source).toLowerCase()
+  const rawSource=text(job.source||job.sourceRecords?.[0]?.source).toLowerCase()
+  const source=rawSource.includes('linkedin')?'linkedin':rawSource
   const id=text(job.sourceJobId||job.jobId)
   if(source&&id)return source+':'+id.replace(/^linkedin:/,'')
   // Do not merge vacancies with different locations unless the provider has a stable ID.
