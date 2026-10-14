@@ -1,0 +1,26 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import {parseBrowserExport,mergeBrowserJobs,normalizeBrowserRecord} from './v20-browser-import.js'
+const record=(id='4479056497',extra={})=>({jobId:id,title:'IT Project Manager',company:'Example',url:`https://www.linkedin.com/jobs/view/${id}/`,fullJd:'A'.repeat(120),jdStatus:'complete',...extra})
+test('collector two-page export maps distinct job IDs without title dedupe',()=>{
+  const result=parseBrowserExport({schemaVersion:1,source:'linkedin-browser',pagesCollected:2,records:[record(),record('4479056498'),record()]})
+  assert.equal(result.jobs.length,2)
+  assert.equal(result.pagesCollected,2)
+  assert.equal(result.jobs[0].jobId,'linkedin:4479056497')
+  assert.equal(result.errors.length,0)
+})
+test('reject malicious URL mismatch and preserve valid rows',()=>{
+  const result=parseBrowserExport({schemaVersion:1,source:'linkedin-browser',records:[record('4479056497',{url:'https://evil.example/jobs/view/4479056497/'}),record('4479056498')]})
+  assert.equal(result.jobs.length,1)
+  assert.equal(result.errors.length,1)
+})
+test('mark missing-fragment JD as review despite complete source flag',()=>{
+  const job=normalizeBrowserRecord(record('4479056497',{fullJd:'A'.repeat(150)+' [remainder of source sentence missing]'}))
+  assert.equal(job.jdStatus,'review')
+})
+test('merge keeps stronger JD and stable unique ids',()=>{
+  const first=normalizeBrowserRecord(record('4479056497',{fullJd:'A'.repeat(130)}))
+  const weak=normalizeBrowserRecord(record('4479056497',{fullJd:'short'}))
+  assert.equal(mergeBrowserJobs([first],[weak])[0].fullJd.length,130)
+})
+test('reject malformed schema',()=>assert.throws(()=>parseBrowserExport({records:[]}),/supported/))
