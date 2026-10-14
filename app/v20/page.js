@@ -68,7 +68,6 @@ export default function BrowserImportV20(){
     if(!current||running)return
     const cv=cvs.find(item=>item.sourceVersion===cvVersion)
     if(!cv){setMessage('Upload a ready Source CV using Legacy Search Profile in this browser first.');return}
-    if(current.needsJdReview){setMessage('This JD needs review before matching.');return}
     setRunning(true)
     setMessage('AI Matching selected job with Source CV...')
     try{
@@ -76,7 +75,7 @@ export default function BrowserImportV20(){
       const data=await response.json()
       if(!response.ok)throw new Error(data?.error||'Matching failed')
       setAnalysis(old=>({...old,[current.sourceJobId]:data.analysis}))
-      setMessage('Matching returned a result for selected job. Result is session-only.')
+      setMessage(current.needsJdReview?'Matching completed using an incomplete JD. Interpret the result with caution; it is session-only.':'Matching returned a result for selected job. Result is session-only.')
     }catch(error){setMessage(error.message||'Matching failed')}
     finally{setRunning(false)}
   }
@@ -117,7 +116,7 @@ export default function BrowserImportV20(){
           {visible.map(job=><button key={job.sourceJobId} onClick={()=>setSelected(job.sourceJobId)}
             style={{display:'block',width:'100%',textAlign:'left',padding:'12px 10px',background:current?.sourceJobId===job.sourceJobId?'#47314B':'transparent',color:'#F8F7F8',border:'none',borderBottom:'1px solid #3B2C3F',cursor:'pointer'}}>
             <strong>{job.title}</strong><div style={labelStyle}>{job.company} · {job.location}</div>
-            {job.needsJdReview&&<small style={{color:'#F59E0B'}}>JD review required</small>}
+            {job.needsJdReview&&<small style={{color:'#F59E0B'}}>Incomplete JD</small>}
           </button>)}
           {!visible.length&&<p style={labelStyle}>No vacancies in this view.</p>}
         </div>
@@ -134,7 +133,7 @@ export default function BrowserImportV20(){
             </select>
           </label>
           <h3 style={{marginBottom:6}}>Full job description</h3>
-          {current.needsJdReview&&<p style={{color:'#F59E0B'}}>The Collector description may be incomplete. AI Matching disabled for this job.</p>}
+          {current.needsJdReview&&<p style={{color:'#F59E0B'}}>Incomplete JD — vacancy retained. AI Matching is available, but gaps and scores may be unreliable.</p>}
           <div style={{whiteSpace:'pre-wrap',lineHeight:1.6,maxHeight:300,overflowY:'auto',background:'#1A1120',padding:14,borderRadius:12,fontSize:13}}>{current.fullJd||'No JD provided'}</div>
           <div style={{marginTop:18}}>
             <label style={{...labelStyle,display:'block',marginBottom:8}}>Source CV
@@ -144,9 +143,10 @@ export default function BrowserImportV20(){
                 {cvs.map(cv=><option value={cv.sourceVersion} key={cv.sourceVersion}>{cv.fileName}</option>)}
               </select>
             </label>
-            <button style={{...btnStyle,opacity:(running||current.needsJdReview||!cvs.length)?0.5:1}} disabled={running||current.needsJdReview||!cvs.length} onClick={match}>{running?'Analyzing…':'AI Match selected vacancy'}</button>
+            <button style={{...btnStyle,opacity:(running||!cvs.length)?0.5:1}} disabled={running||!cvs.length} onClick={match}>{running?'Analyzing…':'AI Match selected vacancy'}</button>
             {analysis[current.sourceJobId]&&<div style={{marginTop:16}}>
               <h3>Expertise Match · {scoreText(analysis[current.sourceJobId])}</h3>
+              {current.needsJdReview&&<p style={{color:'#F59E0B'}}>Provisional result: incomplete job description was used. Missing text can affect the score and gaps.</p>}
               {['whyYouFit','expertiseGaps'].map(key=><div key={key}><strong>{key==='whyYouFit'?'Why you fit':'Gaps'}</strong><ul>{(analysis[current.sourceJobId][key]||[]).map((item,i)=><li key={i}>{item}</li>)}</ul></div>)}
             </div>}
           </div>
