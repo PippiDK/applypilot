@@ -144,7 +144,7 @@ export default function BrowserImportV20(){
                 {cvs.map(cv=><option value={cv.sourceVersion} key={cv.sourceVersion}>{cv.fileName}</option>)}
               </select>
             </label>
-            <button style={{...btnStyle,opacity:running||current.needsJdReview||!cvs.length?.5:1}} disabled={running||current.needsJdReview||!cvs.length} onClick={match}>{running?'Analyzing…':'AI Match selected vacancy'}</button>
+            <button style={{...btnStyle,opacity:(running||current.needsJdReview||!cvs.length)?0.5:1}} disabled={running||current.needsJdReview||!cvs.length} onClick={match}>{running?'Analyzing…':'AI Match selected vacancy'}</button>
             {analysis[current.sourceJobId]&&<div style={{marginTop:16}}>
               <h3>Expertise Match · {scoreText(analysis[current.sourceJobId])}</h3>
               {['whyYouFit','expertiseGaps'].map(key=><div key={key}><strong>{key==='whyYouFit'?'Why you fit':'Gaps'}</strong><ul>{(analysis[current.sourceJobId][key]||[]).map((item,i)=><li key={i}>{item}</li>)}</ul></div>)}
