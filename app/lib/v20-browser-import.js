@@ -8,7 +8,7 @@ const missingMarker=/\[remainder of source sentence missing\]/i
 function validJobId(value){return /^[0-9]{6,15}$/.test(clean(value))}
 export function normalizeBrowserRecord(value){
   if(!value||typeof value!=='object'||Array.isArray(value)) throw new Error('Invalid job record')
-  const id=clean(value.jobId)
+  const id=clean(value.sourceJobId||value.jobId)
   const title=clean(value.title)
   const company=clean(value.company)
   const description=clean(value.fullJd)
