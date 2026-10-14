@@ -8,7 +8,7 @@ export async function POST(request){
   if(!auth.user) return auth.response
   try{
     const body=await request.json()
-    const job=normalizeBrowserRecord(body?.job)
+    const job=normalizeBrowserRecord({...body?.job,url:body?.job?.originalUrl||body?.job?.url})
     const cvText=String(body?.cvText??'').trim()
     if(cvText.length<100||cvText.length>100000) return NextResponse.json({error:'A ready Source CV is required.'},{status:400})
     if(job.needsJdReview) return NextResponse.json({error:'Review JD completeness before AI Matching.'},{status:422})
