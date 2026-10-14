@@ -1,6 +1,7 @@
 'use client'
 import {useState} from 'react'
 import {parseBrowserExport} from '../lib/v20-browser-import.js'
+import {collectorJobsToApplyPilotJobs} from '../lib/v20-browser-adapter.js'
 import styles from './linkedin-json-import.module.css'
 
 // Stage 2: import section only. Stage 3 connects accepted jobs to existing Live Matches.
@@ -14,14 +15,15 @@ export default function LinkedInJsonImport(){
       if(file.size>12*1024*1024) throw new Error('JSON file exceeds 12 MB')
       const payload=JSON.parse(await file.text())
       const result=parseBrowserExport(payload)
+      const mappedJobs=collectorJobsToApplyPilotJobs(result.jobs)
       const stats={
-        imported:result.jobs.length,
-        complete:result.jobs.filter(job=>!job.needsJdReview).length,
-        partial:result.jobs.filter(job=>job.needsJdReview).length,
+        imported:mappedJobs.length,
+        complete:mappedJobs.filter(job=>!job.needsJdReview).length,
+        partial:mappedJobs.filter(job=>job.needsJdReview).length,
         duplicates:result.inputCount-result.jobs.length-result.errors.length,
         invalid:result.errors.length
       }
-      setState({status:'preview',message:'File validated. Live Matches integration is the next development step; no vacancies were added yet.',stats})
+      setState({status:'preview',message:'Collector JSON validated and converted to Apply Pilot job format. Live Matches integration is the next step; no vacancies were added yet.',stats})
     }catch(error){
       setState({status:'error',message:error?.message||'Could not read JSON export',stats:null})
     }
@@ -61,7 +63,7 @@ export default function LinkedInJsonImport(){
       <div><span>Partial description:</span><b>{state.stats?.partial??'—'}</b></div>
       <div><span>Duplicates skipped:</span><b>{state.stats?.duplicates??'—'}</b></div>
       {state.stats?.invalid>0&&<div><span>Invalid rows:</span><b>{state.stats.invalid}</b></div>}
-      <small>Stage 2 · file preview only</small>
+      <small>Stage 3 · validated + adapted; preview only</small>
     </aside>
   </section>
 }
