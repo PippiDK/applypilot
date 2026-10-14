@@ -8,12 +8,11 @@ export async function POST(request){
   if(!auth.user) return auth.response
   try{
     const body=await request.json()
-    const job=normalizeBrowserRecord({...body?.job,url:body?.job?.originalUrl||body?.job?.url})
+    const job=normalizeBrowserRecord({...body?.job,jobId:body?.job?.sourceJobId||body?.job?.jobId,url:body?.job?.originalUrl||body?.job?.url,fullJd:body?.job?.fullJd||body?.job?.description})
     const cvText=String(body?.cvText??'').trim()
     if(cvText.length<100||cvText.length>100000) return NextResponse.json({error:'A ready Source CV is required.'},{status:400})
-    if(job.needsJdReview) return NextResponse.json({error:'Review JD completeness before AI Matching.'},{status:422})
     const analysis=await analyzeExpertiseMatch({job:{title:job.title,company:job.company,location:job.location,description:job.description},cvText})
-    return NextResponse.json({analysis})
+    return NextResponse.json({analysis,jdIncomplete:job.needsJdReview})
   }catch(error){
     if(/Invalid|required|match LinkedIn|URL/.test(String(error?.message))) return NextResponse.json({error:'Invalid Collector record.'},{status:400})
     console.error('v20 expertise match failed',{code:String(error?.code||'AI_UNKNOWN')})
