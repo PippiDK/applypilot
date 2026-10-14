@@ -24,3 +24,19 @@ test('merge keeps stronger JD and stable unique ids',()=>{
   assert.equal(mergeBrowserJobs([first],[weak])[0].fullJd.length,130)
 })
 test('reject malformed schema',()=>assert.throws(()=>parseBrowserExport({records:[]}),/supported/))
+
+test('incomplete Trackunit JD stays imported, keeps its ID, and is marked for review',()=>{
+  const raw=record('4475956666',{title:'Implementation Manager',company:'Trackunit',fullJd:'A'.repeat(170)+' geograph[remainder of source sentence missing].',jdStatus:'complete'})
+  const result=parseBrowserExport({schemaVersion:1,source:'linkedin-browser',records:[raw]})
+  assert.equal(result.jobs.length,1)
+  assert.equal(result.errors.length,0)
+  assert.equal(result.jobs[0].sourceJobId,'4475956666')
+  assert.equal(result.jobs[0].needsJdReview,true)
+  assert.equal(result.jobs[0].jdStatus,'review')
+})
+test('normalized v20 job is accepted again by validation for AI matching',()=>{
+  const job=normalizeBrowserRecord(record('4475956665'))
+  const normalized=normalizeBrowserRecord({...job,url:job.originalUrl})
+  assert.equal(normalized.sourceJobId,'4475956665')
+  assert.equal(normalized.jdStatus,'complete')
+})
