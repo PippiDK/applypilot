@@ -32,8 +32,8 @@ import {freshnessSelectionFromDays,freshnessResultLabel} from './lib/freshness-s
 import {companyConnection,connectedCompanyNames,defaultCompanyWatch,readCompanyWatch,writeCompanyWatch,TARGET_COMPANIES} from './lib/company-watch.js'
 import {CONSULTANT_PORTALS,connectedConsultantPortalIds,defaultConsultantPortals,readConsultantPortals,writeConsultantPortals} from './lib/consultant-portals.js'
 import LinkedInJsonImport from './components/linkedin-json-import.js'
-import {V20_LIVE_IMPORT_KEY,mergeImportedSourceJobs,importedJobsToLiveItems} from './lib/v20-live-matches.js'
-import {mergeLivePool,readLivePool,writeLivePool,livePoolItems} from './lib/v20-live-pool.js'
+import {V20_LIVE_IMPORT_KEY,importedJobsToLiveItems} from './lib/v20-live-matches.js'
+import {V20_LIVE_POOL_KEY,mergeLivePool,readLivePool,writeLivePool,livePoolItems} from './lib/v20-live-pool.js'
 import SearchAudit from './components/search-audit.js'
 import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
@@ -62,8 +62,6 @@ function mergeSourceItems(groups=[]){const out=[];const byKey=new Map();for(cons
 export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(5)
   const [jobs,setJobs]=useState([])
-  const importedLinkedInRef=useRef([])
-  const searchResultsRef=useRef([])
   const livePoolRef=useRef([])
   const [livePoolSaveError,setLivePoolSaveError]=useState('')
   const [selectedSources,setSelectedSources]=useState(()=>[...DEFAULT_SEARCH_SOURCES])
@@ -138,15 +136,22 @@ export default function Home(){
       setProfile(hydrated)
       setDraft(hydrated)
       try{
-        const saved=JSON.parse(localStorage.getItem(V20_LIVE_IMPORT_KEY)||'[]')
-        if(Array.isArray(saved)){
-          importedLinkedInRef.current=saved
-          const mergedPool=mergeLivePool(readLivePool(localStorage),importedJobsToLiveItems(saved,hydrated,freshnessDays))
-          livePoolRef.current=mergedPool
-          setJobs(livePoolItems(mergedPool))
-          try{writeLivePool(localStorage,mergedPool)}catch{setLivePoolSaveError('Browser storage is full. Save a JSON backup before closing this page.')}
+        const existing=readLivePool(localStorage)
+        // One-time migration only: a legacy import must not resurrect an expired pool entry.
+        let initial=existing
+        const migrate=localStorage.getItem(V20_LIVE_POOL_KEY)===null
+        if(migrate){
+          let prior=[]
+          try{prior=JSON.parse(localStorage.getItem(V20_LIVE_IMPORT_KEY)||'[]')}catch{}
+          if(Array.isArray(prior)&&prior.length) initial=mergeLivePool(existing,importedJobsToLiveItems(prior,hydrated,freshnessDays))
         }
-      }catch{}
+        livePoolRef.current=initial
+        setJobs(livePoolItems(initial))
+        try{
+          writeLivePool(localStorage,initial)
+          if(migrate)localStorage.removeItem(V20_LIVE_IMPORT_KEY)
+        }catch{setLivePoolSaveError('Browser storage is full. Save a JSON backup before closing this page.')}
+      }catch{setLivePoolSaveError('Could not restore the saved vacancy pool. Keep your JSON backup.')}
     }catch{}
   },[])
 
@@ -396,13 +401,12 @@ export default function Home(){
   }
 
   async function importLinkedInJobs(incoming){
-    const merged=mergeImportedSourceJobs(importedLinkedInRef.current,incoming)
-    const added=merged.length-importedLinkedInRef.current.length
-    localStorage.setItem(V20_LIVE_IMPORT_KEY,JSON.stringify(merged))
-    importedLinkedInRef.current=merged
-    const imported=importedJobsToLiveItems(merged,profile,freshnessDays)
-    publishLiveMatches(imported)
-    return {added,total:merged.length}
+    const before=new Set(livePoolRef.current.filter(row=>row.item?.job?.importSource==='linkedin-json').map(row=>String(row.item.job.sourceJobId)))
+    const imported=importedJobsToLiveItems(incoming,profile,freshnessDays)
+    const next=publishLiveMatches(imported)
+    const total=next.filter(row=>row.item?.job?.importSource==='linkedin-json').length
+    const added=next.filter(row=>row.item?.job?.importSource==='linkedin-json'&&!before.has(String(row.item.job.sourceJobId))).length
+    return {added,total}
   }
 
   async function search(){
