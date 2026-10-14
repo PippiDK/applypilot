@@ -5,7 +5,7 @@ import {collectorJobsToApplyPilotJobs} from '../lib/v20-browser-adapter.js'
 import styles from './linkedin-json-import.module.css'
 
 // Stage 2: import section only. Stage 3 connects accepted jobs to existing Live Matches.
-export default function LinkedInJsonImport(){
+export default function LinkedInJsonImport({onImported}){
   const [file,setFile]=useState(null)
   const [state,setState]=useState({status:'idle',message:'',stats:null})
   async function preview(){
@@ -16,6 +16,8 @@ export default function LinkedInJsonImport(){
       const payload=JSON.parse(await file.text())
       const result=parseBrowserExport(payload)
       const mappedJobs=collectorJobsToApplyPilotJobs(result.jobs)
+      if(typeof onImported!=='function') throw new Error('Apply Pilot Live Matches is unavailable')
+      const outcome=await onImported(mappedJobs)
       const stats={
         imported:mappedJobs.length,
         complete:mappedJobs.filter(job=>!job.needsJdReview).length,
@@ -23,7 +25,7 @@ export default function LinkedInJsonImport(){
         duplicates:result.inputCount-result.jobs.length-result.errors.length,
         invalid:result.errors.length
       }
-      setState({status:'preview',message:'Collector JSON validated and converted to Apply Pilot job format. Live Matches integration is the next step; no vacancies were added yet.',stats})
+      setState({status:'preview',message:`Added to Live Matches · ${outcome?.total??mappedJobs.length} imported jobs total · ${outcome?.added??mappedJobs.length} new.`,stats})
     }catch(error){
       setState({status:'error',message:error?.message||'Could not read JSON export',stats:null})
     }
@@ -63,7 +65,7 @@ export default function LinkedInJsonImport(){
       <div><span>Partial description:</span><b>{state.stats?.partial??'—'}</b></div>
       <div><span>Duplicates skipped:</span><b>{state.stats?.duplicates??'—'}</b></div>
       {state.stats?.invalid>0&&<div><span>Invalid rows:</span><b>{state.stats.invalid}</b></div>}
-      <small>Stage 3 · validated + adapted; preview only</small>
+      <small>Imported jobs appear in Live Matches</small>
     </aside>
   </section>
 }
