@@ -890,7 +890,7 @@ export default function Home(){
 
     <section className="controls">
       <div><small>POSTED WITHIN</small><div className="choices">{WINDOWS.map(({days,label})=><button key={days} className={freshnessDays===days?'choice selected':'choice'} onClick={()=>setFreshnessDays(days)}>{label}</button>)}</div></div>
-      <div><small>SEARCH SOURCES</small><div className="choices"><label className="choice"><input type="checkbox" checked={selectedSources.includes('linkedin')} onChange={()=>toggleSource('linkedin')}/> LinkedIn</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobindex')} onChange={()=>toggleSource('jobindex')}/> Jobindex</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobnet')} onChange={()=>toggleSource('jobnet')}/> Jobnet</label></div></div>
+      <div><small>SEARCH SOURCES</small><div className="choices"><label className="choice" title="LinkedIn vacancies are supplied through JSON Import"><input type="checkbox" checked={false} disabled/> LinkedIn · JSON Import</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobindex')} onChange={()=>toggleSource('jobindex')}/> Jobindex</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobnet')} onChange={()=>toggleSource('jobnet')}/> Jobnet</label></div></div>
       <button className="primary" onClick={search} disabled={state.loading}>{state.loading?'Searching…':'Search'}</button>
     </section>
 
