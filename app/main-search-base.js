@@ -395,10 +395,9 @@ export default function Home(){
     setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
   }
-  const automatedSources=selectedSources.filter(source=>source!=='linkedin')
   const activeCompanySites=companyWatch.enabled?companyWatch.selected.filter(name=>connectedCompanyNames().includes(name)):[]
   const activeConsultantPortals=consultantPortals.enabled?consultantPortals.selected.filter(id=>connectedConsultantPortalIds().includes(id)):[]
-  if(!automatedSources.length&&!activeCompanySites.length&&!activeConsultantPortals.length){
+  if(!selectedSources.length&&!activeCompanySites.length&&!activeConsultantPortals.length){
     setState({loading:false,error:'Select at least one search source.',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
   }
@@ -409,7 +408,7 @@ export default function Home(){
   try{
     const tasks=[]
 
-    if(automatedSources.includes('linkedin')) tasks.push(runLabeledSearchTask('LinkedIn',async()=>{
+    if(selectedSources.includes('linkedin')) tasks.push(runLabeledSearchTask('LinkedIn',async()=>{
       let res
       if(hasProfilePlan){
         const fingerprint=profile.unionSearchPlanFingerprint||profile.unionSearchPlan?.fingerprint
@@ -539,7 +538,7 @@ export default function Home(){
       return {source:'linkedin',data}
     }))
 
-    if(automatedSources.includes('jobindex')) tasks.push(runLabeledSearchTask('Jobindex',async()=>{
+    if(selectedSources.includes('jobindex')) tasks.push(runLabeledSearchTask('Jobindex',async()=>{
       if(!hasProfilePlan) throw new Error('Jobindex requires a saved Search Profile.')
       const res=await fetch('/api/jobindex-profile-search',{
         method:'POST',
@@ -555,7 +554,7 @@ export default function Home(){
       return {source:'jobindex',data}
     }))
 
-    if(automatedSources.includes('jobnet')) tasks.push(runLabeledSearchTask('Jobnet',async()=>{
+    if(selectedSources.includes('jobnet')) tasks.push(runLabeledSearchTask('Jobnet',async()=>{
       if(!hasProfilePlan) throw new Error('Jobnet requires a saved Search Profile.')
       const res=await fetch('/api/jobnet-profile-search',{
         method:'POST',
@@ -634,7 +633,7 @@ export default function Home(){
     setState({
       loading:false,
       error:'',
-      coverage:{source:[...automatedSources,...(activeCompanySites.length?['company-sites']:[]),...(activeConsultantPortals.length?['consultant-portals']:[])].join('+'),freshnessDays,status:limited?'ACCESS LIMITED':mergedJobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:failed[0]?.reason?.message||null},
+      coverage:{source:[...selectedSources,...(activeCompanySites.length?['company-sites']:[]),...(activeConsultantPortals.length?['consultant-portals']:[])].join('+'),freshnessDays,status:limited?'ACCESS LIMITED':mergedJobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:failed[0]?.reason?.message||null},
       stats,
       fetchedAt:new Date().toISOString(),
       audit,
@@ -890,7 +889,7 @@ export default function Home(){
 
     <section className="controls">
       <div><small>POSTED WITHIN</small><div className="choices">{WINDOWS.map(({days,label})=><button key={days} className={freshnessDays===days?'choice selected':'choice'} onClick={()=>setFreshnessDays(days)}>{label}</button>)}</div></div>
-      <div><small>SEARCH SOURCES</small><div className="choices"><label className="choice" title="LinkedIn vacancies are supplied through JSON Import"><input type="checkbox" checked={false} disabled/> LinkedIn · JSON Import</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobindex')} onChange={()=>toggleSource('jobindex')}/> Jobindex</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobnet')} onChange={()=>toggleSource('jobnet')}/> Jobnet</label></div></div>
+      <div><small>SEARCH SOURCES</small><div className="choices"><label className="choice"><input type="checkbox" checked={selectedSources.includes('linkedin')} onChange={()=>toggleSource('linkedin')}/> LinkedIn</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobindex')} onChange={()=>toggleSource('jobindex')}/> Jobindex</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobnet')} onChange={()=>toggleSource('jobnet')}/> Jobnet</label></div></div>
       <button className="primary" onClick={search} disabled={state.loading}>{state.loading?'Searching…':'Search'}</button>
     </section>
 
