@@ -31,6 +31,7 @@ import {runLabeledSearchTask} from './lib/search-task-label.js'
 import {freshnessSelectionFromDays,freshnessResultLabel} from './lib/freshness-selection.js'
 import {companyConnection,connectedCompanyNames,defaultCompanyWatch,readCompanyWatch,writeCompanyWatch,TARGET_COMPANIES} from './lib/company-watch.js'
 import {CONSULTANT_PORTALS,connectedConsultantPortalIds,defaultConsultantPortals,readConsultantPortals,writeConsultantPortals} from './lib/consultant-portals.js'
+import LinkedInJsonImport from './components/linkedin-json-import.js'
 import SearchAudit from './components/search-audit.js'
 import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
@@ -868,6 +869,8 @@ export default function Home(){
       <div><small>SEARCH SOURCES</small><div className="choices"><label className="choice"><input type="checkbox" checked={selectedSources.includes('linkedin')} onChange={()=>toggleSource('linkedin')}/> LinkedIn</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobindex')} onChange={()=>toggleSource('jobindex')}/> Jobindex</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobnet')} onChange={()=>toggleSource('jobnet')}/> Jobnet</label></div></div>
       <button className="primary" onClick={search} disabled={state.loading}>{state.loading?'Searching…':'Search'}</button>
     </section>
+
+    <LinkedInJsonImport />
 
     <section className="companyWatch">
       <div className="companyWatchMain">
