@@ -6,7 +6,7 @@ import {isApiPath,isPublicPagePath,isStaticAssetPath} from '../auth/route-policy
 export async function updateSession(request){
   const pathname=request.nextUrl.pathname
 
-  if(process.env.VERCEL_ENV==='preview'){
+  if(process.env.VERCEL_ENV==='preview'&&process.env.APPLYPILOT_REAL_TEST_AUTH!=='1'){
     return NextResponse.next({request})
   }
 
