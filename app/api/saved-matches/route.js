@@ -7,10 +7,19 @@ export const runtime='nodejs'
 
 // P2 only: write already-matched results. No reads, merging, or cleanup yet.
 export async function POST(request){
-  // Preview auth has a synthetic user ID: never write it to an authenticated DB table.
-  if(process.env.VERCEL_ENV==='preview') return NextResponse.json({error:'Saved Matches preview persistence is not configured'},{status:503})
-  const auth=await requireUser()
-  if(!auth.user) return auth.response
+  // Preview's generic requireUser() has a synthetic identity. Saved Matches must
+  // always use a real authenticated Supabase user so the database RLS applies.
+  const supabase=await createServerSupabaseClient()
+  let user
+  if(process.env.VERCEL_ENV==='preview'){
+    const {data,error}=await supabase.auth.getUser()
+    if(error||!data?.user) return NextResponse.json({error:'Unauthorized'},{status:401})
+    user=data.user
+  }else{
+    const auth=await requireUser()
+    if(!auth.user) return auth.response
+    user=auth.user
+  }
   const body=await request.json().catch(()=>null)
   if(!body||typeof body.profileKey!=='string'||!body.profileKey.trim()||!Array.isArray(body.items)||body.items.length>500){
     return NextResponse.json({error:'Invalid Saved Matches payload'},{status:400})
@@ -25,7 +34,7 @@ export async function POST(request){
     const publishedAt=new Date(job.publishedAt||'')
     if(!jobId||!source||!Number.isFinite(publishedAt.getTime())) continue
     rows.push({
-      user_id:auth.user.id,
+      user_id:user.id,
       source,job_id:jobId,published_at:publishedAt.toISOString(),
       profile_key:body.profileKey.trim(),job,evaluation,
       updated_at:new Date().toISOString()
@@ -34,7 +43,6 @@ export async function POST(request){
   if(!rows.length) return NextResponse.json({saved:0})
   // Dedupe within the request as well as in the table.
   const byKey=new Map(rows.map(row=>[row.source+'|'+row.job_id,row]))
-  const supabase=await createServerSupabaseClient()
   const {error}=await supabase.from('saved_matches').upsert([...byKey.values()],{onConflict:'user_id,source,job_id'})
   if(error){
     console.error('saved-matches write error',{code:error.code,message:error.message})
