@@ -25,6 +25,7 @@ import {archiveAppliedJob,removeAppliedJob,syncAppliedArchive} from './lib/appli
 import {deleteAppliedJob,fetchAppliedJobs,loadAppliedJobs,persistAppliedJobs} from './lib/applied-jobs-client.js'
 import AppliedJobsArchive from './components/applied-jobs-archive.js'
 import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/linkedin-master-pool-cache.js'
+import {persistSavedMatches,savedMatchesProfileKey} from './lib/saved-matches-client.js'
 import {writeSearchProfileStorage} from './lib/storage-housekeeping.js'
 import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
 import {runLabeledSearchTask} from './lib/search-task-label.js'
@@ -595,6 +596,9 @@ export default function Home(){
 
     const mergedJobs=mergeSourceItems(successful.map(result=>Array.isArray(result.data.jobs)?result.data.jobs:[]))
     setJobs(mergedJobs)
+    // Best effort P2 persistence only; never block or change normal Search results.
+    const savedProfileKey=savedMatchesProfileKey({profile,cvLibrary})
+    if(savedProfileKey&&mergedJobs.length) void persistSavedMatches({items:mergedJobs,profileKey:savedProfileKey}).catch(error=>console.warn('Saved Matches write skipped:',error?.message||'unavailable'))
     const nextAppliedJobs=syncAppliedArchive({archive:appliedJobsRef.current,items:mergedJobs,statuses:jobStatusesRef.current})
     if(JSON.stringify(nextAppliedJobs)!==JSON.stringify(appliedJobsRef.current)) persistAppliedArchive(nextAppliedJobs)
     else setAppliedJobs(nextAppliedJobs)
