@@ -62,6 +62,7 @@ export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(5)
   const [jobs,setJobs]=useState([])
   const liveMatchesRef=useRef([])
+  const savedBeforeSearchRef=useRef(new Set())
   const liveMatchesReadyRef=useRef(null)
   const liveMatchesWriteQueue=useRef(Promise.resolve())
   const [currentRunKeys,setCurrentRunKeys]=useState(()=>new Set())
@@ -397,7 +398,7 @@ export default function Home(){
   }
 
   function publishSavedLiveMatches(items,{current=false}={}){
-    if(current&&items.length)setCurrentRunKeys(previous=>new Set([...previous,...items.map(liveMatchIdentity).filter(Boolean)]))
+    if(current&&items.length)setCurrentRunKeys(previous=>new Set([...previous,...items.map(liveMatchIdentity).filter(key=>key&&!savedBeforeSearchRef.current.has(key))]))
     const next=mergeSavedLiveMatches(liveMatchesRef.current,items)
     liveMatchesRef.current=next
     setJobs(savedLiveMatchItems(next))
@@ -423,7 +424,7 @@ export default function Home(){
     setState({loading:false,error:'Select at least one search source.',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
   }
-  setCurrentRunKeys(new Set()); publishSavedLiveMatches([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
+  savedBeforeSearchRef.current=new Set(liveMatchesRef.current.map(row=>liveMatchIdentity(row.item)).filter(Boolean)); setCurrentRunKeys(new Set()); publishSavedLiveMatches([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
   setShadowState({status:'skipped',error:'',stats:null,coverage:null,comparison:null})
   const hasProfilePlan=Array.isArray(profile?.unionSearchPlan?.directions)&&profile.unionSearchPlan.directions.length>0
   try{
