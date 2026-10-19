@@ -33,7 +33,7 @@ import {companyConnection,connectedCompanyNames,defaultCompanyWatch,readCompanyW
 import {CONSULTANT_PORTALS,connectedConsultantPortalIds,defaultConsultantPortals,readConsultantPortals,writeConsultantPortals} from './lib/consultant-portals.js'
 import LinkedInJsonImport from './components/linkedin-json-import.js'
 import {V20_LIVE_IMPORT_KEY,importedJobsToLiveItems} from './lib/v20-live-matches.js'
-import {V20_LIVE_POOL_KEY,mergeLivePool,readLivePool,writeLivePool,livePoolItems} from './lib/v20-live-pool.js'
+import {V20_LIVE_POOL_KEY,mergeLivePool,readLivePool,writeLivePool,livePoolItems,livePoolIdentity} from './lib/v20-live-pool.js'
 import SearchAudit from './components/search-audit.js'
 import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
@@ -64,6 +64,7 @@ export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(5)
   const [jobs,setJobs]=useState([])
   const livePoolRef=useRef([])
+  const [currentRunKeys,setCurrentRunKeys]=useState(()=>new Set())
   const [livePoolSaveError,setLivePoolSaveError]=useState('')
   const [selectedSources,setSelectedSources]=useState(()=>[...DEFAULT_SEARCH_SOURCES])
   const [companyWatch,setCompanyWatch]=useState(()=>defaultCompanyWatch())
@@ -393,7 +394,8 @@ export default function Home(){
     })
   }
 
-  function publishLiveMatches(items){
+  function publishLiveMatches(items,{current=false}={}){
+    if(current&&items.length) setCurrentRunKeys(previous=>new Set([...previous,...items.map(livePoolIdentity).filter(Boolean)]))
     const next=mergeLivePool(livePoolRef.current,items)
     livePoolRef.current=next
     setJobs(livePoolItems(next))
@@ -405,7 +407,7 @@ export default function Home(){
   async function importLinkedInJobs(incoming){
     const before=new Set(livePoolRef.current.filter(row=>row.item?.job?.importSource==='linkedin-json').map(row=>String(row.item.job.sourceJobId)))
     const imported=importedJobsToLiveItems(incoming,profile,freshnessDays)
-    const next=publishLiveMatches(imported)
+    const next=publishLiveMatches(imported,{current:true})
     const total=next.filter(row=>row.item?.job?.importSource==='linkedin-json').length
     const added=next.filter(row=>row.item?.job?.importSource==='linkedin-json'&&!before.has(String(row.item.job.sourceJobId))).length
     return {added,total}
@@ -422,7 +424,7 @@ export default function Home(){
     setState({loading:false,error:'Select at least one search source.',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
   }
-  publishLiveMatches([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
+  setCurrentRunKeys(new Set()); publishLiveMatches([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
   setShadowState({status:'skipped',error:'',stats:null,coverage:null,comparison:null})
   const hasProfilePlan=Array.isArray(profile?.unionSearchPlan?.directions)&&profile.unionSearchPlan.directions.length>0
   try{
@@ -479,7 +481,7 @@ export default function Home(){
               verifiedJobs:Array.isArray(data.masterVerifiedJobs)?data.masterVerifiedJobs:[],
             })
           }
-          publishLiveMatches(Array.isArray(data.jobs)?data.jobs:[])
+          publishLiveMatches(Array.isArray(data.jobs)?data.jobs:[],{current:true})
           if(data.stats?.detailComplete===true) break
           const next=Number(data.stats?.detailNextStart)
           if(!Number.isFinite(next)||next<=detailBatchStart) throw new Error('LinkedIn detail continuation did not advance.')
@@ -523,7 +525,7 @@ export default function Home(){
             })
           }
           data=recoveryData
-          publishLiveMatches(Array.isArray(recoveryData.jobs)?recoveryData.jobs:[])
+          publishLiveMatches(Array.isArray(recoveryData.jobs)?recoveryData.jobs:[],{current:true})
         }
         const finalAudit=[...auditById.values()]
         const finalDetailFailures=finalAudit.filter(row=>row?.stage==='DETAIL_FETCH_FAILED').length
@@ -636,7 +638,7 @@ export default function Home(){
     if(!successful.length) throw failed[0]?.reason||new Error('Search failed')
 
     const mergedJobs=mergeSourceItems(successful.map(result=>Array.isArray(result.data.jobs)?result.data.jobs:[]))
-    publishLiveMatches(mergedJobs)
+    publishLiveMatches(mergedJobs,{current:true})
     const nextAppliedJobs=syncAppliedArchive({archive:appliedJobsRef.current,items:mergedJobs,statuses:jobStatusesRef.current})
     if(JSON.stringify(nextAppliedJobs)!==JSON.stringify(appliedJobsRef.current)) persistAppliedArchive(nextAppliedJobs)
     else setAppliedJobs(nextAppliedJobs)
@@ -967,7 +969,7 @@ export default function Home(){
         {visibleJobs.map(item=>{const {job,evaluation}=item; const score=Number.isFinite(evaluation?.score)?Math.round(evaluation.score*10):null; const manualStatus=jobStatuses[job.sourceJobId]||''; return <div className="jobWrap" key={job.sourceJobId}>
           <button onClick={()=>setSelected(item)} className={'job '+(active?.job.sourceJobId===job.sourceJobId?'active':'')}>
             <span className="score">{score===null?'N/A':fitLabel(score)}</span>
-            <span><b>{job.title}</b><small>{job.company} · {job.location}</small><small className="sourceLine">{jobSourceLabel(job)} · {job.publishedAt?dateText(job.publishedAt):(job.publishedText||'Date unavailable')}{job.needsJdReview?' · Incomplete JD':''}</small></span>
+            <span><b>{job.title}</b>{!currentRunKeys.has(livePoolIdentity(item))&&<small style={{display:'inline-block',marginLeft:8,color:'#E7B84F',fontWeight:700,letterSpacing:'0.06em'}}>★ SAVED</small>}<small>{job.company} · {job.location}</small><small className="sourceLine">{jobSourceLabel(job)} · {job.publishedAt?dateText(job.publishedAt):(job.publishedText||'Date unavailable')}{job.needsJdReview?' · Incomplete JD':''}</small></span>
             <span>→</span>
           </button>
           <select aria-label={`Status for ${job.title}`} className={`jobStatusSelect status-${manualStatus||'none'}`} value={manualStatus} onChange={event=>changeJobStatus(job.sourceJobId,event.target.value)}>
