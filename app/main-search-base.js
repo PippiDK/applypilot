@@ -38,7 +38,8 @@ import SearchProfileRolesStep from './components/search-profile-roles-step.js'
 import SearchPlanPreview from './components/search-plan-preview.js'
 import BestCvPanel from './components/best-cv-panel.js'
 import filterStyles from './components/job-filters.module.css'
-import {liveMatchIdentity,mergeSavedLiveMatches,readSavedLiveMatches,writeSavedLiveMatches,savedLiveMatchItems} from './lib/saved-live-matches.js'
+import {LIVE_MATCHES_STORAGE_KEY,liveMatchIdentity,mergeSavedLiveMatches,readSavedLiveMatches,savedLiveMatchItems} from './lib/saved-live-matches.js'
+import {readIndexedLiveMatches,writeIndexedLiveMatches} from './lib/saved-live-matches-indexeddb.js'
 
 const WINDOWS=[{days:1,label:'1 Day'},{days:3,label:'3 Days'},{days:5,label:'5 Days'},{days:10,label:'10 Days'}]
 const EMPTY_SEARCH_PROFILE={...DEFAULT_PROFILE,exclusions:''}
@@ -61,6 +62,8 @@ export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(5)
   const [jobs,setJobs]=useState([])
   const liveMatchesRef=useRef([])
+  const liveMatchesReadyRef=useRef(null)
+  const liveMatchesWriteQueue=useRef(Promise.resolve())
   const [currentRunKeys,setCurrentRunKeys]=useState(()=>new Set())
   const [liveMatchesSaveError,setLiveMatchesSaveError]=useState('')
   const [selectedSources,setSelectedSources]=useState(()=>[...DEFAULT_SEARCH_SOURCES])
@@ -109,11 +112,23 @@ export default function Home(){
   const active=visibleJobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||visibleJobs[0]||null
 
   useEffect(()=>{
-    try{
-      const restored=readSavedLiveMatches(localStorage)
-      liveMatchesRef.current=restored
-      setJobs(savedLiveMatchItems(restored))
-    }catch{setLiveMatchesSaveError('Saved vacancies could not be restored from this browser.')}
+    let active=true
+    // Install readiness synchronously so a search cannot overwrite the not-yet-loaded archive.
+    const ready=(async()=>{
+      const stored=await readIndexedLiveMatches()
+      const legacy=readSavedLiveMatches(localStorage)
+      const merged=mergeSavedLiveMatches(stored,[...legacy.map(row=>row.item),...liveMatchesRef.current.map(row=>row.item)])
+      // Commit before removing the legacy copy; a failed write must never destroy the backup.
+      const committed=await writeIndexedLiveMatches(merged)
+      if(legacy.length) localStorage.removeItem(LIVE_MATCHES_STORAGE_KEY)
+      liveMatchesRef.current=committed
+      if(active) setJobs(savedLiveMatchItems(committed))
+    })()
+    liveMatchesReadyRef.current=ready
+    ready.catch(()=>{
+      if(active) setLiveMatchesSaveError('Saved vacancies could not be loaded or migrated to IndexedDB. Existing browser data was not deleted.')
+    })
+    return()=>{active=false}
   },[])
 
   useEffect(()=>{
@@ -386,8 +401,15 @@ export default function Home(){
     const next=mergeSavedLiveMatches(liveMatchesRef.current,items)
     liveMatchesRef.current=next
     setJobs(savedLiveMatchItems(next))
-    try{writeSavedLiveMatches(localStorage,next);setLiveMatchesSaveError('')}
-    catch{setLiveMatchesSaveError('Browser storage is full. Saved vacancies may not persist after a reload.')}
+    // Serialize writes after restore/migration; each operation writes the latest in-memory snapshot.
+    const save=liveMatchesWriteQueue.current.then(async()=>{
+      if(liveMatchesReadyRef.current) await liveMatchesReadyRef.current
+      await writeIndexedLiveMatches(liveMatchesRef.current)
+    })
+    liveMatchesWriteQueue.current=save.catch(()=>{})
+    save.then(()=>setLiveMatchesSaveError('')).catch(()=>{
+      setLiveMatchesSaveError('Saved vacancies could not be written to IndexedDB. They may not persist after a reload.')
+    })
   }
 
   async function search(){
