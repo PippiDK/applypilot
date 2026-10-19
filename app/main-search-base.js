@@ -38,6 +38,7 @@ import SearchProfileRolesStep from './components/search-profile-roles-step.js'
 import SearchPlanPreview from './components/search-plan-preview.js'
 import BestCvPanel from './components/best-cv-panel.js'
 import filterStyles from './components/job-filters.module.css'
+import {liveMatchIdentity,mergeSavedLiveMatches,readSavedLiveMatches,writeSavedLiveMatches,savedLiveMatchItems} from './lib/saved-live-matches.js'
 
 const WINDOWS=[{days:1,label:'1 Day'},{days:3,label:'3 Days'},{days:5,label:'5 Days'},{days:10,label:'10 Days'}]
 const EMPTY_SEARCH_PROFILE={...DEFAULT_PROFILE,exclusions:''}
@@ -59,6 +60,9 @@ function mergeSourceItems(groups=[]){const out=[];const byKey=new Map();for(cons
 export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(5)
   const [jobs,setJobs]=useState([])
+  const liveMatchesRef=useRef([])
+  const [currentRunKeys,setCurrentRunKeys]=useState(()=>new Set())
+  const [liveMatchesSaveError,setLiveMatchesSaveError]=useState('')
   const [selectedSources,setSelectedSources]=useState(()=>[...DEFAULT_SEARCH_SOURCES])
   const [companyWatch,setCompanyWatch]=useState(()=>defaultCompanyWatch())
   const [companyWatchOpen,setCompanyWatchOpen]=useState(false)
@@ -103,6 +107,14 @@ export default function Home(){
   const [exportState,setExportState]=useState({loading:false,error:'',baselineKey:''})
   const visibleJobs=useMemo(()=>filterJobItemsByStatus(filterJobItems(jobs,selectedAreas,selectedWorkModels),jobStatuses,selectedStatuses),[jobs,selectedAreas,selectedWorkModels,jobStatuses,selectedStatuses])
   const active=visibleJobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||visibleJobs[0]||null
+
+  useEffect(()=>{
+    try{
+      const restored=readSavedLiveMatches(localStorage)
+      liveMatchesRef.current=restored
+      setJobs(savedLiveMatchItems(restored))
+    }catch{setLiveMatchesSaveError('Saved vacancies could not be restored from this browser.')}
+  },[])
 
   useEffect(()=>{
     try{
@@ -369,6 +381,15 @@ export default function Home(){
     })
   }
 
+  function publishSavedLiveMatches(items,{current=false}={}){
+    if(current&&items.length)setCurrentRunKeys(previous=>new Set([...previous,...items.map(liveMatchIdentity).filter(Boolean)]))
+    const next=mergeSavedLiveMatches(liveMatchesRef.current,items)
+    liveMatchesRef.current=next
+    setJobs(savedLiveMatchItems(next))
+    try{writeSavedLiveMatches(localStorage,next);setLiveMatchesSaveError('')}
+    catch{setLiveMatchesSaveError('Browser storage is full. Saved vacancies may not persist after a reload.')}
+  }
+
   async function search(){
   if(!resumeLoaded){
     setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[]})
@@ -380,7 +401,7 @@ export default function Home(){
     setState({loading:false,error:'Select at least one search source.',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
   }
-  setJobs([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
+  setCurrentRunKeys(new Set()); publishSavedLiveMatches([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
   setShadowState({status:'skipped',error:'',stats:null,coverage:null,comparison:null})
   const hasProfilePlan=Array.isArray(profile?.unionSearchPlan?.directions)&&profile.unionSearchPlan.directions.length>0
   try{
@@ -437,7 +458,7 @@ export default function Home(){
               verifiedJobs:Array.isArray(data.masterVerifiedJobs)?data.masterVerifiedJobs:[],
             })
           }
-          setJobs(Array.isArray(data.jobs)?data.jobs:[])
+          publishSavedLiveMatches(Array.isArray(data.jobs)?data.jobs:[],{current:true})
           if(data.stats?.detailComplete===true) break
           const next=Number(data.stats?.detailNextStart)
           if(!Number.isFinite(next)||next<=detailBatchStart) throw new Error('LinkedIn detail continuation did not advance.')
@@ -481,7 +502,7 @@ export default function Home(){
             })
           }
           data=recoveryData
-          setJobs(Array.isArray(recoveryData.jobs)?recoveryData.jobs:[])
+          publishSavedLiveMatches(Array.isArray(recoveryData.jobs)?recoveryData.jobs:[],{current:true})
         }
         const finalAudit=[...auditById.values()]
         const finalDetailFailures=finalAudit.filter(row=>row?.stage==='DETAIL_FETCH_FAILED').length
@@ -594,7 +615,7 @@ export default function Home(){
     if(!successful.length) throw failed[0]?.reason||new Error('Search failed')
 
     const mergedJobs=mergeSourceItems(successful.map(result=>Array.isArray(result.data.jobs)?result.data.jobs:[]))
-    setJobs(mergedJobs)
+    publishSavedLiveMatches(mergedJobs,{current:true})
     const nextAppliedJobs=syncAppliedArchive({archive:appliedJobsRef.current,items:mergedJobs,statuses:jobStatusesRef.current})
     if(JSON.stringify(nextAppliedJobs)!==JSON.stringify(appliedJobsRef.current)) persistAppliedArchive(nextAppliedJobs)
     else setAppliedJobs(nextAppliedJobs)
@@ -895,6 +916,7 @@ export default function Home(){
 
     <section className="grid">
       <div className="list">
+        {liveMatchesSaveError&&<div className="warningBox" role="alert">{liveMatchesSaveError}</div>}
         <div className="listHead"><div><h2>Live matches</h2>{jobs.length>0&&<small className={filterStyles.resultCount}>{visibleJobs.length} of {jobs.length}</small>}</div><small>{freshnessResultLabel(freshnessSelectionFromDays(freshnessDays))}</small></div>
         {jobs.length>0&&<details className={filterStyles.filters}>
           <summary><span>FILTERS</span><span>{visibleJobs.length} of {jobs.length}</span></summary>
@@ -912,7 +934,7 @@ export default function Home(){
         {visibleJobs.map(item=>{const {job,evaluation}=item; const score=Math.round(evaluation.score*10); const manualStatus=jobStatuses[job.sourceJobId]||''; return <div className="jobWrap" key={job.sourceJobId}>
           <button onClick={()=>setSelected(item)} className={'job '+(active?.job.sourceJobId===job.sourceJobId?'active':'')}>
             <span className="score">{fitLabel(score)}</span>
-            <span><b>{job.title}</b><small>{job.company} · {job.location}</small><small className="sourceLine">{jobSourceLabel(job)} · {dateText(job.publishedAt)}</small></span>
+            <span>{!currentRunKeys.has(liveMatchIdentity(item))&&<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#E7B84F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline-block',verticalAlign:'-2px',marginRight:6}} role="img" aria-label="Saved from previous search"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>}<b>{job.title}</b><small>{job.company} · {job.location}</small><small className="sourceLine">{jobSourceLabel(job)} · {dateText(job.publishedAt)}</small></span>
             <span>→</span>
           </button>
           <select aria-label={`Status for ${job.title}`} className={`jobStatusSelect status-${manualStatus||'none'}`} value={manualStatus} onChange={event=>changeJobStatus(job.sourceJobId,event.target.value)}>
