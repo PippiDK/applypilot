@@ -5,7 +5,7 @@ const TTL=V20_LIVE_POOL_DAYS*24*60*60*1000
 
 const asTime=value=>{const n=Date.parse(String(value||''));return Number.isFinite(n)?n:null}
 const text=value=>String(value??'').trim()
-function identity(item){
+export function livePoolIdentity(item){
   const job=item?.job
   if(!job||!text(job.title)||!text(job.company))return ''
   const rawSource=text(job.source||job.sourceRecords?.[0]?.source).toLowerCase()
@@ -14,6 +14,18 @@ function identity(item){
   if(source&&id)return source+':'+id.replace(/^linkedin:/,'')
   // Do not merge vacancies with different locations unless the provider has a stable ID.
   return source+':'+text(job.company).toLowerCase()+'|'+text(job.title).toLowerCase()+'|'+text(job.location).toLowerCase()
+}
+function publishedWithinTenDays(item,nowMs){
+  const published=asTime(item?.job?.publishedAt)
+  return published!==null&&published<=nowMs&&nowMs-published<TTL
+}
+function shouldRetain(row,nowMs){
+  const item=row?.item
+  if(item?.job?.importSource==='linkedin-json'&&!Number.isFinite(item?.evaluation?.score)){
+    const first=asTime(row?.firstSeenAt)
+    return first!==null&&first<=nowMs&&nowMs-first<TTL
+  }
+  return publishedWithinTenDays(item,nowMs)
 }
 function prefer(prev,next){
   const old=prev.item,newItem=next.item
@@ -33,14 +45,13 @@ export function mergeLivePool(existing=[],incoming=[],now=new Date().toISOString
   if(nowMs===null)throw new Error('Invalid pool clock')
   const map=new Map()
   for(const row of Array.isArray(existing)?existing:[]){
-    const key=identity(row?.item)
-    const first=asTime(row?.firstSeenAt)
-    if(!key||first===null||first>nowMs||nowMs-first>=TTL)continue
+    const key=livePoolIdentity(row?.item)
+    if(!key||!shouldRetain(row,nowMs))continue
     if(!map.has(key))map.set(key,{item:row.item,firstSeenAt:row.firstSeenAt})
   }
   for(const item of Array.isArray(incoming)?incoming:[]){
-    const key=identity(item)
-    if(!key)continue
+    const key=livePoolIdentity(item)
+    if(!key||!shouldRetain({item,firstSeenAt:now},nowMs))continue
     const fresh={item,firstSeenAt:now}
     map.set(key,map.has(key)?prefer(map.get(key),fresh):fresh)
   }
