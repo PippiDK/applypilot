@@ -3,7 +3,7 @@ import {createServerSupabaseClient} from '../supabase/server.js'
 import {getUserRole} from './route-policy.js'
 
 export async function requireUser(){
-  if(process.env.VERCEL_ENV==='preview'){
+  if(process.env.VERCEL_ENV==='preview'&&process.env.APPLYPILOT_REAL_TEST_AUTH!=='1'){
     return {
       user:{id:'vercel-preview'},
       role:'admin',
