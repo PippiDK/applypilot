@@ -6,7 +6,7 @@ import {isApiPath,isPublicPagePath,isStaticAssetPath} from '../auth/route-policy
 export async function updateSession(request){
   const pathname=request.nextUrl.pathname
 
-  if(process.env.VERCEL_ENV==='preview'){
+  if(process.env.VERCEL_ENV==='preview'&&process.env.APPLYPILOT_REAL_TEST_AUTH!=='1'){
     return NextResponse.next({request})
   }
 
@@ -16,7 +16,7 @@ export async function updateSession(request){
     return NextResponse.next({request})
   }
 
-  if(isStaticAssetPath(pathname)||pathname==='/auth/confirm'||pathname.startsWith('/auth/confirm/')){
+  if(isStaticAssetPath(pathname)||pathname==='/auth/confirm'||pathname.startsWith('/auth/confirm/')||(process.env.VERCEL_ENV==='preview'&&process.env.APPLYPILOT_REAL_TEST_AUTH==='1'&&pathname==='/auth/reset-password')){
     return NextResponse.next({request})
   }
 
