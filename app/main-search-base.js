@@ -969,7 +969,7 @@ export default function Home(){
         {visibleJobs.map(item=>{const {job,evaluation}=item; const score=Number.isFinite(evaluation?.score)?Math.round(evaluation.score*10):null; const manualStatus=jobStatuses[job.sourceJobId]||''; return <div className="jobWrap" key={job.sourceJobId}>
           <button onClick={()=>setSelected(item)} className={'job '+(active?.job.sourceJobId===job.sourceJobId?'active':'')}>
             <span className="score">{score===null?'N/A':fitLabel(score)}</span>
-            <span><b>{job.title}</b>{!currentRunKeys.has(livePoolIdentity(item))&&<small style={{display:'inline-block',marginLeft:8,color:'#E7B84F',fontWeight:700,letterSpacing:'0.06em'}}>★ SAVED</small>}<small>{job.company} · {job.location}</small><small className="sourceLine">{jobSourceLabel(job)} · {job.publishedAt?dateText(job.publishedAt):(job.publishedText||'Date unavailable')}{job.needsJdReview?' · Incomplete JD':''}</small></span>
+            <span><b>{job.title}</b>{Number.isFinite(evaluation?.score)&&!currentRunKeys.has(livePoolIdentity(item))&&<small style={{display:'inline-block',marginLeft:8,color:'#E7B84F',fontWeight:700,letterSpacing:'0.06em'}}>★ SAVED</small>}<small>{job.company} · {job.location}</small><small className="sourceLine">{jobSourceLabel(job)} · {job.publishedAt?dateText(job.publishedAt):(job.publishedText||'Date unavailable')}{job.needsJdReview?' · Incomplete JD':''}</small></span>
             <span>→</span>
           </button>
           <select aria-label={`Status for ${job.title}`} className={`jobStatusSelect status-${manualStatus||'none'}`} value={manualStatus} onChange={event=>changeJobStatus(job.sourceJobId,event.target.value)}>
