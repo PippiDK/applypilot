@@ -17,19 +17,18 @@ export default function ResetPasswordPage(){
       try{
         const params=new URLSearchParams(window.location.search)
         const supabase=createBrowserSupabaseClient()
-        const code=params.get('code')
-        const error=params.get('error')
-        if(error) throw new Error('Reset link was rejected.')
-        if(code){
-          const {error:exchangeError}=await supabase.auth.exchangeCodeForSession(code)
-          if(exchangeError) throw exchangeError
-          window.history.replaceState(null,'','/auth/reset-password')
-        }
+        if(params.get('error')) throw new Error('Supabase rejected the recovery link.')
+        // @supabase/ssr createBrowserClient processes the PKCE callback URL during
+        // auth initialization. Explicit exchangeCodeForSession would consume the
+        // one-time code twice and can incorrectly reject an already valid session.
+        const {data:{session},error:sessionError}=await supabase.auth.getSession()
+        if(sessionError||!session) throw new Error('No recovery session available.')
         const {data:{user},error:userError}=await supabase.auth.getUser()
-        if(userError||!user) throw new Error('No active reset session.')
+        if(userError||!user) throw new Error('Recovery session could not be verified.')
+        window.history.replaceState(null,'','/auth/reset-password')
         if(active){setReady(true);setMessage('Choose a new TEST password (at least 12 characters).')}
-      }catch{
-        if(active)setMessage('The reset link is invalid, expired, or belongs to another TEST address. Request a new password reset from TEST login.')
+      }catch(error){
+        if(active)setMessage('Could not establish a TEST recovery session: '+(error?.message||'Unknown error')+'. Return to TEST login if a fresh recovery email is required.')
       }
     }
     void verify()
