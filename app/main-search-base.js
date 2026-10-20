@@ -445,7 +445,7 @@ export default function Home(){
     const next=publishLiveMatches(imported)
     const total=next.filter(row=>row.item?.job?.importSource==='linkedin-json').length
     const added=next.filter(row=>row.item?.job?.importSource==='linkedin-json'&&!before.has(String(row.item.job.sourceJobId))).length
-    return {added,total}
+    return {added,total,excludedUndated:imported.filter(item=>!item?.job?.publishedAt).length,excludedOther:imported.length-total}
   }
 
   async function search(){
