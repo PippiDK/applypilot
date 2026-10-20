@@ -36,6 +36,7 @@ import {V20_LIVE_IMPORT_KEY,importedJobsToLiveItems} from './lib/v20-live-matche
 import {V20_LIVE_POOL_KEY,mergeLivePool,readLivePool,livePoolItems} from './lib/v20-live-pool.js'
 import {readV20PoolDb,writeV20PoolDb,readLegacyV19Matches} from './lib/v20-live-pool-indexeddb.js'
 import {v20VisibleByWindow,v20SortedByScore,v20ScoreLabel} from './lib/v20-match-view.js'
+import {filterByVisibleProvenance} from './lib/v20-provenance-visibility.js'
 import SearchAudit from './components/search-audit.js'
 import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
@@ -62,7 +63,7 @@ function jobSourceLabel(job={}){const source=String(job?.source||job?.sourceReco
 function sourceDedupeKey(job={}){const company=String(job.company||'').toLowerCase().replace(/\b(a\/s|as)\b/g,'as').replace(/[.,]/g,'').trim();const title=String(job.title||'').toLowerCase().replace(/\s+/g,' ').trim();const location=String(job.location||'').toLowerCase().replace(/\s+/g,' ').trim();return company&&title?company+'|'+title+'|'+location:''}
 function mergeSourceItems(groups=[]){const out=[];const byKey=new Map();for(const item of groups.flat()){const key=sourceDedupeKey(item?.job);if(key&&byKey.has(key)){const index=byKey.get(key);const current=out[index];const currentOfficial=String(current?.job?.source||'')==='company_site';const itemOfficial=String(item?.job?.source||'')==='company_site';if(itemOfficial&&!currentOfficial){out[index]=item;continue}if(currentOfficial&&!itemOfficial)continue;const richer=String(item?.job?.description||item?.job?.fullJd||'').length>String(current?.job?.description||current?.job?.fullJd||'').length?item:current;out[index]=richer;continue}if(key)byKey.set(key,out.length);out.push(item)}return out}
 
-export default function Home(){
+export default function Home({isNightFlightJob=()=>false}={}){
   const [freshnessDays,setFreshnessDays]=useState(5)
   const [jobs,setJobs]=useState([])
   const livePoolRef=useRef([])
@@ -116,7 +117,7 @@ export default function Home(){
   const [editedUpdates,setEditedUpdates]=useState({})
   const [sourceDocxFiles,setSourceDocxFiles]=useState({})
   const [exportState,setExportState]=useState({loading:false,error:'',baselineKey:''})
-  const visibleJobs=useMemo(()=>v20SortedByScore(filterJobItemsByStatus(filterJobItems(v20VisibleByWindow(jobs,freshnessDays).filter(item=>{const job=item?.job||{};return (showImported||job.importSource!=='linkedin-json')&&(showNightPilot||job.nightFlight?.processed!==true)}),selectedAreas,selectedWorkModels),jobStatuses,selectedStatuses)),[jobs,freshnessDays,showImported,showNightPilot,selectedAreas,selectedWorkModels,jobStatuses,selectedStatuses])
+  const visibleJobs=useMemo(()=>v20SortedByScore(filterJobItemsByStatus(filterJobItems(filterByVisibleProvenance(v20VisibleByWindow(jobs,freshnessDays),{showImported,showNightPilot,isNightFlightJob}),selectedAreas,selectedWorkModels),jobStatuses,selectedStatuses)),[jobs,freshnessDays,showImported,showNightPilot,isNightFlightJob,selectedAreas,selectedWorkModels,jobStatuses,selectedStatuses])
   const active=visibleJobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||visibleJobs[0]||null
 
   useEffect(()=>{
@@ -1001,7 +1002,7 @@ export default function Home(){
             <div className={filterStyles.group}><small className={filterStyles.groupTitle}>WORK MODEL</small>{WORK_MODELS.map(model=><label className={filterStyles.option} key={model.id}><input type="checkbox" checked={selectedWorkModels.includes(model.id)} onChange={()=>toggleJobFilter(setSelectedWorkModels,model.id)}/><span>{model.label}</span><b>{workModelCounts[model.id]||0}</b></label>)}</div>
             <div className={filterStyles.group}><small className={filterStyles.groupTitle}>STATUS</small>{JOB_STATUS_FILTERS.map(status=><label className={filterStyles.option} key={status.id}><input type="checkbox" checked={selectedStatuses.includes(status.id)} onChange={()=>toggleJobFilter(setSelectedStatuses,status.id)}/><span>{status.label}</span><b>{statusCounts[status.id]||0}</b></label>)}</div>
             <div style={{borderTop:'1px solid rgba(175,132,242,.38)',marginTop:10,paddingTop:10}}>
-              <label className={filterStyles.option} style={{color:'#c49af7'}}><input type="checkbox" checked={showNightPilot} onChange={event=>setShowNightPilot(event.target.checked)}/><span style={{color:'#c49af7',fontWeight:700}}>Night Pilot</span><b>{jobs.filter(item=>item?.job?.nightFlight?.processed===true).length}</b></label>
+              <label className={filterStyles.option} style={{color:'#c49af7'}}><input type="checkbox" checked={showNightPilot} onChange={event=>setShowNightPilot(event.target.checked)}/><span style={{color:'#c49af7',fontWeight:700}}>Night Pilot</span><b>{jobs.filter(item=>isNightFlightJob(item?.job)).length}</b></label>
               <label className={filterStyles.option} style={{color:'#c49af7'}}><input type="checkbox" checked={showImported} onChange={event=>setShowImported(event.target.checked)}/><span style={{color:'#c49af7',fontWeight:700}}>Imported</span><b>{jobs.filter(item=>item?.job?.importSource==='linkedin-json').length}</b></label>
             </div>
           </div>
