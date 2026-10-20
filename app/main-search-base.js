@@ -29,7 +29,7 @@ import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/link
 import {writeSearchProfileStorage} from './lib/storage-housekeeping.js'
 import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
 import {runLabeledSearchTask} from './lib/search-task-label.js'
-import {freshnessSelectionFromDays,freshnessResultLabel} from './lib/freshness-selection.js'
+import {freshnessSelectionFromDays,freshnessResultLabel,filterItemsByFreshnessSelection} from './lib/freshness-selection.js'
 import {companyConnection,connectedCompanyNames,defaultCompanyWatch,readCompanyWatch,writeCompanyWatch,TARGET_COMPANIES} from './lib/company-watch.js'
 import {CONSULTANT_PORTALS,connectedConsultantPortalIds,defaultConsultantPortals,readConsultantPortals,writeConsultantPortals} from './lib/consultant-portals.js'
 import SearchAudit from './components/search-audit.js'
@@ -110,7 +110,7 @@ export default function Home(){
   const [editedUpdates,setEditedUpdates]=useState({})
   const [sourceDocxFiles,setSourceDocxFiles]=useState({})
   const [exportState,setExportState]=useState({loading:false,error:'',baselineKey:''})
-  const visibleJobs=useMemo(()=>sortLiveMatchesByScore(filterJobItemsByStatus(filterJobItems(jobs,selectedAreas,selectedWorkModels),jobStatuses,selectedStatuses)),[jobs,selectedAreas,selectedWorkModels,jobStatuses,selectedStatuses])
+  const visibleJobs=useMemo(()=>sortLiveMatchesByScore(filterJobItemsByStatus(filterJobItems(filterItemsByFreshnessSelection(jobs,freshnessSelectionFromDays(freshnessDays)),selectedAreas,selectedWorkModels),jobStatuses,selectedStatuses)),[jobs,freshnessDays,selectedAreas,selectedWorkModels,jobStatuses,selectedStatuses])
   const active=visibleJobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||visibleJobs[0]||null
 
   useEffect(()=>{
