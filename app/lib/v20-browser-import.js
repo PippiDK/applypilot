@@ -23,6 +23,8 @@ export function normalizeBrowserRecord(value){
     title,company,location:clean(value.location),
     description,fullJd:description,detailUrl:linkedInUrl(id),originalUrl:linkedInUrl(id),
     publishedText:clean(value.publishedText),
+    // Preserve an explicitly supplied ISO posting timestamp; never infer one from import time.
+    publishedAt:typeof value.publishedAt==='string'&&/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}/.test(value.publishedAt)&&Number.isFinite(Date.parse(value.publishedAt))?new Date(value.publishedAt).toISOString():null,
     jdStatus:jdComplete?'complete':'review',
     needsJdReview:!jdComplete,
   }
