@@ -19,6 +19,7 @@ import {requestExpertiseMatch} from './lib/expertise-match-client.js'
 import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'
 import {evaluateJobConditions} from './lib/job-conditions.js'
 import {fitLabel} from './lib/fit-label.js'
+import {sortLiveMatchesByScore,formatLiveMatchScore} from './lib/live-match-sort.js'
 import {compareShadowToLegacy} from './lib/shadow-search-compare.js'
 import {JOB_STATUS_OPTIONS,isApplicationStatus,readJobStatuses,writeJobStatus} from './lib/job-statuses.js'
 import {archiveAppliedJob,removeAppliedJob,syncAppliedArchive} from './lib/applied-jobs.js'
@@ -109,7 +110,7 @@ export default function Home(){
   const [editedUpdates,setEditedUpdates]=useState({})
   const [sourceDocxFiles,setSourceDocxFiles]=useState({})
   const [exportState,setExportState]=useState({loading:false,error:'',baselineKey:''})
-  const visibleJobs=useMemo(()=>filterJobItemsByStatus(filterJobItems(jobs,selectedAreas,selectedWorkModels),jobStatuses,selectedStatuses),[jobs,selectedAreas,selectedWorkModels,jobStatuses,selectedStatuses])
+  const visibleJobs=useMemo(()=>sortLiveMatchesByScore(filterJobItemsByStatus(filterJobItems(jobs,selectedAreas,selectedWorkModels),jobStatuses,selectedStatuses)),[jobs,selectedAreas,selectedWorkModels,jobStatuses,selectedStatuses])
   const active=visibleJobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||visibleJobs[0]||null
 
   useEffect(()=>{
@@ -956,7 +957,7 @@ export default function Home(){
         {!state.loading&&state.stats&&jobs.length>0&&visibleJobs.length===0&&<div className="empty">NO MATCHES IN SELECTED FILTERS.</div>}
         {visibleJobs.map(item=>{const {job,evaluation}=item; const score=Math.round(evaluation.score*10); const manualStatus=jobStatuses[job.sourceJobId]||''; return <div className="jobWrap" key={job.sourceJobId}>
           <button onClick={()=>setSelected(item)} className={'job '+(active?.job.sourceJobId===job.sourceJobId?'active':'')}>
-            <span className="score">{fitLabel(score)}</span>
+            <span className="score">{fitLabel(score)} · {formatLiveMatchScore(evaluation.score)}</span>
             <span><span style={{display:'flex',alignItems:'center',gap:6}}>{!currentRunKeys.has(liveMatchIdentity(item))&&<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#E7B84F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}} role="img" aria-label="Saved from previous search"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>}<b>{job.title}</b></span><small>{job.company} · {job.location}</small><small className="sourceLine">{jobSourceLabel(job)} · {dateText(job.publishedAt)}</small></span>
             <span>→</span>
           </button>
