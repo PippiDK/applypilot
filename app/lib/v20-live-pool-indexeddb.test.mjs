@@ -24,8 +24,8 @@ function memoryIdb(){
  }}
 }
 const now='2026-10-20T12:00:00.000Z'
-const item=(id,description)=>({job:{source:'linkedin',sourceJobId:id,title:'Project Manager',company:'Example',description,fullJd:description,publishedAt:null,importSource:'linkedin-json'},evaluation:{score:null}})
-test('v20 isolated IndexedDB retains manual JSON with undated incomplete/full JD',async()=>{
+const item=(id,description)=>({job:{source:'linkedin',sourceJobId:id,title:'Project Manager',company:'Example',description,fullJd:description,publishedAt:'2026-10-19T12:00:00.000Z',importSource:'linkedin-json'},evaluation:{score:null}})
+test('v20 isolated IndexedDB retains manual JSON with dated incomplete/full JD',async()=>{
  const db=memoryIdb()
  const original=mergeLivePool([],[item('one','Full text'),item('two','Incomplete JD')],now)
  await writeV20PoolDb(original,{indexedDBImpl:db,now})
@@ -34,10 +34,10 @@ test('v20 isolated IndexedDB retains manual JSON with undated incomplete/full JD
  assert.equal(back[0].item.job.importSource,'linkedin-json')
  assert.equal(db.records.size,1)
 })
-test('v20 IndexedDB retention follows original firstSeen TTL',async()=>{
+test('v20 IndexedDB retention follows publishedAt TTL',async()=>{
  const db=memoryIdb()
  const original=mergeLivePool([],[item('old','Old JD')],now)
  await writeV20PoolDb(original,{indexedDBImpl:db,now})
- assert.equal((await readV20PoolDb({indexedDBImpl:db,now:'2026-10-29T12:00:00.000Z'})).length,1)
- assert.equal((await readV20PoolDb({indexedDBImpl:db,now:'2026-10-30T12:00:00.000Z'})).length,0)
+ assert.equal((await readV20PoolDb({indexedDBImpl:db,now:'2026-10-28T12:00:00.000Z'})).length,1)
+ assert.equal((await readV20PoolDb({indexedDBImpl:db,now:'2026-10-29T12:00:00.000Z'})).length,0)
 })
