@@ -6,7 +6,24 @@ export const V20_STATUS_STORAGE_KEY='auvraen-v20-job-status-v1'
 export const V20_MAX_RECORDS=1000
 const missingMarker=/\[remainder of source sentence missing\]/i
 function validJobId(value){return /^[0-9]{6,15}$/.test(clean(value))}
-export function normalizeBrowserRecord(value){
+// LinkedIn collector timestamps are relative to export creation, not import time.
+// Days/hours express useful age; rounded week/month buckets are not precise enough
+// to establish eligibility at the 10-day expiration boundary.
+export function deriveCollectorPublicationDate(record,generatedAt){
+  const iso=record?.publishedAt
+  if(typeof iso==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(iso)&&Number.isFinite(Date.parse(iso)))return new Date(iso).toISOString()
+  const anchor=Date.parse(generatedAt||'')
+  if(!Number.isFinite(anchor))return null
+  const relative=clean(record?.publishedText).match(/^Posted\s+(\d+)\s+(hours?|days?)\s+ago$/i)
+  if(!relative)return null
+  const quantity=Number(relative[1])
+  if(!Number.isSafeInteger(quantity)||quantity<0)return null
+  const ms=relative[2].toLowerCase().startsWith('hour')?3600000:86400000
+  const date=new Date(anchor-quantity*ms)
+  return Number.isFinite(date.getTime())?date.toISOString():null
+}
+
+export function normalizeBrowserRecord(value,{generatedAt=null}={}){
   if(!value||typeof value!=='object'||Array.isArray(value)) throw new Error('Invalid job record')
   const id=clean(value.sourceJobId||value.jobId)
   const title=clean(value.title)
@@ -24,7 +41,7 @@ export function normalizeBrowserRecord(value){
     description,fullJd:description,detailUrl:linkedInUrl(id),originalUrl:linkedInUrl(id),
     publishedText:clean(value.publishedText),
     // Preserve an explicitly supplied ISO posting timestamp; never infer one from import time.
-    publishedAt:typeof value.publishedAt==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value.publishedAt)&&Number.isFinite(Date.parse(value.publishedAt))?new Date(value.publishedAt).toISOString():null,
+    publishedAt:deriveCollectorPublicationDate(value,generatedAt),
     jdStatus:jdComplete?'complete':'review',
     needsJdReview:!jdComplete,
   }
@@ -35,7 +52,7 @@ export function parseBrowserExport(input){
   const jobs=[],errors=[],seen=new Set()
   for(let i=0;i<input.records.length;i++){
     try{
-      const job=normalizeBrowserRecord(input.records[i])
+      const job=normalizeBrowserRecord(input.records[i],{generatedAt:input.generatedAt})
       if(seen.has(job.sourceJobId)) continue
       seen.add(job.sourceJobId)
       jobs.push(job)
