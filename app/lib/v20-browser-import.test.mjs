@@ -45,3 +45,22 @@ test('preserves verified ISO publication date and rejects unverified text',()=>{
  assert.equal(normalizeBrowserRecord(record('4479056497',{publishedAt:'2026-10-19T10:00:00.000Z'})).publishedAt,'2026-10-19T10:00:00.000Z')
  assert.equal(normalizeBrowserRecord(record('4479056498',{publishedAt:'3 days ago'})).publishedAt,null)
 })
+
+test('Collector day/hour dates are anchored to generatedAt rather than upload time',()=>{
+ const payload={schemaVersion:1,source:'linkedin-browser',generatedAt:'2026-10-17T18:04:12.742Z',records:[
+  record('4472008528',{publishedText:'Posted 7 hours ago'}),
+  record('4470214346',{publishedText:'Posted 4 days ago'}),
+  record('4470155451',{publishedText:'Posted 3 weeks ago'}),
+  record('4470391406',{publishedText:null}),
+ ]}
+ const imported=parseBrowserExport(payload)
+ assert.equal(imported.jobs.length,4)
+ assert.equal(imported.jobs[0].publishedAt,'2026-10-17T11:04:12.742Z')
+ assert.equal(imported.jobs[1].publishedAt,'2026-10-13T18:04:12.742Z')
+ assert.equal(imported.jobs[2].publishedAt,null)
+ assert.equal(imported.jobs[3].publishedAt,null)
+})
+test('No export generatedAt means relative date remains unknown',()=>{
+ const payload={schemaVersion:1,source:'linkedin-browser',records:[record('4472008528',{publishedText:'Posted 1 day ago'})]}
+ assert.equal(parseBrowserExport(payload).jobs[0].publishedAt,null)
+})
