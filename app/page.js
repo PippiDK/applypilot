@@ -1,8 +1,8 @@
 'use client'
-import React,{useEffect,useState} from 'react'
+import React,{useEffect,useMemo,useState} from 'react'
 import MainSearchBase from './main-search-base.js'
 import {NIGHT_FLIGHT_STATUS,resolveJobStatus} from './lib/job-statuses.js'
-import {enrichSearchJobsWithNightFlight} from './lib/night-flight-main-search-bridge.js'
+import {enrichSearchJobsWithNightFlight,createNightFlightProcessedMatcher} from './lib/night-flight-main-search-bridge.js'
 import {resolveNightFlightExpertise} from './lib/night-flight-expertise-reuse.js'
 import {visibleElementKey} from './lib/night-flight-react-key.js'
 
@@ -149,7 +149,8 @@ export default function Home(){
     })()
     return()=>{active=false}
   },[])
-  const tree=MainSearchBase()
+  const isNightFlightJob=useMemo(()=>createNightFlightProcessedMatcher(nightFlightIndex),[nightFlightIndex])
+  const tree=MainSearchBase({isNightFlightJob})
   const activeNightFlightJob=findActiveJobIdentity(tree)
   const currentCvSourceVersion=findCurrentCvSourceVersion(tree)
   const cachedNightFlightAnalysis=resolveNightFlightExpertise({job:activeNightFlightJob,index:nightFlightIndex,sourceVersion:currentCvSourceVersion})
