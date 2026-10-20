@@ -12,7 +12,7 @@ test('v20 one day displays today, while unknown-date JSON remains outside the da
  assert.equal(pool.length,2)
  assert.deepEqual(v20VisibleByWindow(livePoolItems(pool),1,now).map(x=>x.job.sourceJobId),['today'])
  assert.equal(v20VisibleByWindow(livePoolItems(pool),5,now).length,2)
- assert.equal(pool.length,3)
+ assert.equal(pool.length,2)
 })
 test('v20 sorted matching scores and N/A import remain in results',()=>{
  const a=row('one','2026-10-20T08:00:00Z',8.4)
