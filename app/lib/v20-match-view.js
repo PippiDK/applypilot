@@ -1,9 +1,9 @@
-// v20 display-only adapter: keeps undated browser imports visible for manual review.
+// v20 display-only adapter: Live Matches contain only publication-dated vacancies. Manual review stays on /v20.
 import {filterItemsByFreshnessSelection,freshnessSelectionFromDays} from './freshness-selection.js'
 export function v20VisibleByWindow(items=[],days=5,now=new Date()){
  const dated=filterItemsByFreshnessSelection(items,freshnessSelectionFromDays(days),now)
  const present=new Set(dated)
- return items.filter(item=>present.has(item)||item?.job?.importSource==='linkedin-json'&&!item?.job?.publishedAt)
+ return items.filter(item=>present.has(item))
 }
 export function v20SortedByScore(items=[]){
  return [...items].sort((a,b)=>{
