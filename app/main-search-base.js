@@ -28,6 +28,7 @@ import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/link
 import {writeSearchProfileStorage} from './lib/storage-housekeeping.js'
 import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
 import {runLabeledSearchTask} from './lib/search-task-label.js'
+import {readLinkedInApiJson} from './lib/linkedin-api-response.js'
 import {freshnessSelectionFromDays,freshnessResultLabel} from './lib/freshness-selection.js'
 import {companyConnection,connectedCompanyNames,defaultCompanyWatch,readCompanyWatch,writeCompanyWatch,TARGET_COMPANIES} from './lib/company-watch.js'
 import {CONSULTANT_PORTALS,connectedConsultantPortalIds,defaultConsultantPortals,readConsultantPortals,writeConsultantPortals} from './lib/consultant-portals.js'
@@ -484,6 +485,8 @@ export default function Home({isNightFlightJob=()=>false}={}){
         let data=null
         const auditById=new Map()
         let initialDiscoveryStats=null
+        let interruptedLinkedInError=null
+        const completedJobsById=new Map()
         const cumulative={detailFailures:0,detail429Attempts:0,detail429Recovered:0,detail429Final:0,detailTimeouts:0,detailChallenges:0,detailBudgetFailures:0,detailOtherFailures:0,incompleteDetails:0}
         while(true){
           res=await fetch('/api/linkedin-profile-search',{
@@ -500,8 +503,12 @@ export default function Home({isNightFlightJob=()=>false}={}){
               detailBatchSize:10,
             }),
           })
-          data=await res.json()
-          if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
+          try{data=await readLinkedInApiJson(res,{phase:continuation?'LinkedIn detail batch':'LinkedIn discovery'})}
+          catch(error){
+            if(!data)throw error
+            interruptedLinkedInError=error
+            break
+          }
           continuationSearchPlan=data.continuationSearchPlan||continuationSearchPlan
           if(!continuation) initialDiscoveryStats={...data.stats}
           if(Array.isArray(data.masterCandidates)) frozenCandidates=data.masterCandidates
@@ -522,6 +529,10 @@ export default function Home({isNightFlightJob=()=>false}={}){
               verifiedJobs:Array.isArray(data.masterVerifiedJobs)?data.masterVerifiedJobs:[],
             })
           }
+          for(const item of Array.isArray(data.jobs)?data.jobs:[]){
+            const id=String(item?.job?.sourceJobId||'')
+            if(id)completedJobsById.set(id,item)
+          }
           publishLiveMatches(Array.isArray(data.jobs)?data.jobs:[])
           if(data.stats?.detailComplete===true) break
           const next=Number(data.stats?.detailNextStart)
@@ -531,7 +542,7 @@ export default function Home({isNightFlightJob=()=>false}={}){
         }
         const failedIds=new Set([...auditById.values()].filter(row=>row?.stage==='DETAIL_FETCH_FAILED').map(row=>String(row?.jobId||'')).filter(Boolean))
         const recoveryStarts=[...new Set(frozenCandidates.map((candidate,index)=>failedIds.has(String(candidate?.jobId||''))?Math.floor(index/10)*10:null).filter(value=>Number.isFinite(value)))]
-        for(const recoveryStart of recoveryStarts){
+        for(const recoveryStart of interruptedLinkedInError?[]:recoveryStarts){
           res=await fetch('/api/linkedin-profile-search',{
             method:'POST',
             headers:{'Content-Type':'application/json'},
@@ -546,8 +557,9 @@ export default function Home({isNightFlightJob=()=>false}={}){
               detailBatchSize:10,
             }),
           })
-          const recoveryData=await res.json()
-          if(!res.ok) throw new Error(recoveryData.error||'LinkedIn recovery batch failed')
+          let recoveryData
+          try{recoveryData=await readLinkedInApiJson(res,{phase:'LinkedIn recovery batch'})}
+          catch(error){interruptedLinkedInError=error;break}
           for(const row of Array.isArray(recoveryData.audit)?recoveryData.audit:[]){
             const id=String(row?.jobId||'')
             if(!id) continue
@@ -566,12 +578,17 @@ export default function Home({isNightFlightJob=()=>false}={}){
             })
           }
           data=recoveryData
+          for(const item of Array.isArray(recoveryData.jobs)?recoveryData.jobs:[]){
+            const id=String(item?.job?.sourceJobId||'')
+            if(id)completedJobsById.set(id,item)
+          }
           publishLiveMatches(Array.isArray(recoveryData.jobs)?recoveryData.jobs:[])
         }
         const finalAudit=[...auditById.values()]
         const finalDetailFailures=finalAudit.filter(row=>row?.stage==='DETAIL_FETCH_FAILED').length
         data={
           ...data,
+          ...(interruptedLinkedInError?{jobs:[...completedJobsById.values()]}:{}),
           audit:finalAudit,
           stats:{
             ...data.stats,
@@ -579,13 +596,15 @@ export default function Home({isNightFlightJob=()=>false}={}){
             ...cumulative,
             detailFailureAttempts:cumulative.detailFailures,
             detailFailures:finalDetailFailures,
-            detailNextStart:frozenCandidates.length,
-            detailPending:0,
-            detailComplete:true,
+            detailNextStart:interruptedLinkedInError?Number(data.stats?.detailNextStart||0):frozenCandidates.length,
+            detailPending:interruptedLinkedInError?Math.max(0,frozenCandidates.length-Number(data.stats?.detailNextStart||0)):0,
+            detailComplete:!interruptedLinkedInError,
+            ...(interruptedLinkedInError?{returned:completedJobsById.size}:{}),
           },
           coverage:{
             ...data.coverage,
-            status:(finalDetailFailures+cumulative.incompleteDetails)>0?'ACCESS LIMITED':data.coverage?.status,
+            status:interruptedLinkedInError||(finalDetailFailures+cumulative.incompleteDetails)>0?'ACCESS LIMITED':data.coverage?.status,
+            ...(interruptedLinkedInError?{detail:'LinkedIn search stopped before all batches were verified. Saved partial results are retained. '+interruptedLinkedInError.message}:{}),
           },
         }
         return {source:'linkedin',data}
@@ -596,8 +615,7 @@ export default function Home({isNightFlightJob=()=>false}={}){
           body:JSON.stringify({freshnessDays,cvText:cvData.cvText}),
         })
       }
-      const data=await res.json()
-      if(!res.ok) throw new Error(data.error||'LinkedIn search failed')
+      const data=await readLinkedInApiJson(res,{phase:'LinkedIn search'})
       return {source:'linkedin',data}
     }))
 
@@ -694,7 +712,7 @@ export default function Home({isNightFlightJob=()=>false}={}){
     setState({
       loading:false,
       error:'',
-      coverage:{source:[...selectedSources,...(activeCompanySites.length?['company-sites']:[]),...(activeConsultantPortals.length?['consultant-portals']:[])].join('+'),freshnessDays,status:limited?'ACCESS LIMITED':mergedJobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:failed[0]?.reason?.message||null},
+      coverage:{source:[...selectedSources,...(activeCompanySites.length?['company-sites']:[]),...(activeConsultantPortals.length?['consultant-portals']:[])].join('+'),freshnessDays,status:limited?'ACCESS LIMITED':mergedJobs.length?'SEARCHED':'NO RELEVANT RESULTS',detail:failed[0]?.reason?.message||successful.map(result=>result.data.coverage?.detail).find(Boolean)||null},
       stats,
       fetchedAt:new Date().toISOString(),
       audit,
