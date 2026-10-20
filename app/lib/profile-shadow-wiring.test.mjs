@@ -16,5 +16,5 @@ test('page promotes the saved Union Search Plan to LIVE while preserving legacy 
   assert.match(searchBlock,/JSON\.stringify\(\{freshnessDays,cvText:cvData\.cvText\}\)/)
   assert.doesNotMatch(searchBlock,/\/api\/linkedin-shadow-search/)
   assert.match(searchBlock,/const mergedJobs=mergeSourceItems/)
-  assert.match(searchBlock,/publishSavedLiveMatches\(mergedJobs,\{current:true\}\)/)
+  assert.match(searchBlock,/publishLiveMatches\(mergedJobs\)/)
 })

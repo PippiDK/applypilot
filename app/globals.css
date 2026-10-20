@@ -43,3 +43,11 @@
 .reviewBaseline{margin:8px 0 0;color:#7ee2b8;font-size:12px;font-weight:750}.reviewScopeLine{margin:16px 0;color:#7f8c99;font-size:11px;letter-spacing:.03em}.adaptationLoading,.adaptationRunStatus,.reviewEmpty{margin:18px 0;padding:14px 16px;border-radius:12px;display:flex;flex-direction:column;gap:5px}.adaptationLoading{background:#151a20;border:1px solid #343d48}.adaptationLoading span,.reviewEmpty span{color:#9aa5b1;font-size:12px}.adaptationRunStatus{background:#132019;border:1px solid #285e4a}.adaptationRunStatus b{color:#7ee2b8}.adaptationRunStatus span{color:#aab5ae;font-size:12px}.reviewEmpty{background:#151a20;border:1px solid #2a323c}.reviewEmpty b{color:#dce2e8}
 
 .searchPlanPreview{display:block;padding:0;overflow:hidden}.searchPlanPreview>summary{position:relative;display:flex;align-items:center;cursor:pointer;list-style:none;padding:15px 44px 15px 15px}.searchPlanPreview>summary::-webkit-details-marker{display:none}.searchPlanPreview>summary::after{content:'▾';position:absolute;right:16px;top:50%;transform:translateY(-50%);color:#7ee2b8;font-size:16px;font-weight:900}.searchPlanPreview[open]>summary::after{content:'▴'}.searchPlanPreview>summary span{display:flex;flex-direction:column;gap:5px}.searchPlanPreview>summary small{color:#aab5ae;font-size:13px;font-weight:400}.searchPlanPreviewBody{padding:0 15px 15px}.searchPlanPreviewBody .reviewRow:first-child{border-top:1px solid #242c35}
+
+/* v20 manual LinkedIn query copy: review-only control. */
+.targetRolesLabel{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.targetRolesCopyButton{border:1px solid #3b6558;background:#173026;color:#7ee2b8;border-radius:7px;padding:3px 7px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
+.targetRolesCopyButton:hover:not(:disabled),.targetRolesCopyButton:focus-visible{background:#224739;outline-color:#7ee2b8}
+.targetRolesCopyButton:disabled{opacity:.45;cursor:not-allowed}
+.targetRolesCopyStatus{flex-basis:100%;font-size:11px;color:#9da8b5;line-height:1.3}
+.targetRolesCopyStatus:empty{display:none}

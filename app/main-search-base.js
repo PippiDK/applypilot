@@ -19,7 +19,6 @@ import {requestExpertiseMatch} from './lib/expertise-match-client.js'
 import {readExpertiseMatchCache,writeExpertiseMatchCache} from './lib/expertise-match-cache.js'
 import {evaluateJobConditions} from './lib/job-conditions.js'
 import {fitLabel} from './lib/fit-label.js'
-import {sortLiveMatchesByScore,formatLiveMatchScore} from './lib/live-match-sort.js'
 import {compareShadowToLegacy} from './lib/shadow-search-compare.js'
 import {JOB_STATUS_OPTIONS,isApplicationStatus,readJobStatuses,writeJobStatus} from './lib/job-statuses.js'
 import {archiveAppliedJob,removeAppliedJob,syncAppliedArchive} from './lib/applied-jobs.js'
@@ -29,18 +28,22 @@ import {readLinkedInMasterPoolSnapshot,writeLinkedInMasterPool} from './lib/link
 import {writeSearchProfileStorage} from './lib/storage-housekeeping.js'
 import {DEFAULT_SEARCH_SOURCES,readSearchSources,writeSearchSources} from './lib/search-sources.js'
 import {runLabeledSearchTask} from './lib/search-task-label.js'
-import {freshnessSelectionFromDays,freshnessResultLabel,filterItemsByFreshnessSelection} from './lib/freshness-selection.js'
+import {freshnessSelectionFromDays,freshnessResultLabel} from './lib/freshness-selection.js'
 import {companyConnection,connectedCompanyNames,defaultCompanyWatch,readCompanyWatch,writeCompanyWatch,TARGET_COMPANIES} from './lib/company-watch.js'
 import {CONSULTANT_PORTALS,connectedConsultantPortalIds,defaultConsultantPortals,readConsultantPortals,writeConsultantPortals} from './lib/consultant-portals.js'
+import LinkedInJsonImport from './components/linkedin-json-import.js'
+import {V20_LIVE_IMPORT_KEY,importedJobsToLiveItems} from './lib/v20-live-matches.js'
+import {V20_LIVE_POOL_KEY,mergeLivePool,readLivePool,livePoolItems} from './lib/v20-live-pool.js'
+import {readV20PoolDb,writeV20PoolDb,readLegacyV19Matches} from './lib/v20-live-pool-indexeddb.js'
+import {v20VisibleByWindow,v20SortedByScore,v20ScoreLabel} from './lib/v20-match-view.js'
 import SearchAudit from './components/search-audit.js'
 import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
 import SearchProfileRolesStep from './components/search-profile-roles-step.js'
 import SearchPlanPreview from './components/search-plan-preview.js'
+import {rolesToLinkedInOrQuery} from './lib/v20-linkedin-or-query.js'
 import BestCvPanel from './components/best-cv-panel.js'
 import filterStyles from './components/job-filters.module.css'
-import {LIVE_MATCHES_STORAGE_KEY,liveMatchIdentity,mergeSavedLiveMatches,readSavedLiveMatches,savedLiveMatchItems} from './lib/saved-live-matches.js'
-import {readIndexedLiveMatches,writeIndexedLiveMatches} from './lib/saved-live-matches-indexeddb.js'
 
 const WINDOWS=[{days:1,label:'1 Day'},{days:3,label:'3 Days'},{days:5,label:'5 Days'},{days:10,label:'10 Days'}]
 const EMPTY_SEARCH_PROFILE={...DEFAULT_PROFILE,exclusions:''}
@@ -55,19 +58,19 @@ function legacyRoles(value=''){return String(value??'').split(',').map(item=>ite
 function combinedRoles(primary=[],adjacent=[]){return [...roleList(primary),...roleList(adjacent)].join(', ')}
 function resetRoleDraft(value={}){return {...value,primaryRoles:[],adjacentRoles:[],roles:'',cvRoleProfiles:[],roleSources:[],rolesLibraryFingerprint:'',rolesSourceVersion:'',rolesBuilderVersion:''}}
 function workModelText(values=[]){return values.map(value=>value==='onsite'?'On-site':value==='hybrid'?'Hybrid':'Remote').join(' · ')}
-function jobSourceLabel(job={}){const source=String(job?.source||job?.sourceRecords?.[0]?.source||'').toLowerCase();if(source==='consultant_portal')return `Consultant portal · ${job?.consultantPortal?.name||job?.company||'Consultant'}`;if(source==='company_site')return `Company site · ${job?.company||'Official'}`;if(source==='jobindex')return 'Jobindex';if(source==='jobnet')return 'Jobnet';if(source==='linkedin')return 'LinkedIn';const url=String(job?.originalUrl||'');if(url.includes('jobnet.dk'))return 'Jobnet';if(url.includes('linkedin.com'))return 'LinkedIn';return 'Source'}
+function jobSourceLabel(job={}){const source=String(job?.source||job?.sourceRecords?.[0]?.source||'').toLowerCase();if(source==='consultant_portal')return `Consultant portal · ${job?.consultantPortal?.name||job?.company||'Consultant'}`;if(source==='company_site')return `Company site · ${job?.company||'Official'}`;if(source==='jobindex')return 'Jobindex';if(source==='jobnet')return 'Jobnet';if(job?.importSource==='linkedin-json')return 'LinkedIn Import';if(source==='linkedin')return 'LinkedIn';const url=String(job?.originalUrl||'');if(url.includes('jobnet.dk'))return 'Jobnet';if(url.includes('linkedin.com'))return 'LinkedIn';return 'Source'}
 function sourceDedupeKey(job={}){const company=String(job.company||'').toLowerCase().replace(/\b(a\/s|as)\b/g,'as').replace(/[.,]/g,'').trim();const title=String(job.title||'').toLowerCase().replace(/\s+/g,' ').trim();const location=String(job.location||'').toLowerCase().replace(/\s+/g,' ').trim();return company&&title?company+'|'+title+'|'+location:''}
 function mergeSourceItems(groups=[]){const out=[];const byKey=new Map();for(const item of groups.flat()){const key=sourceDedupeKey(item?.job);if(key&&byKey.has(key)){const index=byKey.get(key);const current=out[index];const currentOfficial=String(current?.job?.source||'')==='company_site';const itemOfficial=String(item?.job?.source||'')==='company_site';if(itemOfficial&&!currentOfficial){out[index]=item;continue}if(currentOfficial&&!itemOfficial)continue;const richer=String(item?.job?.description||item?.job?.fullJd||'').length>String(current?.job?.description||current?.job?.fullJd||'').length?item:current;out[index]=richer;continue}if(key)byKey.set(key,out.length);out.push(item)}return out}
 
 export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(5)
   const [jobs,setJobs]=useState([])
-  const liveMatchesRef=useRef([])
+  const livePoolRef=useRef([])
   const savedBeforeSearchRef=useRef(new Set())
-  const liveMatchesReadyRef=useRef(null)
-  const liveMatchesWriteQueue=useRef(Promise.resolve())
-  const [currentRunKeys,setCurrentRunKeys]=useState(()=>new Set())
-  const [liveMatchesSaveError,setLiveMatchesSaveError]=useState('')
+  const [currentRunIds,setCurrentRunIds]=useState(()=>new Set())
+  const livePoolReadyRef=useRef(null)
+  const livePoolWriteQueue=useRef(Promise.resolve())
+  const [livePoolSaveError,setLivePoolSaveError]=useState('')
   const [selectedSources,setSelectedSources]=useState(()=>[...DEFAULT_SEARCH_SOURCES])
   const [companyWatch,setCompanyWatch]=useState(()=>defaultCompanyWatch())
   const [companyWatchOpen,setCompanyWatchOpen]=useState(false)
@@ -99,6 +102,7 @@ export default function Home(){
   const [profileRoleState,setProfileRoleState]=useState(EMPTY_ROLE_STATE)
   const [pendingRoleReanalysisCvIds,setPendingRoleReanalysisCvIds]=useState([])
   const [profileSaveState,setProfileSaveState]=useState({loading:false,error:''})
+  const [rolesCopyStatus,setRolesCopyStatus]=useState('')
   const [nightFlightSyncWarning,setNightFlightSyncWarning]=useState('')
   const [reviewOpen,setReviewOpen]=useState(false)
   const [adaptationSelections,setAdaptationSelections]=useState({})
@@ -110,28 +114,8 @@ export default function Home(){
   const [editedUpdates,setEditedUpdates]=useState({})
   const [sourceDocxFiles,setSourceDocxFiles]=useState({})
   const [exportState,setExportState]=useState({loading:false,error:'',baselineKey:''})
-  const visibleJobs=useMemo(()=>sortLiveMatchesByScore(filterJobItemsByStatus(filterJobItems(filterItemsByFreshnessSelection(jobs,freshnessSelectionFromDays(freshnessDays)),selectedAreas,selectedWorkModels),jobStatuses,selectedStatuses)),[jobs,freshnessDays,selectedAreas,selectedWorkModels,jobStatuses,selectedStatuses])
+  const visibleJobs=useMemo(()=>v20SortedByScore(filterJobItemsByStatus(filterJobItems(v20VisibleByWindow(jobs,freshnessDays),selectedAreas,selectedWorkModels),jobStatuses,selectedStatuses)),[jobs,freshnessDays,selectedAreas,selectedWorkModels,jobStatuses,selectedStatuses])
   const active=visibleJobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||visibleJobs[0]||null
-
-  useEffect(()=>{
-    let active=true
-    // Install readiness synchronously so a search cannot overwrite the not-yet-loaded archive.
-    const ready=(async()=>{
-      const stored=await readIndexedLiveMatches()
-      const legacy=readSavedLiveMatches(localStorage)
-      const merged=mergeSavedLiveMatches(stored,[...legacy.map(row=>row.item),...liveMatchesRef.current.map(row=>row.item)])
-      // Commit before removing the legacy copy; a failed write must never destroy the backup.
-      const committed=await writeIndexedLiveMatches(merged)
-      if(legacy.length) localStorage.removeItem(LIVE_MATCHES_STORAGE_KEY)
-      liveMatchesRef.current=committed
-      if(active) setJobs(savedLiveMatchItems(committed))
-    })()
-    liveMatchesReadyRef.current=ready
-    ready.catch(()=>{
-      if(active) setLiveMatchesSaveError('Saved vacancies could not be loaded or migrated to IndexedDB. Existing browser data was not deleted.')
-    })
-    return()=>{active=false}
-  },[])
 
   useEffect(()=>{
     try{
@@ -160,6 +144,48 @@ export default function Home(){
       setProfile(hydrated)
       setDraft(hydrated)
     }catch{}
+  },[])
+
+  useEffect(()=>{
+    let active=true
+    const ready=(async()=>{
+      // Recover v20-only browser data before touching the legacy backup.
+      const oldPool=readLivePool(localStorage)
+      const saved=await readV20PoolDb()
+      // Preserve qualified LIVE v19 vacancies on the same production origin, read-only.
+      const legacyV19=await readLegacyV19Matches()
+      const imported=[]
+      if(localStorage.getItem(V20_LIVE_POOL_KEY)===null){
+        try{
+          const prior=JSON.parse(localStorage.getItem(V20_LIVE_IMPORT_KEY)||'[]')
+          if(Array.isArray(prior)&&prior.length){
+            const profileRaw=localStorage.getItem('applypilot-profile')
+            const profileValue=profileRaw?JSON.parse(profileRaw):{}
+            imported.push(...importedJobsToLiveItems(prior,profileValue,10))
+          }
+        }catch{}
+      }
+      // Merge by v20 pool semantics: keep manual unscored jobs and first-seen TTL.
+      const merged=mergeLivePool(saved,[...legacyV19,...oldPool.map(row=>row.item),...imported])
+      // Preserve exact firstSeenAt for old localStorage rows.
+      const byKey=new Map(merged.map(row=>[String(row.item?.job?.sourceJobId),row]))
+      for(const row of oldPool){
+        const key=String(row.item?.job?.sourceJobId)
+        if(byKey.has(key)){
+          const retained=byKey.get(key)
+          byKey.set(key,{...retained,firstSeenAt:row.firstSeenAt})
+        }
+      }
+      const committed=await writeV20PoolDb([...byKey.values()])
+      livePoolRef.current=committed
+      if(active)setJobs(livePoolItems(committed))
+      // Delete localStorage backup only after the IndexedDB write commits.
+      localStorage.removeItem(V20_LIVE_POOL_KEY)
+      if(imported.length)localStorage.removeItem(V20_LIVE_IMPORT_KEY)
+    })()
+    livePoolReadyRef.current=ready
+    ready.catch(()=>{if(active)setLivePoolSaveError('v20 vacancies could not be restored into IndexedDB. Browser backups were retained.')})
+    return()=>{active=false}
   },[])
 
   useEffect(()=>{
@@ -398,23 +424,34 @@ export default function Home(){
     })
   }
 
-  function publishSavedLiveMatches(items,{current=false}={}){
-    if(current&&items.length)setCurrentRunKeys(previous=>new Set([...previous,...items.map(liveMatchIdentity).filter(key=>key&&!savedBeforeSearchRef.current.has(key))]))
-    const next=mergeSavedLiveMatches(liveMatchesRef.current,items)
-    liveMatchesRef.current=next
-    setJobs(savedLiveMatchItems(next))
-    // Serialize writes after restore/migration; each operation writes the latest in-memory snapshot.
-    const save=liveMatchesWriteQueue.current.then(async()=>{
-      if(liveMatchesReadyRef.current) await liveMatchesReadyRef.current
-      await writeIndexedLiveMatches(liveMatchesRef.current)
+  function publishLiveMatches(items){
+    if(items.length)setCurrentRunIds(previous=>new Set([...previous,...items.filter(item=>!savedBeforeSearchRef.current.has(String(item?.job?.sourceJobId||''))).map(item=>String(item?.job?.sourceJobId||''))]))
+    const next=mergeLivePool(livePoolRef.current,items)
+    livePoolRef.current=next
+    setJobs(livePoolItems(next))
+    const save=livePoolWriteQueue.current.then(async()=>{
+      if(livePoolReadyRef.current)await livePoolReadyRef.current
+      await writeV20PoolDb(livePoolRef.current)
     })
-    liveMatchesWriteQueue.current=save.catch(()=>{})
-    save.then(()=>setLiveMatchesSaveError('')).catch(()=>{
-      setLiveMatchesSaveError('Saved vacancies could not be written to IndexedDB. They may not persist after a reload.')
-    })
+    livePoolWriteQueue.current=save.catch(()=>{})
+    save.then(()=>setLivePoolSaveError('')).catch(()=>setLivePoolSaveError('v20 vacancies could not be saved to IndexedDB; keep your manual JSON backup.'))
+    return next
+  }
+
+  async function importLinkedInJobs(incoming){
+    if(livePoolReadyRef.current)await livePoolReadyRef.current
+    savedBeforeSearchRef.current=new Set(livePoolRef.current.map(row=>String(row.item?.job?.sourceJobId||'')))
+    setCurrentRunIds(new Set())
+    const before=new Set(livePoolRef.current.filter(row=>row.item?.job?.importSource==='linkedin-json').map(row=>String(row.item.job.sourceJobId)))
+    const imported=importedJobsToLiveItems(incoming,profile,freshnessDays)
+    const next=publishLiveMatches(imported)
+    const total=next.filter(row=>row.item?.job?.importSource==='linkedin-json').length
+    const added=next.filter(row=>row.item?.job?.importSource==='linkedin-json'&&!before.has(String(row.item.job.sourceJobId))).length
+    return {added,total,excludedUndated:imported.filter(item=>!item?.job?.publishedAt).length,excludedOther:imported.length-total}
   }
 
   async function search(){
+  if(livePoolReadyRef.current)await livePoolReadyRef.current
   if(!resumeLoaded){
     setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
@@ -425,7 +462,7 @@ export default function Home(){
     setState({loading:false,error:'Select at least one search source.',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
   }
-  savedBeforeSearchRef.current=new Set(liveMatchesRef.current.map(row=>liveMatchIdentity(row.item)).filter(Boolean)); setCurrentRunKeys(new Set()); publishSavedLiveMatches([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
+  savedBeforeSearchRef.current=new Set(livePoolRef.current.map(row=>String(row.item?.job?.sourceJobId||''))); setCurrentRunIds(new Set()); publishLiveMatches([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
   setShadowState({status:'skipped',error:'',stats:null,coverage:null,comparison:null})
   const hasProfilePlan=Array.isArray(profile?.unionSearchPlan?.directions)&&profile.unionSearchPlan.directions.length>0
   try{
@@ -482,7 +519,7 @@ export default function Home(){
               verifiedJobs:Array.isArray(data.masterVerifiedJobs)?data.masterVerifiedJobs:[],
             })
           }
-          publishSavedLiveMatches(Array.isArray(data.jobs)?data.jobs:[],{current:true})
+          publishLiveMatches(Array.isArray(data.jobs)?data.jobs:[])
           if(data.stats?.detailComplete===true) break
           const next=Number(data.stats?.detailNextStart)
           if(!Number.isFinite(next)||next<=detailBatchStart) throw new Error('LinkedIn detail continuation did not advance.')
@@ -526,7 +563,7 @@ export default function Home(){
             })
           }
           data=recoveryData
-          publishSavedLiveMatches(Array.isArray(recoveryData.jobs)?recoveryData.jobs:[],{current:true})
+          publishLiveMatches(Array.isArray(recoveryData.jobs)?recoveryData.jobs:[])
         }
         const finalAudit=[...auditById.values()]
         const finalDetailFailures=finalAudit.filter(row=>row?.stage==='DETAIL_FETCH_FAILED').length
@@ -639,7 +676,7 @@ export default function Home(){
     if(!successful.length) throw failed[0]?.reason||new Error('Search failed')
 
     const mergedJobs=mergeSourceItems(successful.map(result=>Array.isArray(result.data.jobs)?result.data.jobs:[]))
-    publishSavedLiveMatches(mergedJobs,{current:true})
+    publishLiveMatches(mergedJobs)
     const nextAppliedJobs=syncAppliedArchive({archive:appliedJobsRef.current,items:mergedJobs,statuses:jobStatusesRef.current})
     if(JSON.stringify(nextAppliedJobs)!==JSON.stringify(appliedJobsRef.current)) persistAppliedArchive(nextAppliedJobs)
     else setAppliedJobs(nextAppliedJobs)
@@ -896,6 +933,16 @@ export default function Home(){
     }
   }
 
+  async function copyTargetRolesOrQuery(){
+    const query=rolesToLinkedInOrQuery(draft.roles)
+    if(!query){setRolesCopyStatus('No target roles to copy');return}
+    try{
+      if(!navigator.clipboard?.writeText)throw new Error('Clipboard unavailable')
+      await navigator.clipboard.writeText(query)
+      setRolesCopyStatus('Copied ✓')
+    }catch{setRolesCopyStatus('Copy failed — check browser clipboard permission')}
+  }
+
   return <main>
     <header><div><div className="brand">ApplyPilot</div><div className="tag">Search less. Apply better.</div></div><div className="headerActions"><div className={`sourceBadge profileStatus ${resumeLoaded?'statusReady':'statusEmpty'}`}>{resumeLoaded?'Profile ready':'Profile empty'}</div><div className="sourceBadge">MULTI-SOURCE + COMPANY WATCH · TEST</div></div></header>
 
@@ -913,6 +960,8 @@ export default function Home(){
       <div><small>SEARCH SOURCES</small><div className="choices"><label className="choice"><input type="checkbox" checked={selectedSources.includes('linkedin')} onChange={()=>toggleSource('linkedin')}/> LinkedIn</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobindex')} onChange={()=>toggleSource('jobindex')}/> Jobindex</label><label className="choice"><input type="checkbox" checked={selectedSources.includes('jobnet')} onChange={()=>toggleSource('jobnet')}/> Jobnet</label></div></div>
       <button className="primary" onClick={search} disabled={state.loading}>{state.loading?'Searching…':'Search'}</button>
     </section>
+
+    <LinkedInJsonImport onImported={importLinkedInJobs}/>
 
     <section className="companyWatch">
       <div className="companyWatchMain">
@@ -934,13 +983,13 @@ export default function Home(){
       </div>}
     </section>
 
+    {livePoolSaveError&&<div className="warningBox" role="alert">{livePoolSaveError}</div>}
     {state.error&&<div className="errorBox"><b>{state.error==='Please Upload Your CV'?'Please Upload Your CV':'Search failed'}</b>{state.error!=='Please Upload Your CV'&&<span>{state.error}</span>}</div>}
     {state.stats&&<div className="searchMeta"><span><b>{state.stats.masterPoolSize??state.stats.discovered}</b> jobs discovered</span><span><b>{state.stats.fullJdVerified}</b> full JDs read</span><span><b>{state.stats.returned??jobs.length}</b> worthwhile after evaluation</span><span>Coverage: <b>{state.coverage?.status}</b></span></div>}
     {state.coverage?.detail&&<div className="warningBox">Partial source access: {state.coverage.detail}</div>}
 
     <section className="grid">
       <div className="list">
-        {liveMatchesSaveError&&<div className="warningBox" role="alert">{liveMatchesSaveError}</div>}
         <div className="listHead"><div><h2>Live matches</h2>{jobs.length>0&&<small className={filterStyles.resultCount}>{visibleJobs.length} of {jobs.length}</small>}</div><small>{freshnessResultLabel(freshnessSelectionFromDays(freshnessDays))}</small></div>
         {jobs.length>0&&<details className={filterStyles.filters}>
           <summary><span>FILTERS</span><span>{visibleJobs.length} of {jobs.length}</span></summary>
@@ -951,14 +1000,14 @@ export default function Home(){
             <div className={filterStyles.group}><small className={filterStyles.groupTitle}>STATUS</small>{JOB_STATUS_FILTERS.map(status=><label className={filterStyles.option} key={status.id}><input type="checkbox" checked={selectedStatuses.includes(status.id)} onChange={()=>toggleJobFilter(setSelectedStatuses,status.id)}/><span>{status.label}</span><b>{statusCounts[status.id]||0}</b></label>)}</div>
           </div>
         </details>}
-        {!state.loading&&!state.error&&!state.stats&&<div className="empty">Run search to find matching vacancies from the selected sources.</div>}
+        {!state.loading&&!state.error&&!state.stats&&jobs.length===0&&<div className="empty">Run search to find matching vacancies from the selected sources.</div>}
         {state.loading&&<div className="empty">Searching selected sources and reading full job descriptions…</div>}
         {!state.loading&&state.stats&&jobs.length===0&&<div className="empty">NO STRONG NEW MATCHES FOUND.</div>}
         {!state.loading&&state.stats&&jobs.length>0&&visibleJobs.length===0&&<div className="empty">NO MATCHES IN SELECTED FILTERS.</div>}
-        {visibleJobs.map(item=>{const {job,evaluation}=item; const score=Math.round(evaluation.score*10); const manualStatus=jobStatuses[job.sourceJobId]||''; return <div className="jobWrap" key={job.sourceJobId}>
+        {visibleJobs.map(item=>{const {job,evaluation}=item; const score=Number.isFinite(evaluation?.score)?Math.round(evaluation.score*10):null; const manualStatus=jobStatuses[job.sourceJobId]||''; return <div className="jobWrap" key={job.sourceJobId}>
           <button onClick={()=>setSelected(item)} className={'job '+(active?.job.sourceJobId===job.sourceJobId?'active':'')}>
-            <span className="score">{fitLabel(score)} · {formatLiveMatchScore(evaluation.score)}</span>
-            <span><span style={{display:'flex',alignItems:'center',gap:6}}>{!currentRunKeys.has(liveMatchIdentity(item))&&<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#E7B84F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}} role="img" aria-label="Saved from previous search"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>}<b>{job.title}</b></span><small>{job.company} · {job.location}</small><small className="sourceLine">{jobSourceLabel(job)} · {dateText(job.publishedAt)}</small></span>
+            <span className="score">{score===null?'N/A':`${fitLabel(score)} · ${v20ScoreLabel(evaluation)}`}</span>
+            <span><span style={{display:'flex',alignItems:'center',gap:6}}>{!currentRunIds.has(String(job.sourceJobId))&&<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#E7B84F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}} role="img" aria-label="Saved from previous search"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>}<b>{job.title}</b></span><small>{job.company} · {job.location}</small><small className="sourceLine">{jobSourceLabel(job)} · {job.publishedAt?dateText(job.publishedAt):(job.publishedText||'Date unavailable')}{job.needsJdReview?' · Incomplete JD':''}</small></span>
             <span>→</span>
           </button>
           <select aria-label={`Status for ${job.title}`} className={`jobStatusSelect status-${manualStatus||'none'}`} value={manualStatus} onChange={event=>changeJobStatus(job.sourceJobId,event.target.value)}>
@@ -969,7 +1018,7 @@ export default function Home(){
 
       <div className="panel">
         {active?(()=>{const {job}=active; const expertise=expertiseState.jobKey===jobKey?expertiseState.analysis:null; return <>
-          <div className="panelTop expertiseHeader"><div><h2>{job.title}</h2><p>{job.company} · {job.location}</p><small className="sourceLine">Source: {jobSourceLabel(job)} · {dateText(job.publishedAt)}</small></div></div>
+          <div className="panelTop expertiseHeader"><div><h2>{job.title}</h2><p>{job.company} · {job.location}</p><small className="sourceLine">Source: {jobSourceLabel(job)} · {job.publishedAt?dateText(job.publishedAt):(job.publishedText||'Date unavailable')}{job.needsJdReview?' · Incomplete JD':''}</small></div></div>
 
           <div className="conditionGrid">
             <div className="conditionCard"><small>Area</small><b>{conditionScore(jobConditions?.area.score)}</b><span>{jobConditions?.area.value||'Not stated'}</span></div>
@@ -1032,7 +1081,7 @@ export default function Home(){
       {profileStep===1&&<CvLibraryStep library={cvLibrary} loadingSlot={cvState.loadingSlot} error={cvState.error} primarySkills={draft.skills} onUpload={parseCv} onRemove={removeCv}/>} 
       {profileStep===2&&<SearchProfileRolesStep primaryRoles={draftPrimaryRoles} adjacentRoles={draftAdjacentRoles} status={profileRoleState.status} error={profileRoleState.error} source={profileRoleState.source} totalCount={profileRoleState.totalCount||cvReadyCount} analysedCount={profileRoleState.analysedCount} failedCvs={profileRoleState.failedCvs} onPrimaryChange={roles=>updateDraftRoles('primaryRoles',roles)} onAdjacentChange={roles=>updateDraftRoles('adjacentRoles',roles)} onRetry={()=>buildProfileRoles({forceCvIds:(profileRoleState.failedCvs||[]).map(cv=>cv.cvId)})}/>} 
       {profileStep===3&&<div className="wizard"><h3>What should ApplyPilot exclude?</h3><p>Optional. Write any hard no-go roles, industries, languages or working conditions. ApplyPilot interprets this text only when you save the profile.</p><textarea value={draft.exclusions} onChange={event=>setDraft(current=>({...current,exclusions:event.target.value}))} rows="6"/></div>}
-      {profileStep===4&&<div className="wizard review"><h3>Confirm your search profile</h3><p>This saves your Search Profile and activates profile-driven LinkedIn discovery for future searches.</p><div className="reviewRow"><span>CV library</span><b>{readyCvs.length?readyCvs.map(cv=>`CV ${cv.slot} · ${cv.fileName}`).join(' · '):'No CVs uploaded'}</b></div><div className="reviewRow"><span>CV preparation</span><b>{cvReadyCount?`Ready — ${cvReadyCount} complete Source CV${cvReadyCount===1?'':'s'} prepared`:'CV not ready'}</b></div><div className="reviewRow"><span>Role profiles</span><b>{cvReadyCount?`${analysedRoleProfileCount}/${cvReadyCount} CVs analysed`:'Not generated'}</b></div><div className="reviewRow"><span>Target roles</span><b>{draft.roles||'Not set'}</b></div><div className="reviewRow"><span>Exclude</span><b>{draft.exclusions||'None'}</b></div><SearchPlanPreview plan={draftUnionSearchPlan}/>{profileSaveState.error&&<div className="errorBox"><b>Search Profile save failed</b><span>{profileSaveState.error}</span></div>}<div className="truth"><b>Truth rule</b><span>ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.</span></div></div>}
+      {profileStep===4&&<div className="wizard review"><h3>Confirm your search profile</h3><p>This saves your Search Profile and activates profile-driven LinkedIn discovery for future searches.</p><div className="reviewRow"><span>CV library</span><b>{readyCvs.length?readyCvs.map(cv=>`CV ${cv.slot} · ${cv.fileName}`).join(' · '):'No CVs uploaded'}</b></div><div className="reviewRow"><span>CV preparation</span><b>{cvReadyCount?`Ready — ${cvReadyCount} complete Source CV${cvReadyCount===1?'':'s'} prepared`:'CV not ready'}</b></div><div className="reviewRow"><span>Role profiles</span><b>{cvReadyCount?`${analysedRoleProfileCount}/${cvReadyCount} CVs analysed`:'Not generated'}</b></div><div className="reviewRow"><span className="targetRolesLabel">Target roles <button type="button" className="targetRolesCopyButton" onClick={copyTargetRolesOrQuery} disabled={!draft.roles?.trim()} title="Copy quoted target roles joined by OR for manual LinkedIn search" aria-label="Copy target roles as LinkedIn OR search">Copy OR</button><small className="targetRolesCopyStatus" role="status" aria-live="polite">{rolesCopyStatus}</small></span><b>{draft.roles||'Not set'}</b></div><div className="reviewRow"><span>Exclude</span><b>{draft.exclusions||'None'}</b></div><SearchPlanPreview plan={draftUnionSearchPlan}/>{profileSaveState.error&&<div className="errorBox"><b>Search Profile save failed</b><span>{profileSaveState.error}</span></div>}<div className="truth"><b>Truth rule</b><span>ApplyPilot may rephrase verified experience, but may never invent skills, achievements, employers or responsibilities.</span></div></div>}
       <div className="modalActions"><button className="secondary" disabled={profileSaveState.loading} onClick={()=>profileStep===1?closeProfile():setProfileStep(step=>step-1)}>{profileStep===1?'Cancel':'Back'}</button>{profileStep<4?<button className="primary" disabled={(profileStep===1&&(Boolean(cvState.loadingSlot)||cvReadyCount===0))||(profileStep===2&&profileRoleState.status==='loading')} onClick={nextProfileStep}>Continue</button>:<button className="primary" disabled={profileSaveState.loading} onClick={saveProfile}>{profileSaveState.loading?'Saving profile…':'Save profile'}</button>}</div>
     </div></div>}
 
