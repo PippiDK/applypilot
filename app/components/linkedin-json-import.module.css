@@ -1,0 +1,23 @@
+.section{display:flex;gap:22px;align-items:flex-start;margin:0 0 14px;padding:20px 22px;border:1px solid #252b34;border-radius:18px;background:linear-gradient(120deg,#131922,#10151b);min-width:0}
+.icon{flex:0 0 30px;font-size:28px;line-height:1.2;color:#78e7b7}
+.main{flex:1;min-width:0}
+.main h2{margin:0 0 5px;color:#eef1f4;font-size:19px}
+.main p{margin:0 0 13px;color:#aab3bf;font-size:12px;line-height:1.45}
+.actions{display:flex;gap:14px;align-items:stretch}
+.fileBox{display:flex;align-items:stretch;flex:1;min-width:0;overflow:hidden;border:1px solid #343d48;border-radius:10px;background:#151a20}
+.choose{position:relative;flex:0 0 auto;display:flex;align-items:center;justify-content:center;min-width:125px;padding:12px;border-right:1px solid #343d48;font-size:12px;font-weight:700;color:#eef1f4;cursor:pointer}
+.choose input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.choose:focus-within{outline:2px solid #78e7b7;outline-offset:-2px}
+.fileName{flex:1;min-width:0;align-self:center;padding:0 14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:#ccd3dd}
+.clear{border:0;background:transparent;color:#9daab9;padding:0 15px;font-size:21px;cursor:pointer}
+.import{flex:0 0 160px;border:0;border-radius:10px;background:#77efbf;color:#0c1613;font-size:13px;font-weight:850;cursor:pointer}
+.import:disabled{opacity:.5;cursor:default}
+.stats{flex:0 0 240px;min-width:0;background:#10191a;border:1px solid #263a36;border-radius:12px;padding:12px 15px;font-size:12px;color:#94a5b3}
+.indicator{display:inline-block;margin-bottom:8px;padding:5px 9px;background:#133529;color:#77e5b3;border-radius:9px;font-size:11px;font-weight:750}
+.stats div{display:flex;justify-content:space-between;gap:8px;margin:3px 0}
+.stats b{font-weight:750;color:#e3e8ed;text-align:right}
+.stats small{display:block;margin-top:8px;color:#74898b}
+.main p.notice{color:#b1decb;margin:10px 0 0}
+.main p.error{color:#f1a6a6;margin:10px 0 0}
+@media(max-width:900px){.section{flex-wrap:wrap}.stats{flex:1 1 100%}}
+@media(max-width:600px){.section{padding:15px;gap:10px}.actions{flex-direction:column}.import{flex:0 0 auto;min-height:44px}.fileBox{min-height:44px}.stats{flex:1 1 100%}}
