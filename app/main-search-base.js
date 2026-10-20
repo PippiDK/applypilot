@@ -66,6 +66,8 @@ export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(5)
   const [jobs,setJobs]=useState([])
   const livePoolRef=useRef([])
+  const savedBeforeSearchRef=useRef(new Set())
+  const [currentRunIds,setCurrentRunIds]=useState(()=>new Set())
   const livePoolReadyRef=useRef(null)
   const livePoolWriteQueue=useRef(Promise.resolve())
   const [livePoolSaveError,setLivePoolSaveError]=useState('')
@@ -421,6 +423,7 @@ export default function Home(){
   }
 
   function publishLiveMatches(items){
+    if(items.length)setCurrentRunIds(previous=>new Set([...previous,...items.filter(item=>!savedBeforeSearchRef.current.has(String(item?.job?.sourceJobId||''))).map(item=>String(item?.job?.sourceJobId||''))]))
     const next=mergeLivePool(livePoolRef.current,items)
     livePoolRef.current=next
     setJobs(livePoolItems(next))
@@ -435,6 +438,8 @@ export default function Home(){
 
   async function importLinkedInJobs(incoming){
     if(livePoolReadyRef.current)await livePoolReadyRef.current
+    savedBeforeSearchRef.current=new Set(livePoolRef.current.map(row=>String(row.item?.job?.sourceJobId||'')))
+    setCurrentRunIds(new Set())
     const before=new Set(livePoolRef.current.filter(row=>row.item?.job?.importSource==='linkedin-json').map(row=>String(row.item.job.sourceJobId)))
     const imported=importedJobsToLiveItems(incoming,profile,freshnessDays)
     const next=publishLiveMatches(imported)
@@ -455,7 +460,7 @@ export default function Home(){
     setState({loading:false,error:'Select at least one search source.',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
   }
-  publishLiveMatches([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
+  savedBeforeSearchRef.current=new Set(livePoolRef.current.map(row=>String(row.item?.job?.sourceJobId||''))); setCurrentRunIds(new Set()); publishLiveMatches([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
   setShadowState({status:'skipped',error:'',stats:null,coverage:null,comparison:null})
   const hasProfilePlan=Array.isArray(profile?.unionSearchPlan?.directions)&&profile.unionSearchPlan.directions.length>0
   try{
@@ -1000,7 +1005,7 @@ export default function Home(){
         {visibleJobs.map(item=>{const {job,evaluation}=item; const score=Number.isFinite(evaluation?.score)?Math.round(evaluation.score*10):null; const manualStatus=jobStatuses[job.sourceJobId]||''; return <div className="jobWrap" key={job.sourceJobId}>
           <button onClick={()=>setSelected(item)} className={'job '+(active?.job.sourceJobId===job.sourceJobId?'active':'')}>
             <span className="score">{score===null?'N/A':`${fitLabel(score)} · ${v20ScoreLabel(evaluation)}`}</span>
-            <span><b>{job.title}</b><small>{job.company} · {job.location}</small><small className="sourceLine">{jobSourceLabel(job)} · {job.publishedAt?dateText(job.publishedAt):(job.publishedText||'Date unavailable')}{job.needsJdReview?' · Incomplete JD':''}</small></span>
+            <span><span style={{display:'flex',alignItems:'center',gap:6}}>{!currentRunIds.has(String(job.sourceJobId))&&<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#E7B84F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}} role="img" aria-label="Saved from previous search"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>}<b>{job.title}</b></span><small>{job.company} · {job.location}</small><small className="sourceLine">{jobSourceLabel(job)} · {job.publishedAt?dateText(job.publishedAt):(job.publishedText||'Date unavailable')}{job.needsJdReview?' · Incomplete JD':''}</small></span>
             <span>→</span>
           </button>
           <select aria-label={`Status for ${job.title}`} className={`jobStatusSelect status-${manualStatus||'none'}`} value={manualStatus} onChange={event=>changeJobStatus(job.sourceJobId,event.target.value)}>
