@@ -79,8 +79,8 @@ export default function Home(){
   const [selectedAreas,setSelectedAreas]=useState(()=>SEARCH_AREAS.map(({id})=>id))
   const [selectedWorkModels,setSelectedWorkModels]=useState(()=>WORK_MODELS.map(({id})=>id))
   const [selectedStatuses,setSelectedStatuses]=useState(()=>[...DEFAULT_JOB_STATUS_FILTERS])
-  const [importedOnly,setImportedOnly]=useState(false)
-  const [nightPilotOnly,setNightPilotOnly]=useState(false)
+  const [showImported,setShowImported]=useState(true)
+  const [showNightPilot,setShowNightPilot]=useState(true)
   const allFiltersSelected=SEARCH_AREAS.every(({id})=>selectedAreas.includes(id))&&WORK_MODELS.every(({id})=>selectedWorkModels.includes(id))
   const someFiltersSelected=selectedAreas.length>0||selectedWorkModels.length>0
   const [selected,setSelected]=useState(null)
@@ -116,7 +116,7 @@ export default function Home(){
   const [editedUpdates,setEditedUpdates]=useState({})
   const [sourceDocxFiles,setSourceDocxFiles]=useState({})
   const [exportState,setExportState]=useState({loading:false,error:'',baselineKey:''})
-  const visibleJobs=useMemo(()=>v20SortedByScore(filterJobItemsByStatus(filterJobItems(v20VisibleByWindow(jobs,freshnessDays).filter(item=>(!importedOnly||item?.job?.importSource==='linkedin-json')&&(!nightPilotOnly||item?.job?.nightFlight?.processed===true)),selectedAreas,selectedWorkModels),jobStatuses,selectedStatuses)),[jobs,freshnessDays,importedOnly,nightPilotOnly,selectedAreas,selectedWorkModels,jobStatuses,selectedStatuses])
+  const visibleJobs=useMemo(()=>v20SortedByScore(filterJobItemsByStatus(filterJobItems(v20VisibleByWindow(jobs,freshnessDays).filter(item=>{const job=item?.job||{};return (showImported||job.importSource!=='linkedin-json')&&(showNightPilot||job.nightFlight?.processed!==true)}),selectedAreas,selectedWorkModels),jobStatuses,selectedStatuses)),[jobs,freshnessDays,showImported,showNightPilot,selectedAreas,selectedWorkModels,jobStatuses,selectedStatuses])
   const active=visibleJobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||visibleJobs[0]||null
 
   useEffect(()=>{
@@ -1001,8 +1001,8 @@ export default function Home(){
             <div className={filterStyles.group}><small className={filterStyles.groupTitle}>WORK MODEL</small>{WORK_MODELS.map(model=><label className={filterStyles.option} key={model.id}><input type="checkbox" checked={selectedWorkModels.includes(model.id)} onChange={()=>toggleJobFilter(setSelectedWorkModels,model.id)}/><span>{model.label}</span><b>{workModelCounts[model.id]||0}</b></label>)}</div>
             <div className={filterStyles.group}><small className={filterStyles.groupTitle}>STATUS</small>{JOB_STATUS_FILTERS.map(status=><label className={filterStyles.option} key={status.id}><input type="checkbox" checked={selectedStatuses.includes(status.id)} onChange={()=>toggleJobFilter(setSelectedStatuses,status.id)}/><span>{status.label}</span><b>{statusCounts[status.id]||0}</b></label>)}</div>
             <div style={{borderTop:'1px solid rgba(175,132,242,.38)',marginTop:10,paddingTop:10}}>
-              <label className={filterStyles.option} style={{color:'#c49af7'}}><input type="checkbox" checked={nightPilotOnly} onChange={event=>setNightPilotOnly(event.target.checked)}/><span style={{color:'#c49af7',fontWeight:700}}>Night Pilot</span><b>{jobs.filter(item=>item?.job?.nightFlight?.processed===true).length}</b></label>
-              <label className={filterStyles.option} style={{color:'#c49af7'}}><input type="checkbox" checked={importedOnly} onChange={event=>setImportedOnly(event.target.checked)}/><span style={{color:'#c49af7',fontWeight:700}}>Imported</span><b>{jobs.filter(item=>item?.job?.importSource==='linkedin-json').length}</b></label>
+              <label className={filterStyles.option} style={{color:'#c49af7'}}><input type="checkbox" checked={showNightPilot} onChange={event=>setShowNightPilot(event.target.checked)}/><span style={{color:'#c49af7',fontWeight:700}}>Night Pilot</span><b>{jobs.filter(item=>item?.job?.nightFlight?.processed===true).length}</b></label>
+              <label className={filterStyles.option} style={{color:'#c49af7'}}><input type="checkbox" checked={showImported} onChange={event=>setShowImported(event.target.checked)}/><span style={{color:'#c49af7',fontWeight:700}}>Imported</span><b>{jobs.filter(item=>item?.job?.importSource==='linkedin-json').length}</b></label>
             </div>
           </div>
         </details>}
