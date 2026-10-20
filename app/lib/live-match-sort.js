@@ -15,5 +15,5 @@ export function sortLiveMatchesByScore(items=[]){
 }
 export function formatLiveMatchScore(score){
   const value=Number(score)
-  return Number.isFinite(value)?(value*10).toFixed(1)+'/10':'N/A'
+  return Number.isFinite(value)?value.toFixed(1)+'/10':'N/A'
 }
