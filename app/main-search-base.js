@@ -33,7 +33,9 @@ import {companyConnection,connectedCompanyNames,defaultCompanyWatch,readCompanyW
 import {CONSULTANT_PORTALS,connectedConsultantPortalIds,defaultConsultantPortals,readConsultantPortals,writeConsultantPortals} from './lib/consultant-portals.js'
 import LinkedInJsonImport from './components/linkedin-json-import.js'
 import {V20_LIVE_IMPORT_KEY,importedJobsToLiveItems} from './lib/v20-live-matches.js'
-import {V20_LIVE_POOL_KEY,mergeLivePool,readLivePool,writeLivePool,livePoolItems} from './lib/v20-live-pool.js'
+import {V20_LIVE_POOL_KEY,mergeLivePool,readLivePool,livePoolItems} from './lib/v20-live-pool.js'
+import {readV20PoolDb,writeV20PoolDb,readLegacyV19Matches} from './lib/v20-live-pool-indexeddb.js'
+import {v20VisibleByWindow,v20SortedByScore,v20ScoreLabel} from './lib/v20-match-view.js'
 import SearchAudit from './components/search-audit.js'
 import ShadowSearchAudit from './components/shadow-search-audit.js'
 import CvLibraryStep from './components/cv-library-step.js'
@@ -64,6 +66,10 @@ export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(5)
   const [jobs,setJobs]=useState([])
   const livePoolRef=useRef([])
+  const savedBeforeSearchRef=useRef(new Set())
+  const [currentRunIds,setCurrentRunIds]=useState(()=>new Set())
+  const livePoolReadyRef=useRef(null)
+  const livePoolWriteQueue=useRef(Promise.resolve())
   const [livePoolSaveError,setLivePoolSaveError]=useState('')
   const [selectedSources,setSelectedSources]=useState(()=>[...DEFAULT_SEARCH_SOURCES])
   const [companyWatch,setCompanyWatch]=useState(()=>defaultCompanyWatch())
@@ -108,7 +114,7 @@ export default function Home(){
   const [editedUpdates,setEditedUpdates]=useState({})
   const [sourceDocxFiles,setSourceDocxFiles]=useState({})
   const [exportState,setExportState]=useState({loading:false,error:'',baselineKey:''})
-  const visibleJobs=useMemo(()=>filterJobItemsByStatus(filterJobItems(jobs,selectedAreas,selectedWorkModels),jobStatuses,selectedStatuses),[jobs,selectedAreas,selectedWorkModels,jobStatuses,selectedStatuses])
+  const visibleJobs=useMemo(()=>v20SortedByScore(filterJobItemsByStatus(filterJobItems(v20VisibleByWindow(jobs,freshnessDays),selectedAreas,selectedWorkModels),jobStatuses,selectedStatuses)),[jobs,freshnessDays,selectedAreas,selectedWorkModels,jobStatuses,selectedStatuses])
   const active=visibleJobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||visibleJobs[0]||null
 
   useEffect(()=>{
@@ -137,24 +143,49 @@ export default function Home(){
       }
       setProfile(hydrated)
       setDraft(hydrated)
-      try{
-        const existing=readLivePool(localStorage)
-        // One-time migration only: a legacy import must not resurrect an expired pool entry.
-        let initial=existing
-        const migrate=localStorage.getItem(V20_LIVE_POOL_KEY)===null
-        if(migrate){
-          let prior=[]
-          try{prior=JSON.parse(localStorage.getItem(V20_LIVE_IMPORT_KEY)||'[]')}catch{}
-          if(Array.isArray(prior)&&prior.length) initial=mergeLivePool(existing,importedJobsToLiveItems(prior,hydrated,freshnessDays))
-        }
-        livePoolRef.current=initial
-        setJobs(livePoolItems(initial))
-        try{
-          writeLivePool(localStorage,initial)
-          if(migrate)localStorage.removeItem(V20_LIVE_IMPORT_KEY)
-        }catch{setLivePoolSaveError('Browser storage is full. Save a JSON backup before closing this page.')}
-      }catch{setLivePoolSaveError('Could not restore the saved vacancy pool. Keep your JSON backup.')}
     }catch{}
+  },[])
+
+  useEffect(()=>{
+    let active=true
+    const ready=(async()=>{
+      // Recover v20-only browser data before touching the legacy backup.
+      const oldPool=readLivePool(localStorage)
+      const saved=await readV20PoolDb()
+      // Preserve qualified LIVE v19 vacancies on the same production origin, read-only.
+      const legacyV19=await readLegacyV19Matches()
+      const imported=[]
+      if(localStorage.getItem(V20_LIVE_POOL_KEY)===null){
+        try{
+          const prior=JSON.parse(localStorage.getItem(V20_LIVE_IMPORT_KEY)||'[]')
+          if(Array.isArray(prior)&&prior.length){
+            const profileRaw=localStorage.getItem('applypilot-profile')
+            const profileValue=profileRaw?JSON.parse(profileRaw):{}
+            imported.push(...importedJobsToLiveItems(prior,profileValue,10))
+          }
+        }catch{}
+      }
+      // Merge by v20 pool semantics: keep manual unscored jobs and first-seen TTL.
+      const merged=mergeLivePool(saved,[...legacyV19,...oldPool.map(row=>row.item),...imported])
+      // Preserve exact firstSeenAt for old localStorage rows.
+      const byKey=new Map(merged.map(row=>[String(row.item?.job?.sourceJobId),row]))
+      for(const row of oldPool){
+        const key=String(row.item?.job?.sourceJobId)
+        if(byKey.has(key)){
+          const retained=byKey.get(key)
+          byKey.set(key,{...retained,firstSeenAt:row.firstSeenAt})
+        }
+      }
+      const committed=await writeV20PoolDb([...byKey.values()])
+      livePoolRef.current=committed
+      if(active)setJobs(livePoolItems(committed))
+      // Delete localStorage backup only after the IndexedDB write commits.
+      localStorage.removeItem(V20_LIVE_POOL_KEY)
+      if(imported.length)localStorage.removeItem(V20_LIVE_IMPORT_KEY)
+    })()
+    livePoolReadyRef.current=ready
+    ready.catch(()=>{if(active)setLivePoolSaveError('v20 vacancies could not be restored into IndexedDB. Browser backups were retained.')})
+    return()=>{active=false}
   },[])
 
   useEffect(()=>{
@@ -394,24 +425,33 @@ export default function Home(){
   }
 
   function publishLiveMatches(items){
+    if(items.length)setCurrentRunIds(previous=>new Set([...previous,...items.filter(item=>!savedBeforeSearchRef.current.has(String(item?.job?.sourceJobId||''))).map(item=>String(item?.job?.sourceJobId||''))]))
     const next=mergeLivePool(livePoolRef.current,items)
     livePoolRef.current=next
     setJobs(livePoolItems(next))
-    try{writeLivePool(localStorage,next);setLivePoolSaveError('')}
-    catch{setLivePoolSaveError('Browser storage is full. Save a JSON backup before closing this page.')}
+    const save=livePoolWriteQueue.current.then(async()=>{
+      if(livePoolReadyRef.current)await livePoolReadyRef.current
+      await writeV20PoolDb(livePoolRef.current)
+    })
+    livePoolWriteQueue.current=save.catch(()=>{})
+    save.then(()=>setLivePoolSaveError('')).catch(()=>setLivePoolSaveError('v20 vacancies could not be saved to IndexedDB; keep your manual JSON backup.'))
     return next
   }
 
   async function importLinkedInJobs(incoming){
+    if(livePoolReadyRef.current)await livePoolReadyRef.current
+    savedBeforeSearchRef.current=new Set(livePoolRef.current.map(row=>String(row.item?.job?.sourceJobId||'')))
+    setCurrentRunIds(new Set())
     const before=new Set(livePoolRef.current.filter(row=>row.item?.job?.importSource==='linkedin-json').map(row=>String(row.item.job.sourceJobId)))
     const imported=importedJobsToLiveItems(incoming,profile,freshnessDays)
     const next=publishLiveMatches(imported)
     const total=next.filter(row=>row.item?.job?.importSource==='linkedin-json').length
     const added=next.filter(row=>row.item?.job?.importSource==='linkedin-json'&&!before.has(String(row.item.job.sourceJobId))).length
-    return {added,total}
+    return {added,total,excludedUndated:imported.filter(item=>!item?.job?.publishedAt).length,excludedOther:imported.length-total}
   }
 
   async function search(){
+  if(livePoolReadyRef.current)await livePoolReadyRef.current
   if(!resumeLoaded){
     setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
@@ -422,7 +462,7 @@ export default function Home(){
     setState({loading:false,error:'Select at least one search source.',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
   }
-  publishLiveMatches([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
+  savedBeforeSearchRef.current=new Set(livePoolRef.current.map(row=>String(row.item?.job?.sourceJobId||''))); setCurrentRunIds(new Set()); publishLiveMatches([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
   setShadowState({status:'skipped',error:'',stats:null,coverage:null,comparison:null})
   const hasProfilePlan=Array.isArray(profile?.unionSearchPlan?.directions)&&profile.unionSearchPlan.directions.length>0
   try{
@@ -966,8 +1006,8 @@ export default function Home(){
         {!state.loading&&state.stats&&jobs.length>0&&visibleJobs.length===0&&<div className="empty">NO MATCHES IN SELECTED FILTERS.</div>}
         {visibleJobs.map(item=>{const {job,evaluation}=item; const score=Number.isFinite(evaluation?.score)?Math.round(evaluation.score*10):null; const manualStatus=jobStatuses[job.sourceJobId]||''; return <div className="jobWrap" key={job.sourceJobId}>
           <button onClick={()=>setSelected(item)} className={'job '+(active?.job.sourceJobId===job.sourceJobId?'active':'')}>
-            <span className="score">{score===null?'N/A':fitLabel(score)}</span>
-            <span><b>{job.title}</b><small>{job.company} · {job.location}</small><small className="sourceLine">{jobSourceLabel(job)} · {job.publishedAt?dateText(job.publishedAt):(job.publishedText||'Date unavailable')}{job.needsJdReview?' · Incomplete JD':''}</small></span>
+            <span className="score">{score===null?'N/A':`${fitLabel(score)} · ${v20ScoreLabel(evaluation)}`}</span>
+            <span><span style={{display:'flex',alignItems:'center',gap:6}}>{!currentRunIds.has(String(job.sourceJobId))&&<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#E7B84F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}} role="img" aria-label="Saved from previous search"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>}<b>{job.title}</b></span><small>{job.company} · {job.location}</small><small className="sourceLine">{jobSourceLabel(job)} · {job.publishedAt?dateText(job.publishedAt):(job.publishedText||'Date unavailable')}{job.needsJdReview?' · Incomplete JD':''}</small></span>
             <span>→</span>
           </button>
           <select aria-label={`Status for ${job.title}`} className={`jobStatusSelect status-${manualStatus||'none'}`} value={manualStatus} onChange={event=>changeJobStatus(job.sourceJobId,event.target.value)}>

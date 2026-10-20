@@ -25,7 +25,7 @@ export default function LinkedInJsonImport({onImported}){
         duplicates:result.inputCount-result.jobs.length-result.errors.length,
         invalid:result.errors.length
       }
-      setState({status:'preview',message:`Added to Live Matches · ${outcome?.total??mappedJobs.length} imported jobs total · ${outcome?.added??mappedJobs.length} new.`,stats})
+      setState({status:'preview',message:`Live Matches · ${outcome?.total??0} retained · ${outcome?.added??0} new. ${outcome?.excludedUndated??0} missing publication dates (not retained in ten-day list; keep your JSON backup).`,stats})
     }catch(error){
       setState({status:'error',message:error?.message||'Could not read JSON export',stats:null})
     }
@@ -65,7 +65,7 @@ export default function LinkedInJsonImport({onImported}){
       <div><span>Partial description:</span><b>{state.stats?.partial??'—'}</b></div>
       <div><span>Duplicates skipped:</span><b>{state.stats?.duplicates??'—'}</b></div>
       {state.stats?.invalid>0&&<div><span>Invalid rows:</span><b>{state.stats.invalid}</b></div>}
-      <small>Imported jobs appear in Live Matches</small>
+      <small>Only vacancies with a verified publication date within 10 days appear in Live Matches. Keep the JSON file for undated vacancies.</small>
     </aside>
   </section>
 }
