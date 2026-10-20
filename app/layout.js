@@ -43,8 +43,8 @@ export default async function RootLayout({children}){
   const environment=process.env.VERCEL_ENV||'development'
   const shortSha=String(process.env.VERCEL_GIT_COMMIT_SHA||'').trim().slice(0,7)
   const versionLabel=environment==='production'
-    ? `LIVE 19${shortSha?` · ${shortSha}`:''}`
-    : `V19 · PREVIEW${shortSha?` · ${shortSha}`:''}`
+    ? `LIVE 20${shortSha?` · ${shortSha}`:''}`
+    : `V20 · PREVIEW${shortSha?` · ${shortSha}`:''}`
   const remoteAppliedJobs=await appliedJobsForHydration()
 
   return <html lang="en"><body><Script id="applied-jobs-storage-hydration" strategy="beforeInteractive" dangerouslySetInnerHTML={{__html:appliedJobsBootstrapScript(remoteAppliedJobs)}}/><SplashGate>{children}<NightFlightDrawer><NightFlightMorningReview/><NightFlightSettings/></NightFlightDrawer><NeutralizeLegacyTestLabels/><div className="versionBadge">{versionLabel}</div><SignOutButton/></SplashGate></body></html>
