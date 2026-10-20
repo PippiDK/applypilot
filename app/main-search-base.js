@@ -38,7 +38,8 @@ import SearchProfileRolesStep from './components/search-profile-roles-step.js'
 import SearchPlanPreview from './components/search-plan-preview.js'
 import BestCvPanel from './components/best-cv-panel.js'
 import filterStyles from './components/job-filters.module.css'
-import {liveMatchIdentity,mergeSavedLiveMatches,readSavedLiveMatches,writeSavedLiveMatches,savedLiveMatchItems} from './lib/saved-live-matches.js'
+import {LIVE_MATCHES_STORAGE_KEY,liveMatchIdentity,mergeSavedLiveMatches,readSavedLiveMatches,savedLiveMatchItems} from './lib/saved-live-matches.js'
+import {readIndexedLiveMatches,writeIndexedLiveMatches} from './lib/saved-live-matches-indexeddb.js'
 
 const WINDOWS=[{days:1,label:'1 Day'},{days:3,label:'3 Days'},{days:5,label:'5 Days'},{days:10,label:'10 Days'}]
 const EMPTY_SEARCH_PROFILE={...DEFAULT_PROFILE,exclusions:''}
@@ -61,6 +62,9 @@ export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(5)
   const [jobs,setJobs]=useState([])
   const liveMatchesRef=useRef([])
+  const savedBeforeSearchRef=useRef(new Set())
+  const liveMatchesReadyRef=useRef(null)
+  const liveMatchesWriteQueue=useRef(Promise.resolve())
   const [currentRunKeys,setCurrentRunKeys]=useState(()=>new Set())
   const [liveMatchesSaveError,setLiveMatchesSaveError]=useState('')
   const [selectedSources,setSelectedSources]=useState(()=>[...DEFAULT_SEARCH_SOURCES])
@@ -109,11 +113,23 @@ export default function Home(){
   const active=visibleJobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||visibleJobs[0]||null
 
   useEffect(()=>{
-    try{
-      const restored=readSavedLiveMatches(localStorage)
-      liveMatchesRef.current=restored
-      setJobs(savedLiveMatchItems(restored))
-    }catch{setLiveMatchesSaveError('Saved vacancies could not be restored from this browser.')}
+    let active=true
+    // Install readiness synchronously so a search cannot overwrite the not-yet-loaded archive.
+    const ready=(async()=>{
+      const stored=await readIndexedLiveMatches()
+      const legacy=readSavedLiveMatches(localStorage)
+      const merged=mergeSavedLiveMatches(stored,[...legacy.map(row=>row.item),...liveMatchesRef.current.map(row=>row.item)])
+      // Commit before removing the legacy copy; a failed write must never destroy the backup.
+      const committed=await writeIndexedLiveMatches(merged)
+      if(legacy.length) localStorage.removeItem(LIVE_MATCHES_STORAGE_KEY)
+      liveMatchesRef.current=committed
+      if(active) setJobs(savedLiveMatchItems(committed))
+    })()
+    liveMatchesReadyRef.current=ready
+    ready.catch(()=>{
+      if(active) setLiveMatchesSaveError('Saved vacancies could not be loaded or migrated to IndexedDB. Existing browser data was not deleted.')
+    })
+    return()=>{active=false}
   },[])
 
   useEffect(()=>{
@@ -382,12 +398,19 @@ export default function Home(){
   }
 
   function publishSavedLiveMatches(items,{current=false}={}){
-    if(current&&items.length)setCurrentRunKeys(previous=>new Set([...previous,...items.map(liveMatchIdentity).filter(Boolean)]))
+    if(current&&items.length)setCurrentRunKeys(previous=>new Set([...previous,...items.map(liveMatchIdentity).filter(key=>key&&!savedBeforeSearchRef.current.has(key))]))
     const next=mergeSavedLiveMatches(liveMatchesRef.current,items)
     liveMatchesRef.current=next
     setJobs(savedLiveMatchItems(next))
-    try{writeSavedLiveMatches(localStorage,next);setLiveMatchesSaveError('')}
-    catch{setLiveMatchesSaveError('Browser storage is full. Saved vacancies may not persist after a reload.')}
+    // Serialize writes after restore/migration; each operation writes the latest in-memory snapshot.
+    const save=liveMatchesWriteQueue.current.then(async()=>{
+      if(liveMatchesReadyRef.current) await liveMatchesReadyRef.current
+      await writeIndexedLiveMatches(liveMatchesRef.current)
+    })
+    liveMatchesWriteQueue.current=save.catch(()=>{})
+    save.then(()=>setLiveMatchesSaveError('')).catch(()=>{
+      setLiveMatchesSaveError('Saved vacancies could not be written to IndexedDB. They may not persist after a reload.')
+    })
   }
 
   async function search(){
@@ -401,7 +424,7 @@ export default function Home(){
     setState({loading:false,error:'Select at least one search source.',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
   }
-  setCurrentRunKeys(new Set()); publishSavedLiveMatches([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
+  savedBeforeSearchRef.current=new Set(liveMatchesRef.current.map(row=>liveMatchIdentity(row.item)).filter(Boolean)); setCurrentRunKeys(new Set()); publishSavedLiveMatches([]); setState({loading:true,error:'',coverage:null,stats:null,fetchedAt:null,audit:[]})
   setShadowState({status:'skipped',error:'',stats:null,coverage:null,comparison:null})
   const hasProfilePlan=Array.isArray(profile?.unionSearchPlan?.directions)&&profile.unionSearchPlan.directions.length>0
   try{
@@ -934,7 +957,7 @@ export default function Home(){
         {visibleJobs.map(item=>{const {job,evaluation}=item; const score=Math.round(evaluation.score*10); const manualStatus=jobStatuses[job.sourceJobId]||''; return <div className="jobWrap" key={job.sourceJobId}>
           <button onClick={()=>setSelected(item)} className={'job '+(active?.job.sourceJobId===job.sourceJobId?'active':'')}>
             <span className="score">{fitLabel(score)}</span>
-            <span>{!currentRunKeys.has(liveMatchIdentity(item))&&<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#E7B84F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline-block',verticalAlign:'-2px',marginRight:6}} role="img" aria-label="Saved from previous search"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>}<b>{job.title}</b><small>{job.company} · {job.location}</small><small className="sourceLine">{jobSourceLabel(job)} · {dateText(job.publishedAt)}</small></span>
+            <span><span style={{display:'flex',alignItems:'center',gap:6}}>{!currentRunKeys.has(liveMatchIdentity(item))&&<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#E7B84F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}} role="img" aria-label="Saved from previous search"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>}<b>{job.title}</b></span><small>{job.company} · {job.location}</small><small className="sourceLine">{jobSourceLabel(job)} · {dateText(job.publishedAt)}</small></span>
             <span>→</span>
           </button>
           <select aria-label={`Status for ${job.title}`} className={`jobStatusSelect status-${manualStatus||'none'}`} value={manualStatus} onChange={event=>changeJobStatus(job.sourceJobId,event.target.value)}>
