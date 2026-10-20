@@ -40,3 +40,21 @@ export async function writeV20PoolDb(rows,{indexedDBImpl,now=new Date().toISOStr
   return retained
  }finally{db.close()}
 }
+
+export async function readLegacyV19Matches({indexedDBImpl=globalThis.indexedDB}={}){
+ if(!indexedDBImpl)return []
+ return new Promise((resolve,reject)=>{
+  const request=indexedDBImpl.open('applypilot-saved-live-matches-v1')
+  let newlyCreated=false
+  request.onupgradeneeded=()=>{newlyCreated=true}
+  request.onerror=()=>reject(request.error||new Error('Legacy v19 database unavailable'))
+  request.onsuccess=()=>{
+   const db=request.result
+   if(newlyCreated||!db.objectStoreNames.contains('matches')){db.close();resolve([]);return}
+   const tx=db.transaction('matches','readonly')
+   const get=tx.objectStore('matches').getAll()
+   get.onsuccess=()=>{const items=get.result||[];db.close();resolve(items.map(row=>row.item).filter(Boolean))}
+   get.onerror=()=>{db.close();reject(get.error||new Error('Cannot read v19 archive'))}
+  }
+ })
+}
