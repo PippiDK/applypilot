@@ -33,7 +33,8 @@ import {companyConnection,connectedCompanyNames,defaultCompanyWatch,readCompanyW
 import {CONSULTANT_PORTALS,connectedConsultantPortalIds,defaultConsultantPortals,readConsultantPortals,writeConsultantPortals} from './lib/consultant-portals.js'
 import LinkedInJsonImport from './components/linkedin-json-import.js'
 import {V20_LIVE_IMPORT_KEY,importedJobsToLiveItems} from './lib/v20-live-matches.js'
-import {V20_LIVE_POOL_KEY,mergeLivePool,readLivePool,writeLivePool,livePoolItems} from './lib/v20-live-pool.js'
+import {V20_LIVE_POOL_KEY,mergeLivePool,readLivePool,livePoolItems} from './lib/v20-live-pool.js'
+import {readV20PoolDb,writeV20PoolDb} from './lib/v20-live-pool-indexeddb.js'
 import {v20VisibleByWindow,v20SortedByScore,v20ScoreLabel} from './lib/v20-match-view.js'
 import SearchAudit from './components/search-audit.js'
 import ShadowSearchAudit from './components/shadow-search-audit.js'
@@ -65,6 +66,8 @@ export default function Home(){
   const [freshnessDays,setFreshnessDays]=useState(5)
   const [jobs,setJobs]=useState([])
   const livePoolRef=useRef([])
+  const livePoolReadyRef=useRef(null)
+  const livePoolWriteQueue=useRef(Promise.resolve())
   const [livePoolSaveError,setLivePoolSaveError]=useState('')
   const [selectedSources,setSelectedSources]=useState(()=>[...DEFAULT_SEARCH_SOURCES])
   const [companyWatch,setCompanyWatch]=useState(()=>defaultCompanyWatch())
@@ -138,24 +141,47 @@ export default function Home(){
       }
       setProfile(hydrated)
       setDraft(hydrated)
-      try{
-        const existing=readLivePool(localStorage)
-        // One-time migration only: a legacy import must not resurrect an expired pool entry.
-        let initial=existing
-        const migrate=localStorage.getItem(V20_LIVE_POOL_KEY)===null
-        if(migrate){
-          let prior=[]
-          try{prior=JSON.parse(localStorage.getItem(V20_LIVE_IMPORT_KEY)||'[]')}catch{}
-          if(Array.isArray(prior)&&prior.length) initial=mergeLivePool(existing,importedJobsToLiveItems(prior,hydrated,freshnessDays))
-        }
-        livePoolRef.current=initial
-        setJobs(livePoolItems(initial))
-        try{
-          writeLivePool(localStorage,initial)
-          if(migrate)localStorage.removeItem(V20_LIVE_IMPORT_KEY)
-        }catch{setLivePoolSaveError('Browser storage is full. Save a JSON backup before closing this page.')}
-      }catch{setLivePoolSaveError('Could not restore the saved vacancy pool. Keep your JSON backup.')}
     }catch{}
+  },[])
+
+  useEffect(()=>{
+    let active=true
+    const ready=(async()=>{
+      // Recover v20-only browser data before touching the legacy backup.
+      const oldPool=readLivePool(localStorage)
+      const saved=await readV20PoolDb()
+      const imported=[]
+      if(localStorage.getItem(V20_LIVE_POOL_KEY)===null){
+        try{
+          const prior=JSON.parse(localStorage.getItem(V20_LIVE_IMPORT_KEY)||'[]')
+          if(Array.isArray(prior)&&prior.length){
+            const profileRaw=localStorage.getItem('applypilot-profile')
+            const profileValue=profileRaw?JSON.parse(profileRaw):{}
+            imported.push(...importedJobsToLiveItems(prior,profileValue,10))
+          }
+        }catch{}
+      }
+      // Merge by v20 pool semantics: keep manual unscored jobs and first-seen TTL.
+      const merged=mergeLivePool(saved,[...oldPool.map(row=>row.item),...imported])
+      // Preserve exact firstSeenAt for old localStorage rows.
+      const byKey=new Map(merged.map(row=>[String(row.item?.job?.sourceJobId),row]))
+      for(const row of oldPool){
+        const key=String(row.item?.job?.sourceJobId)
+        if(byKey.has(key)){
+          const retained=byKey.get(key)
+          byKey.set(key,{...retained,firstSeenAt:row.firstSeenAt})
+        }
+      }
+      const committed=await writeV20PoolDb([...byKey.values()])
+      livePoolRef.current=committed
+      if(active)setJobs(livePoolItems(committed))
+      // Delete localStorage backup only after the IndexedDB write commits.
+      localStorage.removeItem(V20_LIVE_POOL_KEY)
+      if(imported.length)localStorage.removeItem(V20_LIVE_IMPORT_KEY)
+    })()
+    livePoolReadyRef.current=ready
+    ready.catch(()=>{if(active)setLivePoolSaveError('v20 vacancies could not be restored into IndexedDB. Browser backups were retained.')})
+    return()=>{active=false}
   },[])
 
   useEffect(()=>{
@@ -398,12 +424,17 @@ export default function Home(){
     const next=mergeLivePool(livePoolRef.current,items)
     livePoolRef.current=next
     setJobs(livePoolItems(next))
-    try{writeLivePool(localStorage,next);setLivePoolSaveError('')}
-    catch{setLivePoolSaveError('Browser storage is full. Save a JSON backup before closing this page.')}
+    const save=livePoolWriteQueue.current.then(async()=>{
+      if(livePoolReadyRef.current)await livePoolReadyRef.current
+      await writeV20PoolDb(livePoolRef.current)
+    })
+    livePoolWriteQueue.current=save.catch(()=>{})
+    save.then(()=>setLivePoolSaveError('')).catch(()=>setLivePoolSaveError('v20 vacancies could not be saved to IndexedDB; keep your manual JSON backup.'))
     return next
   }
 
   async function importLinkedInJobs(incoming){
+    if(livePoolReadyRef.current)await livePoolReadyRef.current
     const before=new Set(livePoolRef.current.filter(row=>row.item?.job?.importSource==='linkedin-json').map(row=>String(row.item.job.sourceJobId)))
     const imported=importedJobsToLiveItems(incoming,profile,freshnessDays)
     const next=publishLiveMatches(imported)
@@ -413,6 +444,7 @@ export default function Home(){
   }
 
   async function search(){
+  if(livePoolReadyRef.current)await livePoolReadyRef.current
   if(!resumeLoaded){
     setState({loading:false,error:'Please Upload Your CV',coverage:null,stats:null,fetchedAt:null,audit:[]})
     return
