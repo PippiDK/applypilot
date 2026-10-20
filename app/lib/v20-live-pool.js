@@ -1,10 +1,14 @@
-// Apply Pilot v20: independent 10-day Live Matches retention. No discovery or Night Pilot logic.
+// Apply Pilot v20: independent 10-day Live Matches retention from publication date. No discovery or Night Pilot logic.
 export const V20_LIVE_POOL_KEY='auvraen-v20-live-pool-v1'
 export const V20_LIVE_POOL_DAYS=10
 const TTL=V20_LIVE_POOL_DAYS*24*60*60*1000
 
 const asTime=value=>{const n=Date.parse(String(value||''));return Number.isFinite(n)?n:null}
 const text=value=>String(value??'').trim()
+function withinPublicationWindow(item,nowMs){
+  const published=asTime(item?.job?.publishedAt)
+  return published!==null&&published<=nowMs&&nowMs-published<TTL
+}
 function identity(item){
   const job=item?.job
   if(!job||!text(job.title)||!text(job.company))return ''
@@ -34,13 +38,12 @@ export function mergeLivePool(existing=[],incoming=[],now=new Date().toISOString
   const map=new Map()
   for(const row of Array.isArray(existing)?existing:[]){
     const key=identity(row?.item)
-    const first=asTime(row?.firstSeenAt)
-    if(!key||first===null||first>nowMs||nowMs-first>=TTL)continue
+    if(!key||!withinPublicationWindow(row?.item,nowMs))continue
     if(!map.has(key))map.set(key,{item:row.item,firstSeenAt:row.firstSeenAt})
   }
   for(const item of Array.isArray(incoming)?incoming:[]){
     const key=identity(item)
-    if(!key)continue
+    if(!key||!withinPublicationWindow(item,nowMs))continue
     const fresh={item,firstSeenAt:now}
     map.set(key,map.has(key)?prefer(map.get(key),fresh):fresh)
   }
