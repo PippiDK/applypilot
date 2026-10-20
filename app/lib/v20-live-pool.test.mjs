@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {mergeLivePool,readLivePool,writeLivePool,livePoolItems,V20_LIVE_POOL_KEY} from './v20-live-pool.js'
 
 const date='2026-10-14T13:00:00.000Z'
-const job=(id,source='linkedin',jd='complete')=>({job:{source,sourceJobId:id,title:'Title '+id,company:'Company',location:'Copenhagen',fullJd:jd,needsJdReview:jd==='short'},evaluation:{score:null,action:'Review'}})
+const job=(id,source='linkedin',jd='complete')=>({job:{source,sourceJobId:id,title:'Title '+id,company:'Company',location:'Copenhagen',fullJd:jd,needsJdReview:jd==='short',publishedAt:'2026-10-13T13:00:00.000Z'},evaluation:{score:null,action:'Review'}})
 const rated=(id,source='linkedin')=>({...job(id,source),evaluation:{score:8.2,verdict:'High'}})
 const store=()=>{const data=new Map();return {getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v)}}
 
@@ -24,10 +24,10 @@ test('keeps distinct provider ids even with equal titles and ids',()=>{
   const pool=mergeLivePool([], [job('101','linkedin'),job('101','jobnet')],date)
   assert.equal(pool.length,2)
 })
-test('drops expired records at 10 days, not at 9 days',()=>{
+test('drops expired records at 10 days, from publication date',()=>{
   const existing=mergeLivePool([], [job('101')],date)
-  assert.equal(mergeLivePool(existing,[],'2026-10-23T13:00:00.000Z').length,1)
-  assert.equal(mergeLivePool(existing,[],'2026-10-24T13:00:00.000Z').length,0)
+  assert.equal(mergeLivePool(existing,[],'2026-10-22T13:00:00.000Z').length,1)
+  assert.equal(mergeLivePool(existing,[],'2026-10-23T13:00:00.000Z').length,0)
 })
 test('roundtrip local storage restores intact job description',()=>{
   const storage=store()
@@ -49,4 +49,14 @@ test('does not resurrect expired record on empty new search',()=>{
   const old=mergeLivePool([],[job('101')],date)
   const now='2026-10-25T13:00:00.000Z'
   assert.equal(mergeLivePool(old,[],now).length,0)
+})
+
+test('missing publication date cannot be retained as a ten-day Live Match',()=>{
+ const undated=job('undated')
+ delete undated.job.publishedAt
+ assert.equal(mergeLivePool([],[undated],date).length,0)
+})
+test('newly discovered old vacancy is not refreshed by firstSeenAt',()=>{
+ const outdated=job('outdated');outdated.job.publishedAt='2026-10-03T13:00:00.000Z'
+ assert.equal(mergeLivePool([],[outdated],date).length,0)
 })
