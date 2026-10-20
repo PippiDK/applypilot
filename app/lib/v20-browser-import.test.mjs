@@ -40,3 +40,8 @@ test('normalized v20 job is accepted again by validation for AI matching',()=>{
   assert.equal(normalized.sourceJobId,'4475956665')
   assert.equal(normalized.jdStatus,'complete')
 })
+
+test('preserves verified ISO publication date and rejects unverified text',()=>{
+ assert.equal(normalizeBrowserRecord(record('4479056497',{publishedAt:'2026-10-19T10:00:00.000Z'})).publishedAt,'2026-10-19T10:00:00.000Z')
+ assert.equal(normalizeBrowserRecord(record('4479056498',{publishedAt:'3 days ago'})).publishedAt,null)
+})
