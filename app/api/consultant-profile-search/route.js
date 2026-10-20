@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireUser } from '../../lib/auth/require-user.js'
 import { searchConsultantHtmlPortals } from '../../lib/consultant-html-source.js'
+import { searchEtteplanJobs } from '../../lib/etteplan-jobylon-source.js'
 import { evaluateProfileJob } from '../../lib/job-profile-evaluator.js'
 import { filterItemsByFreshnessSelection } from '../../lib/freshness-selection.js'
 
@@ -19,7 +20,21 @@ export async function POST(request){
     const foundBy=Array.isArray(body?.unionSearchPlan?.directions)?body.unionSearchPlan.directions:[]
     if(!portalIds.length)return NextResponse.json({jobs:[],audit:[],stats:{discovered:0,fullJdVerified:0,evaluated:0,returned:0},coverage:{source:'Consultant portals',freshnessDays,status:'NO RELEVANT RESULTS'},fetchedAt:new Date().toISOString()})
 
-    const source=await searchConsultantHtmlPortals({portalIds,freshnessDays,fetcher:globalThis.fetch})
+    const sources=await Promise.all([
+      ...(portalIds.some(id=>id!=='etteplan')?[searchConsultantHtmlPortals({portalIds:portalIds.filter(id=>id!=='etteplan'),freshnessDays,fetcher:globalThis.fetch})]:[]),
+      ...(portalIds.includes('etteplan')?[searchEtteplanJobs({freshnessDays,fetcher:globalThis.fetch})]:[]),
+    ])
+    const source={
+      jobs:sources.flatMap(entry=>entry.jobs||[]),
+      stats:{
+        rawDiscovered:sources.reduce((sum,entry)=>sum+Number(entry.stats?.rawDiscovered||0),0),
+        discovered:sources.reduce((sum,entry)=>sum+Number(entry.stats?.discovered||0),0),
+        fullJdVerified:sources.reduce((sum,entry)=>sum+Number(entry.stats?.fullJdVerified||0),0),
+        detailRequests:sources.reduce((sum,entry)=>sum+Number(entry.stats?.detailRequests||0),0),
+      },
+      status:sources.some(entry=>entry.status==='partial')?'partial':'success',
+      error:sources.map(entry=>entry.error).filter(Boolean).join(' · '),
+    }
     const jobs=[];const audit=[];let evaluated=0
     for(const job of Array.isArray(source.jobs)?source.jobs:[]){
       evaluated++
