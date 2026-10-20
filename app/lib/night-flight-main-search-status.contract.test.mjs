@@ -19,5 +19,7 @@ test('Main Search renders derived NIGHT FLIGHT only when no manual status overri
 
 test('Night Flight index failure is isolated from normal Main Search rendering',()=>{
   assert.match(page,/catch\{\}/)
-  assert.match(page,/MainSearchBase\(\)/)
+  assert.match(page,/MainSearchBase\(\{isNightFlightJob\}\)/)
+  assert.match(page,/createNightFlightProcessedMatcher\(nightFlightIndex\)/)
+  assert.match(page,/useState\(\{jobs:\{\}\}\)/)
 })

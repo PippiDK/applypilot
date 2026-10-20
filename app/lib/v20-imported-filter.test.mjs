@@ -15,8 +15,8 @@ test('both special filters enabled by default and shown below STATUS',()=>{
 test('switching off one category hides that category independently without excluding normal Search',()=>{
  const visible=main.match(/const visibleJobs=useMemo\(\(\)=>[^\n]+/)
  assert.ok(visible)
- assert.match(visible[0],/v20VisibleByWindow\(jobs,freshnessDays\)\.filter/)
- assert.match(visible[0],/showImported\|\|job\.importSource!=='linkedin-json'/)
- assert.match(visible[0],/showNightPilot\|\|job\.nightFlight\?\.processed!==true/)
+ assert.match(visible[0],/filterByVisibleProvenance\(v20VisibleByWindow\(jobs,freshnessDays\)/)
+ assert.match(visible[0],/showImported,showNightPilot,isNightFlightJob/)
+ assert.match(main,/jobs\.filter\(item=>isNightFlightJob\(item\?\.job\)\)\.length/)
  assert.match(visible[0],/v20SortedByScore/)
 })
