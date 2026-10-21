@@ -5,6 +5,7 @@ export const CONSULTANT_PORTALS=[
   {id:'7n',name:'7N',status:'connected',connector:'html',baseUrl:'https://jobs.7n.com',listingPath:'/job-offers',detailPattern:'/job-offers/'},
   {id:'epico',name:'EPICO',status:'connected',connector:'html',baseUrl:'https://www.epicogroup.com',listingPath:'/available-positions',detailPattern:'/available-positions/'},
   {id:'right-people-group',name:'Right People Group',status:'connected',connector:'html',baseUrl:'https://rightpeoplegroup.com',listingPath:'/open-assignments',detailPattern:'/open-assignments/'},
+  {id:'etteplan',name:'Etteplan',status:'connected',connector:'jobylon',baseUrl:'https://www.etteplan.com',listingPath:'/careers/open-positions/apply-now/',detailPattern:'https://emp.jobylon.com/jobs/'},
   {id:'twins-consulting',name:'Twins Consulting',status:'connected',connector:'html',baseUrl:'https://www.twins.dk',listingPath:'/freelance-it-konsulent/',detailPattern:'/opgaver/'},
 ]
 
