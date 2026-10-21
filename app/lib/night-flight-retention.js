@@ -44,3 +44,14 @@ export async function cleanupNightFlightRuns({supabase,now=new Date()}={}){
     deletedRunIds:rows.map(row=>String(row?.id??'').trim()).filter(Boolean),
   }
 }
+
+/** Dispose completed discovery page/JD snapshots with the same 15-day horizon.
+ * Cascade removes units. Incomplete discoveries are retained for recovery. */
+export async function cleanupNightFlightDiscoveryCheckpoints({supabase,now=new Date()}={}){
+ requireSupabase(supabase)
+ const cutoffDate=nightFlightRetentionCutoffDate(now)
+ const {data,error}=await supabase.from('night_flight_discovery_runs')
+  .delete().lt('target_date',cutoffDate).eq('state','FROZEN').select('id')
+ if(error) throw new Error('Night Flight discovery retention failed: '+error.message)
+ return {deletedDiscoveryRuns:(data||[]).length,cutoffDate}
+}

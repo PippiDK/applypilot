@@ -23,5 +23,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Full regression
         run: npm test
+      - name: Real Night Pilot source transport smoke (this PR only)
+        if: contains(github.head_ref, 'night-pilot-durable-incremental-discovery')
+        run: node scripts/night-flight-live-source-smoke.mjs
       - name: Production build
         run: npm run build
