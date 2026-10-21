@@ -65,7 +65,7 @@ function groupDirections(directions){
   return [...byQuery.values()]
 }
 
-export async function searchLinkedInShadow({freshnessDays=7,unionSearchPlan={},fetcher}={}){
+export async function searchLinkedInShadow({freshnessDays=7,unionSearchPlan={},fetcher,maxSearchPages=MAX_SEARCH_PAGES,maxSearchRequests=MAX_SEARCH_REQUESTS}={}){
   const days=WINDOWS.has(Number(freshnessDays))?Number(freshnessDays):7
   const directions=(Array.isArray(unionSearchPlan?.directions)?unionSearchPlan.directions:[])
     .map(normalizeDirection)
@@ -88,8 +88,8 @@ export async function searchLinkedInShadow({freshnessDays=7,unionSearchPlan={},f
   const windows=days===1?[1]:[1,days]
   for(const windowDays of windows){
     let eligible=[...searchGroups]
-    for(let page=0;page<MAX_SEARCH_PAGES&&eligible.length;page++){
-      const remaining=MAX_SEARCH_REQUESTS-searchRequests
+    for(let page=0;page<maxSearchPages&&eligible.length;page++){
+      const remaining=maxSearchRequests-searchRequests
       if(remaining<=0){requestBudgetReached=true;break}
       const scheduled=eligible.slice(0,remaining)
       if(scheduled.length<eligible.length)requestBudgetReached=true
@@ -125,7 +125,7 @@ export async function searchLinkedInShadow({freshnessDays=7,unionSearchPlan={},f
         }
         if(rows.length>=SEARCH_PAGE_SIZE)next.push(group)
       }
-      if(page===MAX_SEARCH_PAGES-1&&next.length)pageLimitReached=true
+      if(page===maxSearchPages-1&&next.length)pageLimitReached=true
       eligible=next
       if(requestBudgetReached)break
     }
