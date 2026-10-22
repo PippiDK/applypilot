@@ -1,3 +1,4 @@
+import {NIGHT_PILOT_ENABLED} from '../../lib/night-pilot-feature.js'
 import { NextResponse } from 'next/server'
 import { resolveNightFlightRequestContext } from '../../lib/night-flight-preview-context.js'
 import { loadNightFlightMorningReview } from '../../lib/night-flight-review.js'
@@ -7,6 +8,7 @@ export const dynamic='force-dynamic'
 const clean=value=>String(value??'').trim()
 
 export async function GET(){
+  if(!NIGHT_PILOT_ENABLED) return NextResponse.json({error:'Night Pilot is disabled'},{status:410})
   const {auth,supabase}=await resolveNightFlightRequestContext()
   if(!auth.user) return auth.response
 
@@ -20,6 +22,7 @@ export async function GET(){
 }
 
 export async function POST(request){
+  if(!NIGHT_PILOT_ENABLED) return NextResponse.json({error:'Night Pilot is disabled'},{status:410})
   const {auth,supabase}=await resolveNightFlightRequestContext()
   if(!auth.user) return auth.response
 

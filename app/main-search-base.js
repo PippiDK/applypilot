@@ -1,3 +1,4 @@
+import {NIGHT_PILOT_ENABLED} from './lib/night-pilot-feature.js'
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,applicationPackState} from './lib/profile-review.js'
@@ -818,8 +819,10 @@ export default function Home({isNightFlightJob=()=>false}={}){
       const compiledExclusions=await resolveSearchProfileExclusions({storage:localStorage,exclusionsText:draft.exclusions,savedProfile:profile,parse:requestSearchProfileExclusions})
       const exclusions=String(draft.exclusions??'').replace(/\s+/g,' ').trim()
       const saved={...resumeToProfile(draft,cvData),primaryRoles,adjacentRoles,roles:combinedRoles(primaryRoles,adjacentRoles),rolesSourceVersion:cvData?.sourceVersion||draft.rolesSourceVersion||'',cvRoleProfiles:Array.isArray(draft.cvRoleProfiles)?draft.cvRoleProfiles:[],roleSources:Array.isArray(draft.roleSources)?draft.roleSources:[],rolesLibraryFingerprint:draft.rolesLibraryFingerprint||rolesLibraryFingerprint,rolesBuilderVersion:SEARCH_PROFILE_BUILDER_VERSION,unionSearchPlan:draftUnionSearchPlan,unionSearchPlanVersion:UNION_SEARCH_PLAN_VERSION,unionSearchPlanFingerprint:draftUnionSearchPlan.fingerprint,locations,workModels,geography,exclusions,exclusionRules:compiledExclusions.rules,exclusionsFingerprint:compiledExclusions.fingerprint,exclusionsParserVersion:compiledExclusions.parserVersion,exclusionsParsedAt:exclusions?new Date().toISOString():'',savedAt:new Date().toISOString()}
-      const syncResult=await attemptNightFlightProfileSync({sync:requestNightFlightProfileSync,searchProfile:saved,cv:cvData?{text:cvData.cvText,sourceVersion:cvData.sourceVersion}:null})
-      setNightFlightSyncWarning(syncResult.stale?syncResult.error:'')
+      if(NIGHT_PILOT_ENABLED){
+        const syncResult=await attemptNightFlightProfileSync({sync:requestNightFlightProfileSync,searchProfile:saved,cv:cvData?{text:cvData.cvText,sourceVersion:cvData.sourceVersion}:null})
+        setNightFlightSyncWarning(syncResult.stale?syncResult.error:'')
+      }
       writeSearchProfileStorage({storage:localStorage,profile:saved,keepMasterPoolFingerprint:saved.unionSearchPlanFingerprint||saved.unionSearchPlan?.fingerprint||''})
       setProfile(saved)
       setDraft(saved)
@@ -974,7 +977,7 @@ export default function Home({isNightFlightJob=()=>false}={}){
 
     <div className="profileStrip"><span className="profileSearchSummary">{profileSearchPlanSummary}</span><button className="profileEditButton" onClick={startProfile}>{profileReady?'Edit profile':'Search profile'}</button><button className="cvButton" onClick={startProfile}>{cvReadyCount?`✓ CVs ${cvReadyCount}/${MAX_CVS}`:'Upload CVs'}</button></div>
 
-    {nightFlightSyncWarning&&<div className="warningBox"><b>Night Flight backend is not synced</b><span>{nightFlightSyncWarning}</span></div>}
+    {NIGHT_PILOT_ENABLED&&nightFlightSyncWarning&&<div className="warningBox"><b>Night Flight backend is not synced</b><span>{nightFlightSyncWarning}</span></div>}
 
     <section className="controls">
       <div><small>POSTED WITHIN</small><div className="choices">{WINDOWS.map(({days,label})=><button key={days} className={freshnessDays===days?'choice selected':'choice'} onClick={()=>setFreshnessDays(days)}>{label}</button>)}</div></div>
@@ -1020,7 +1023,7 @@ export default function Home({isNightFlightJob=()=>false}={}){
             <div className={filterStyles.group}><small className={filterStyles.groupTitle}>WORK MODEL</small>{WORK_MODELS.map(model=><label className={filterStyles.option} key={model.id}><input type="checkbox" checked={selectedWorkModels.includes(model.id)} onChange={()=>toggleJobFilter(setSelectedWorkModels,model.id)}/><span>{model.label}</span><b>{workModelCounts[model.id]||0}</b></label>)}</div>
             <div className={filterStyles.group}><small className={filterStyles.groupTitle}>STATUS</small>{JOB_STATUS_FILTERS.map(status=><label className={filterStyles.option} key={status.id}><input type="checkbox" checked={selectedStatuses.includes(status.id)} onChange={()=>toggleJobFilter(setSelectedStatuses,status.id)}/><span>{status.label}</span><b>{statusCounts[status.id]||0}</b></label>)}</div>
             <div style={{borderTop:'1px solid rgba(175,132,242,.38)',marginTop:10,paddingTop:10}}>
-              <label className={filterStyles.option} style={{color:'#c49af7'}}><input type="checkbox" checked={showNightPilot} onChange={event=>setShowNightPilot(event.target.checked)}/><span style={{color:'#c49af7',fontWeight:700}}>Night Pilot</span><b>{jobs.filter(item=>isNightFlightJob(item?.job)).length}</b></label>
+              {NIGHT_PILOT_ENABLED&&<label className={filterStyles.option} style={{color:'#c49af7'}}><input type="checkbox" checked={showNightPilot} onChange={event=>setShowNightPilot(event.target.checked)}/><span style={{color:'#c49af7',fontWeight:700}}>Night Pilot</span><b>{jobs.filter(item=>isNightFlightJob(item?.job)).length}</b></label>}
               <label className={filterStyles.option} style={{color:'#c49af7'}}><input type="checkbox" checked={showImported} onChange={event=>setShowImported(event.target.checked)}/><span style={{color:'#c49af7',fontWeight:700}}>Imported</span><b>{jobs.filter(item=>item?.job?.importSource==='linkedin-json').length}</b></label>
             </div>
           </div>

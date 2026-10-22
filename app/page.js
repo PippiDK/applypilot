@@ -1,3 +1,4 @@
+import {NIGHT_PILOT_ENABLED} from './lib/night-pilot-feature.js'
 'use client'
 import React,{useEffect,useMemo,useState} from 'react'
 import MainSearchBase from './main-search-base.js'
@@ -135,7 +136,7 @@ function transformMainSearchTree(node,index,cachedNightFlightAnalysis){
   return React.cloneElement(node,undefined,children)
 }
 
-export default function Home(){
+function NightFlightIntegratedHome(){
   const [nightFlightIndex,setNightFlightIndex]=useState({jobs:{}})
   useEffect(()=>{
     let active=true
@@ -155,4 +156,9 @@ export default function Home(){
   const currentCvSourceVersion=findCurrentCvSourceVersion(tree)
   const cachedNightFlightAnalysis=resolveNightFlightExpertise({job:activeNightFlightJob,index:nightFlightIndex,sourceVersion:currentCvSourceVersion})
   return transformMainSearchTree(tree,nightFlightIndex,cachedNightFlightAnalysis)
+}
+
+// Night Pilot is not mounted or queried while disabled.
+export default function Home(){
+  return NIGHT_PILOT_ENABLED?React.createElement(NightFlightIntegratedHome):React.createElement(MainSearchBase)
 }
