@@ -36,7 +36,7 @@ import {CONSULTANT_PORTALS,connectedConsultantPortalIds,defaultConsultantPortals
 import LinkedInJsonImport from './components/linkedin-json-import.js'
 import {V20_LIVE_IMPORT_KEY,importedJobsToLiveItems} from './lib/v20-live-matches.js'
 import {V20_LIVE_POOL_KEY,mergeLivePool,readLivePool,livePoolItems} from './lib/v20-live-pool.js'
-import {readV20PoolDb,writeV20PoolDb,readLegacyV19Matches} from './lib/v20-live-pool-indexeddb.js'
+import {readV20PoolDb,writeV20PoolDb} from './lib/v20-live-pool-indexeddb.js'
 import {v20VisibleByWindow,v20SortedByScore,v20ScoreLabel} from './lib/v20-match-view.js'
 import {filterByVisibleProvenance} from './lib/v20-provenance-visibility.js'
 import SearchAudit from './components/search-audit.js'
@@ -154,11 +154,9 @@ export default function Home({isNightFlightJob=()=>false}={}){
   useEffect(()=>{
     let active=true
     const ready=(async()=>{
-      // Recover v20-only browser data before touching the legacy backup.
+      // Restore only v20-owned data. Never re-import the separate v19 archive.
       const oldPool=readLivePool(localStorage)
       const saved=await readV20PoolDb()
-      // Preserve qualified LIVE v19 vacancies on the same production origin, read-only.
-      const legacyV19=await readLegacyV19Matches()
       const imported=[]
       if(localStorage.getItem(V20_LIVE_POOL_KEY)===null){
         try{
@@ -171,7 +169,7 @@ export default function Home({isNightFlightJob=()=>false}={}){
         }catch{}
       }
       // Merge by v20 pool semantics: keep manual unscored jobs and first-seen TTL.
-      const merged=mergeLivePool(saved,[...legacyV19,...oldPool.map(row=>row.item),...imported])
+      const merged=mergeLivePool(saved,[...oldPool.map(row=>row.item),...imported])
       // Preserve exact firstSeenAt for old localStorage rows.
       const byKey=new Map(merged.map(row=>[String(row.item?.job?.sourceJobId),row]))
       for(const row of oldPool){
