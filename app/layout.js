@@ -1,3 +1,4 @@
+import {NIGHT_PILOT_ENABLED} from './lib/night-pilot-feature.js'
 import './globals.css'
 import './expertise-loader.css'
 import './loader.css'
@@ -47,5 +48,5 @@ export default async function RootLayout({children}){
     : `V20 · PREVIEW${shortSha?` · ${shortSha}`:''}`
   const remoteAppliedJobs=await appliedJobsForHydration()
 
-  return <html lang="en"><body><Script id="applied-jobs-storage-hydration" strategy="beforeInteractive" dangerouslySetInnerHTML={{__html:appliedJobsBootstrapScript(remoteAppliedJobs)}}/><SplashGate>{children}<NightFlightDrawer><NightFlightMorningReview/><NightFlightSettings/></NightFlightDrawer><NeutralizeLegacyTestLabels/><div className="versionBadge">{versionLabel}</div><SignOutButton/></SplashGate></body></html>
+  return <html lang="en"><body><Script id="applied-jobs-storage-hydration" strategy="beforeInteractive" dangerouslySetInnerHTML={{__html:appliedJobsBootstrapScript(remoteAppliedJobs)}}/><SplashGate>{children}{NIGHT_PILOT_ENABLED&&<NightFlightDrawer><NightFlightMorningReview/><NightFlightSettings/></NightFlightDrawer>}<NeutralizeLegacyTestLabels/><div className="versionBadge">{versionLabel}</div><SignOutButton/></SplashGate></body></html>
 }
