@@ -1,5 +1,5 @@
-import {NIGHT_PILOT_ENABLED} from './lib/night-pilot-feature.js'
 'use client'
+import {NIGHT_PILOT_ENABLED} from './lib/night-pilot-feature.js'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {DEFAULT_PROFILE,mergeProfile,resumeToProfile,applicationPackState} from './lib/profile-review.js'
 import {SOURCE_CV_STORAGE_KEY,LEGACY_CV_STORAGE_KEY,buildSourceCvRecord,normalizeStoredSourceCv,isSourceCvReady} from './lib/source-cv.js'

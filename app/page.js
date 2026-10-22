@@ -1,5 +1,5 @@
-import {NIGHT_PILOT_ENABLED} from './lib/night-pilot-feature.js'
 'use client'
+import {NIGHT_PILOT_ENABLED} from './lib/night-pilot-feature.js'
 import React,{useEffect,useMemo,useState} from 'react'
 import MainSearchBase from './main-search-base.js'
 import {NIGHT_FLIGHT_STATUS,resolveJobStatus} from './lib/job-statuses.js'
