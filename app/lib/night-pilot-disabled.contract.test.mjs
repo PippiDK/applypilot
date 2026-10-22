@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import {NIGHT_PILOT_ENABLED} from './night-pilot-feature.js'
 const root=new URL('../',import.meta.url)
-const read=path=>fs.readFileSync(new URL(path,root),'utf8')
+const read=path=>fs.readFileSync(new URL(path.startsWith('app/')?path.slice(4):path,root),'utf8')
 test('Night Pilot is disabled centrally',()=>assert.equal(NIGHT_PILOT_ENABLED,false))
 test('No Vercel cron entries exist',()=>assert.equal(JSON.parse(fs.readFileSync(new URL('../../vercel.json',import.meta.url),'utf8')).crons,undefined))
 test('Layout never mounts Night Pilot drawer while disabled',()=>assert.match(read('layout.js'),/NIGHT_PILOT_ENABLED&&<NightFlightDrawer>/))
