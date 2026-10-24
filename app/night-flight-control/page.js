@@ -1,6 +1,7 @@
 'use client'
 import {useCallback,useEffect,useState} from 'react'
 import Link from 'next/link'
+import {NIGHT_FLIGHT_EXECUTION_ENABLED} from '../lib/night-flight-execution.js'
 import styles from './manual-progress.module.css'
 
 const frame={maxWidth:960,margin:'32px auto',padding:'0 18px',fontFamily:'system-ui,sans-serif',color:'#e5e7eb'}
@@ -58,7 +59,7 @@ export default function NightFlightControl(){
   },[activeRequest])
 
   async function execute(mode,runId,jobKey){
-    if(busy) return
+    if(busy||!NIGHT_FLIGHT_EXECUTION_ENABLED) return
     if(mode==='retry'&&!window.confirm('Retry this FAILED job using the original frozen CV and JD?')) return
     setActiveRequest({mode,runId:runId||null,jobKey:jobKey||null,startedAt:Date.now()})
     setElapsed(0)
@@ -79,9 +80,9 @@ export default function NightFlightControl(){
   return <main style={frame}>
     <p><Link href="/" style={{color:'#f9a8d4'}}>← ApplyPilot</Link></p>
     <h1>Night Flight · Manual Control</h1>
-    <p style={muted}>Run at any time. Start uses the previous Copenhagen calendar day; Resume and Retry use an existing frozen run. Each invocation processes as many queued jobs as fit safely within its time budget. READY results are preserved.</p>
+    <p style={muted}>{NIGHT_FLIGHT_EXECUTION_ENABLED?'Start uses the previous Copenhagen calendar day; Resume and Retry use an existing frozen run.':'Night Flight is paused. Start, Resume and Retry are disabled. Saved runs and READY results remain available below.'}</p>
     <div style={panel}>
-      <button style={button} disabled={busy} onClick={()=>execute('start')}>Start / resume yesterday</button>
+      <button style={button} disabled={busy||!NIGHT_FLIGHT_EXECUTION_ENABLED} onClick={()=>execute('start')}>Start / resume yesterday</button>
       <button style={button} disabled={busy} onClick={refresh}>Refresh status</button>
       {activeRequest?.mode==='start'&&<Progress label="Starting Night Flight" elapsed={elapsed}/>}
       {message&&<p role="status" style={{color:'#86efac'}}>{message}</p>}
@@ -90,12 +91,12 @@ export default function NightFlightControl(){
     {loading?<p>Loading runs…</p>:runs.map(run=><section key={run.id} style={panel}>
       <h2>{run.targetDate} · {run.status}</h2>
       <p style={muted}>READY {run.jobsReady??0} · FAILED {run.jobsFailed??0} · discovered {run.jobsDiscovered??0}</p>
-      <button style={button} disabled={busy} onClick={()=>execute('resume',run.id)}>Resume existing run</button>
+      <button style={button} disabled={busy||!NIGHT_FLIGHT_EXECUTION_ENABLED} onClick={()=>execute('resume',run.id)}>Resume existing run</button>
       {activeRequest?.mode==='resume'&&activeRequest.runId===run.id&&<Progress label="Resuming this run" elapsed={elapsed}/>} 
       {run.jobs.map(job=><div key={job.jobKey} style={rowStyle}>
         <strong>{job.title||job.jobKey}</strong> · {job.company||'Unknown company'}
         <p style={muted}>{job.status} · attempts {job.attempts}{job.lastError?` · ${job.lastError}`:''}</p>
-        {job.status==='FAILED'&&<button style={button} disabled={busy} onClick={()=>execute('retry',run.id,job.jobKey)}>Retry only this FAILED job</button>}
+        {job.status==='FAILED'&&<button style={button} disabled={busy||!NIGHT_FLIGHT_EXECUTION_ENABLED} onClick={()=>execute('retry',run.id,job.jobKey)}>Retry only this FAILED job</button>}
         {activeRequest?.mode==='retry'&&activeRequest.runId===run.id&&activeRequest.jobKey===job.jobKey&&<Progress label="Retrying this job" elapsed={elapsed}/>}
       </div>)}
     </section>)}

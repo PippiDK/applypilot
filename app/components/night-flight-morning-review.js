@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {distinctRecoveryError} from '../lib/night-flight-review-errors.js'
+import {NIGHT_FLIGHT_EXECUTION_ENABLED} from '../lib/night-flight-execution.js'
 import styles from './night-flight-morning-review.module.css'
 
 const POLL_INTERVAL_MS=45000
@@ -147,7 +148,7 @@ export default function NightFlightMorningReview(){
   const visibleRecoveryError=distinctRecoveryError(selected?.lastError,recoveryError)
 
   async function recoverNightFlightMatch(){
-    if(!review?.run?.id||selected?.status!=='FAILED'||!selected?.key||recoveringKey) return
+    if(!NIGHT_FLIGHT_EXECUTION_ENABLED||!review?.run?.id||selected?.status!=='FAILED'||!selected?.key||recoveringKey) return
     const selectedJobKey=selected.key
     setRecoveringKey(selectedJobKey)
     setRecoveryError('')
@@ -174,7 +175,7 @@ export default function NightFlightMorningReview(){
   const card=createPortal(
     <div className={styles.card} aria-label="Night Flight Morning Review">
       <div>
-        <div className={styles.eyebrow}>NIGHT FLIGHT</div>
+        <div className={styles.eyebrow}>NIGHT FLIGHT {NIGHT_FLIGHT_EXECUTION_ENABLED?'':'· PAUSED'}</div>
         <div className={styles.meta}>
           <span>Last completed day · {formatDay(review?.run?.targetDate)}</span>
           <span className={styles.counts}>{activeRun?`${visibleProgress.ready} / ${visibleProgress.total} ready`:`${counts.ready} READY · ${counts.failed} FAILED`}</span>
@@ -190,7 +191,7 @@ export default function NightFlightMorningReview(){
     <div className={styles.backdrop} onMouseDown={event=>{if(event.target===event.currentTarget)setOpen(false)}}>
       <section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="night-flight-review-title">
         <div className={styles.heading}>
-          <div><div className={styles.eyebrow}>NIGHT FLIGHT</div><h2 id="night-flight-review-title">Last completed day · {formatDay(review.run?.targetDate)}</h2></div>
+          <div><div className={styles.eyebrow}>NIGHT FLIGHT {NIGHT_FLIGHT_EXECUTION_ENABLED?'':'· PAUSED'}</div><h2 id="night-flight-review-title">Last completed day · {formatDay(review.run?.targetDate)}</h2></div>
           <button type="button" className={styles.close} aria-label="Close Night Flight review" onClick={()=>setOpen(false)}>×</button>
         </div>
         <div className={styles.body}>
@@ -218,7 +219,7 @@ export default function NightFlightMorningReview(){
             {selected?.status==='FAILED'&&<>
               <div className={styles.failure}>{selected.lastError||'Automatic Profile Match failed.'}</div>
               {visibleRecoveryError&&<div className={styles.failure}>{visibleRecoveryError}</div>}
-              <button type="button" className={styles.retry} onClick={recoverNightFlightMatch} disabled={recoveringKey===selected.key}>{recoveringKey===selected.key?'Running…':'Run Match'}</button>
+              <button type="button" className={styles.retry} onClick={recoverNightFlightMatch} disabled={!NIGHT_FLIGHT_EXECUTION_ENABLED||recoveringKey===selected.key}>{recoveringKey===selected.key?'Running…':'Run Match'}</button>
             </>}
             {selected?.status==='READY'&&analysis&&<>
               <div className={styles.score}><b>{Number.isFinite(Number(analysis.expertiseMatch))?Math.round(Number(analysis.expertiseMatch)):'—'}%</b><span>Expertise Match</span></div>

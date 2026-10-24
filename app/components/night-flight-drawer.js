@@ -1,6 +1,7 @@
 'use client'
 import {useEffect,useState} from 'react'
 import Link from 'next/link'
+import {NIGHT_FLIGHT_EXECUTION_ENABLED} from '../lib/night-flight-execution.js'
 import styles from './night-flight-drawer.module.css'
 
 export default function NightFlightDrawer({children}){
@@ -27,13 +28,13 @@ export default function NightFlightDrawer({children}){
         </div>
         <section className={styles.section}>
           <div className={styles.sectionHeading}>
-            <div><h3>Automation</h3><p>Run Night Flight automatically using your saved Search Profile.</p></div>
+            <div><h3>Automation</h3><p>{NIGHT_FLIGHT_EXECUTION_ENABLED?'Run Night Flight automatically using your saved Search Profile.':'Paused. Settings are read-only; saved Morning Review results remain available.'}</p></div>
             <div id="nightFlightSettingsHost" className={styles.settingsHost}/>
           </div>
         </section>
         <section className={styles.section}>
           <div className={styles.sectionHeading}>
-            <div><h3>Manual Control</h3><p>Start, resume or retry Night Flight whenever you need.</p></div>
+            <div><h3>Manual Control</h3><p>{NIGHT_FLIGHT_EXECUTION_ENABLED?'Start, resume or retry Night Flight whenever you need.':'Manual Start, Resume and Retry are disabled. Historical runs can still be viewed.'}</p></div>
             <Link href="/night-flight-control" className={styles.manualLink} onClick={()=>setOpen(false)}>Open →</Link>
           </div>
         </section>

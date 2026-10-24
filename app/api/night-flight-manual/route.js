@@ -1,4 +1,5 @@
 import {NextResponse} from 'next/server'
+import {NIGHT_FLIGHT_EXECUTION_ENABLED} from '../../lib/night-flight-execution.js'
 import {requireUser} from '../../lib/auth/require-user.js'
 import {createAdminSupabaseClient} from '../../lib/supabase/admin.js'
 import {executeManualNightFlight,listManualNightFlights,ManualNightFlightError} from '../../lib/night-flight-manual-control.js'
@@ -36,6 +37,7 @@ export async function POST(request){
   try{
     const ctx=await context()
     if(ctx.response) return ctx.response
+    if(!NIGHT_FLIGHT_EXECUTION_ENABLED) return NextResponse.json({error:'Night Flight is paused. Saved runs remain available.'},{status:409})
     const body=await request.json()
     if(!body||typeof body!=='object'||Array.isArray(body)){
       return NextResponse.json({error:'Invalid request body'},{status:400})

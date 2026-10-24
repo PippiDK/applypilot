@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import {NIGHT_FLIGHT_EXECUTION_ENABLED} from '../../lib/night-flight-execution.js'
 import { resolveNightFlightRequestContext } from '../../lib/night-flight-preview-context.js'
 import { NightFlightSettingsValidationError } from '../../lib/night-flight-settings.js'
 import { loadNightFlightSettings, saveNightFlightSettings } from '../../lib/night-flight-settings-store.js'
@@ -21,6 +22,7 @@ export async function GET(){
 export async function PUT(request){
   const {auth,supabase}=await resolveNightFlightRequestContext()
   if(!auth.user) return auth.response
+  if(!NIGHT_FLIGHT_EXECUTION_ENABLED) return NextResponse.json({error:'Night Flight is paused. Settings are read-only.'},{status:409})
 
   try{
     const body=await request.json()

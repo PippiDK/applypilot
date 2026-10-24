@@ -1,4 +1,5 @@
 import {NextResponse} from 'next/server'
+import {NIGHT_FLIGHT_EXECUTION_ENABLED} from '../../../lib/night-flight-execution.js'
 import {createAdminSupabaseClient} from '../../../lib/supabase/admin.js'
 import {runNightFlightWorker} from '../../../lib/night-flight-worker.js'
 
@@ -13,6 +14,8 @@ export async function GET(request){
   if(!secret||authorization!==`Bearer ${secret}`){
     return NextResponse.json({error:'Unauthorized'},{status:401})
   }
+
+  if(!NIGHT_FLIGHT_EXECUTION_ENABLED) return NextResponse.json({skipped:true,disabled:true,reason:'Night Flight is paused'})
 
   try{
     const supabase=createAdminSupabaseClient()

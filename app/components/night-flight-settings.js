@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { SEARCH_AREAS } from '../lib/job-list-filters.js'
+import {NIGHT_FLIGHT_EXECUTION_ENABLED} from '../lib/night-flight-execution.js'
 import { DEFAULT_NIGHT_FLIGHT_SETTINGS, NIGHT_FLIGHT_SOURCES, normalizeNightFlightSettings } from '../lib/night-flight-settings.js'
 import { requestNightFlightSettings, saveNightFlightSettings } from '../lib/night-flight-settings-client.js'
 import styles from './night-flight-settings.module.css'
@@ -126,18 +127,18 @@ export default function NightFlightSettings(){
           <div>
             <p className={styles.eyebrow}>NIGHT FLIGHT</p>
             <h2 id="night-flight-settings-title">Night Flight Settings</h2>
-            <p className={styles.description}>Prepares matches from the last completed day overnight.</p>
+            <p className={styles.description}>{NIGHT_FLIGHT_EXECUTION_ENABLED?'Prepares matches from the last completed day overnight.':'Night Flight is paused. Settings are visible but read-only.'}</p>
           </div>
           <button type="button" className={styles.close} aria-label="Close Night Flight Settings" onClick={closeWithoutSaving}>×</button>
         </div>
 
         {status.loading?<div className={styles.loading}>Loading settings…</div>:<>
           <label className={styles.masterToggle}>
-            <input type="checkbox" checked={draft.enabled} disabled={!status.loaded||status.saving} onChange={event=>setDraft(current=>({...current,enabled:event.target.checked}))}/>
+            <input type="checkbox" checked={NIGHT_FLIGHT_EXECUTION_ENABLED&&draft.enabled} disabled={!NIGHT_FLIGHT_EXECUTION_ENABLED||!status.loaded||status.saving} onChange={event=>setDraft(current=>({...current,enabled:event.target.checked}))}/>
             <span><b>Run Night Flight automatically</b><small>Uses the latest saved Search Profile for the last completed day.</small></span>
           </label>
 
-          <fieldset className={styles.group} disabled={!status.loaded||status.saving}>
+          <fieldset className={styles.group} disabled={!NIGHT_FLIGHT_EXECUTION_ENABLED||!status.loaded||status.saving}>
             <legend>Sources</legend>
             <div className={styles.checkGrid}>
               {NIGHT_FLIGHT_SOURCES.map(source=><label key={source.id} className={styles.option}>
@@ -148,7 +149,7 @@ export default function NightFlightSettings(){
             {sourceError&&<p className={styles.validation}>{sourceError}</p>}
           </fieldset>
 
-          <fieldset className={styles.group} disabled={!status.loaded||status.saving}>
+          <fieldset className={styles.group} disabled={!NIGHT_FLIGHT_EXECUTION_ENABLED||!status.loaded||status.saving}>
             <legend>Match areas</legend>
             <label className={`${styles.option} ${styles.allAreasOption}`}>
               <input type="checkbox" checked={allAreasSelected} onChange={toggleAllAreas}/>
@@ -169,7 +170,7 @@ export default function NightFlightSettings(){
 
         <div className={styles.actions}>
           <button type="button" className={styles.cancel} onClick={closeWithoutSaving}>Cancel</button>
-          <button type="button" className={styles.save} disabled={!status.loaded||status.saving||Boolean(sourceError)||Boolean(areaError)} onClick={persistDraft}>Save</button>
+          <button type="button" className={styles.save} disabled={!NIGHT_FLIGHT_EXECUTION_ENABLED||!status.loaded||status.saving||Boolean(sourceError)||Boolean(areaError)} onClick={persistDraft}>Save</button>
           {status.saving&&<span className={styles.saving} aria-live="polite">Saving…</span>}
         </div>
       </section>
