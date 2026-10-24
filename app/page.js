@@ -1,9 +1,8 @@
 'use client'
-import {NIGHT_PILOT_ENABLED} from './lib/night-pilot-feature.js'
-import React,{useEffect,useMemo,useState} from 'react'
+import React,{useEffect,useState} from 'react'
 import MainSearchBase from './main-search-base.js'
 import {NIGHT_FLIGHT_STATUS,resolveJobStatus} from './lib/job-statuses.js'
-import {enrichSearchJobsWithNightFlight,createNightFlightProcessedMatcher} from './lib/night-flight-main-search-bridge.js'
+import {enrichSearchJobsWithNightFlight} from './lib/night-flight-main-search-bridge.js'
 import {resolveNightFlightExpertise} from './lib/night-flight-expertise-reuse.js'
 import {visibleElementKey} from './lib/night-flight-react-key.js'
 
@@ -136,7 +135,7 @@ function transformMainSearchTree(node,index,cachedNightFlightAnalysis){
   return React.cloneElement(node,undefined,children)
 }
 
-function NightFlightIntegratedHome(){
+export default function Home(){
   const [nightFlightIndex,setNightFlightIndex]=useState({jobs:{}})
   useEffect(()=>{
     let active=true
@@ -150,15 +149,9 @@ function NightFlightIntegratedHome(){
     })()
     return()=>{active=false}
   },[])
-  const isNightFlightJob=useMemo(()=>createNightFlightProcessedMatcher(nightFlightIndex),[nightFlightIndex])
-  const tree=MainSearchBase({isNightFlightJob})
+  const tree=MainSearchBase()
   const activeNightFlightJob=findActiveJobIdentity(tree)
   const currentCvSourceVersion=findCurrentCvSourceVersion(tree)
   const cachedNightFlightAnalysis=resolveNightFlightExpertise({job:activeNightFlightJob,index:nightFlightIndex,sourceVersion:currentCvSourceVersion})
   return transformMainSearchTree(tree,nightFlightIndex,cachedNightFlightAnalysis)
-}
-
-// Night Pilot is not mounted or queried while disabled.
-export default function Home(){
-  return NIGHT_PILOT_ENABLED?React.createElement(NightFlightIntegratedHome):React.createElement(MainSearchBase)
 }

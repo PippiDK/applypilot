@@ -1,4 +1,3 @@
-import {NIGHT_PILOT_ENABLED} from '../../lib/night-pilot-feature.js'
 import {NextResponse} from 'next/server'
 import {requireUser} from '../../lib/auth/require-user.js'
 import {createAdminSupabaseClient} from '../../lib/supabase/admin.js'
@@ -22,7 +21,6 @@ function safeError(error){
 }
 
 export async function GET(){
-  if(!NIGHT_PILOT_ENABLED) return NextResponse.json({error:'Night Pilot is disabled'},{status:410})
   try{
     const ctx=await context()
     if(ctx.response) return ctx.response
@@ -31,7 +29,6 @@ export async function GET(){
 }
 
 export async function POST(request){
-  if(!NIGHT_PILOT_ENABLED) return NextResponse.json({error:'Night Pilot is disabled'},{status:410})
   const origin=request.headers.get('origin')
   if(!origin||origin!==new URL(request.url).origin){
     return NextResponse.json({error:'Invalid request origin'},{status:403})

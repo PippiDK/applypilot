@@ -10,15 +10,15 @@ test('Task 13 version badge remains visible without any visual-style change',()=
   assert.match(css,/\.versionBadge\s*\{/)
 })
 
-test('Task 13 preview badge identifies V20 PREVIEW and deployment commit SHA',()=>{
+test('Task 13 preview badge identifies V19 PREVIEW and deployment commit SHA',()=>{
   assert.match(layout,/VERCEL_ENV/)
   assert.match(layout,/VERCEL_GIT_COMMIT_SHA/)
-  assert.match(layout,/V20\s*·\s*PREVIEW/)
+  assert.match(layout,/V19\s*·\s*PREVIEW/)
   assert.match(layout,/slice\(0,\s*7\)/)
 })
 
-test('Task 13 production badge identifies LIVE 20 and deployment commit SHA',()=>{
-  assert.match(layout,/LIVE 20/)
+test('Task 13 production badge identifies LIVE 19 and deployment commit SHA',()=>{
+  assert.match(layout,/LIVE 19/)
   assert.match(layout,/VERCEL_GIT_COMMIT_SHA/)
 })
 

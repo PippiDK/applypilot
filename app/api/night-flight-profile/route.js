@@ -1,4 +1,3 @@
-import {NIGHT_PILOT_ENABLED} from '../../lib/night-pilot-feature.js'
 import { NextResponse } from 'next/server'
 import { requireUser } from '../../lib/auth/require-user.js'
 import { createServerSupabaseClient } from '../../lib/supabase/server.js'
@@ -7,7 +6,6 @@ import { syncNightFlightProfileSave } from '../../lib/night-flight-profile-sync.
 export const dynamic = 'force-dynamic'
 
 export async function POST(request) {
-  if(!NIGHT_PILOT_ENABLED) return NextResponse.json({error:'Night Pilot is disabled'},{status:410})
   const auth = await requireUser()
   if (!auth.user) return auth.response
 

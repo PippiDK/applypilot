@@ -107,13 +107,6 @@ function findEntry(job,lookup){
   return null
 }
 
-// The same indexed, exact-ID/URL Night Flight provenance used by the status bridge.
-// Returns a stable predicate for the Live Matches visibility controls.
-export function createNightFlightProcessedMatcher(index={}){
-  const lookup=buildLookup(index)
-  return job=>job?.nightFlight?.processed===true||Boolean(job&&findEntry(job,lookup))
-}
-
 export function enrichSearchJobsWithNightFlight(items,index={}){
   if(!Array.isArray(items)) return []
   const lookup=buildLookup(index)
