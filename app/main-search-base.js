@@ -70,6 +70,7 @@ export default function Home(){
   const allFiltersSelected=SEARCH_AREAS.every(({id})=>selectedAreas.includes(id))&&WORK_MODELS.every(({id})=>selectedWorkModels.includes(id))
   const someFiltersSelected=selectedAreas.length>0||selectedWorkModels.length>0
   const [selected,setSelected]=useState(null)
+  const [jobDetailsTab,setJobDetailsTab]=useState({jobId:'',tab:'overview'})
   const [jobStatuses,setJobStatuses]=useState({})
   const [appliedJobs,setAppliedJobs]=useState([])
   const [appliedSaveError,setAppliedSaveError]=useState('')
@@ -103,6 +104,7 @@ export default function Home(){
   const [exportState,setExportState]=useState({loading:false,error:'',baselineKey:''})
   const visibleJobs=useMemo(()=>filterJobItemsByStatus(filterJobItems(jobs,selectedAreas,selectedWorkModels),jobStatuses,selectedStatuses),[jobs,selectedAreas,selectedWorkModels,jobStatuses,selectedStatuses])
   const active=visibleJobs.find(({job})=>job.sourceJobId===selected?.job?.sourceJobId)||visibleJobs[0]||null
+  const currentJobDetailsTab=jobDetailsTab.jobId===active?.job?.sourceJobId?jobDetailsTab.tab:'overview'
 
   useEffect(()=>{
     try{
@@ -922,15 +924,23 @@ export default function Home(){
       </div>
 
       <div className="panel">
-        {active?(()=>{const {job}=active; const expertise=expertiseState.jobKey===jobKey?expertiseState.analysis:null; return <>
+        {active?(()=>{const {job}=active; const expertise=expertiseState.jobKey===jobKey?expertiseState.analysis:null; const descriptionText=String(job.fullJd||job.description||job.sourceRecords?.find(record=>record?.fullJd)?.fullJd||'').trim(); return <>
           <div className="panelTop expertiseHeader"><div><h2>{job.title}</h2><p>{job.company} · {job.location}</p><small className="sourceLine">Source: {jobSourceLabel(job)} · {dateText(job.publishedAt)}</small></div></div>
 
+          <div className="jobDetailsToolbar">
+            <div className="jobDetailsTabs" role="group" aria-label="Vacancy view">
+              <button type="button" className={'jobDetailsTab'+(currentJobDetailsTab==='overview'?' isActive':'')} aria-pressed={currentJobDetailsTab==='overview'} onClick={()=>setJobDetailsTab({jobId:job.sourceJobId,tab:'overview'})}>Overview</button>
+              <button type="button" className={'jobDetailsTab'+(currentJobDetailsTab==='description'?' isActive':'')} aria-pressed={currentJobDetailsTab==='description'} onClick={()=>setJobDetailsTab({jobId:job.sourceJobId,tab:'description'})}>Job Description</button>
+            </div>
+            <a className="secondary openLink jobDetailsExternal" href={job.originalUrl||job.detailUrl||job.applicationUrl} target="_blank" rel="noreferrer">Open vacancy <span aria-hidden="true">↗</span></a>
+          </div>
+
+          <div className="jobDetailsOverview" role="region" aria-label="Overview" style={currentJobDetailsTab==='overview'?undefined:{display:'none'}}>
           <div className="conditionGrid">
             <div className="conditionCard"><small>Area</small><b>{conditionScore(jobConditions?.area.score)}</b><span>{jobConditions?.area.value||'Not stated'}</span></div>
             <div className="conditionCard"><small>Salary</small><b>{conditionScore(jobConditions?.salary.score)}</b><span>{jobConditions?.salary.value||'Not stated'}</span></div>
             <div className="conditionCard"><small>Employment type</small><b>{conditionScore(jobConditions?.employmentType.score)}</b><span>{jobConditions?.employmentType.value||'Not stated'}</span></div>
             <div className="conditionCard"><small>Work model</small><b>{conditionScore(jobConditions?.workModel.score)}</b><span>{jobConditions?.workModel.value||'Not stated'}</span></div>
-            <a className="secondary openLink" style={{gridColumn:'1 / -1',justifySelf:'start'}} href={job.originalUrl||job.detailUrl||job.applicationUrl} target="_blank" rel="noreferrer">Open vacancy</a>
           </div>
 
           <BestCvPanel
@@ -966,6 +976,13 @@ export default function Home(){
 
 
           <div className="section"><h3>Application pack</h3><div className="docs"><div>{pack.cvReady?'✓':'○'} Tailored CV <span className={pack.cvReady?'ready':'pending'}>{pack.tailoredCvLabel}</span></div><div>○ Cover letter <span className="pending">{pack.coverLetterLabel}</span></div></div></div>
+          </div>
+          <section className="jobDetailsDescription" role="region" aria-label="Job Description" style={currentJobDetailsTab==='description'?undefined:{display:'none'}}>
+            <div className="jobDescriptionSheet">
+              <div className="jobDescriptionHeading"><h3>Job Description</h3>{job.needsJdReview&&<span className="jobDescriptionStatus">Incomplete JD</span>}</div>
+              {descriptionText?<div className="jobDescriptionText">{descriptionText}</div>:<p className="jobDescriptionUnavailable">Full description unavailable for this vacancy.</p>}
+            </div>
+          </section>
         </>})():<div className="emptyPanel"><h2>No selected vacancy</h2><p>{state.loading?'Searching LinkedIn public pages…':'Run the LinkedIn search to see matching vacancies.'}</p></div>}
       </div>
     </section>
