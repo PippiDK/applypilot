@@ -945,18 +945,6 @@ export default function Home(){
             <div className="conditionCard"><small>Work model</small><b>{conditionScore(jobConditions?.workModel.score)}</b><span>{jobConditions?.workModel.value||'Not stated'}</span></div>
           </div>
 
-          <BestCvPanel
-            job={job}
-            cvLibrary={cvLibrary}
-            selectedCvId={activeAdaptationBaseline?.cvId||''}
-            onSelectCv={chooseAdaptationCv}
-            adaptationActions={<div className="actions reviewActions">
-              <button className="primary" onClick={runCvAdaptationReview} disabled={!activeAdaptationBaseline||adaptationRun.loading||Boolean(currentAdaptationResult)}>{adaptationRun.loading&&adaptationRun.jobKey===jobKey?'Generating…':currentAdaptationResult?'Generated':'Generate CV update'}</button>
-              <button className="secondary" onClick={()=>setReviewOpen(true)} disabled={!currentAdaptationResult}>View CV update</button>
-              {job.officialUrl&&<a className="secondary openLink" href={job.officialUrl} target="_blank" rel="noreferrer">Employer link</a>}
-            </div>}
-          />
-
           <div className="expertiseHero" data-cv-source-version={cvData?.sourceVersion||''}>
             <div className="expertiseHeroHead"><div><p className="eyebrow">EXPERTISE MATCH</p><p className="expertiseIntro">Full JD ↔ Source CV professional expertise only</p></div><div className="expertiseScore">{expertiseState.loading&&expertiseState.jobKey===jobKey?'…':expertise?`${expertise.expertiseMatch}%`:'N/A'}</div></div>
             {expertiseState.loading&&expertiseState.jobKey===jobKey&&<div className="expertiseLoading">Analysing professional requirements and Source CV evidence…</div>}
@@ -975,6 +963,19 @@ export default function Home(){
               </div></div>
             </>}
           </div>
+
+          <BestCvPanel
+            job={job}
+            cvLibrary={cvLibrary}
+            selectedCvId={activeAdaptationBaseline?.cvId||''}
+            onSelectCv={chooseAdaptationCv}
+            adaptationActions={<div className="actions reviewActions">
+              <button className="primary" onClick={runCvAdaptationReview} disabled={!activeAdaptationBaseline||adaptationRun.loading||Boolean(currentAdaptationResult)}>{adaptationRun.loading&&adaptationRun.jobKey===jobKey?'Generating…':currentAdaptationResult?'Generated':'Generate CV update'}</button>
+              <button className="secondary" onClick={()=>setReviewOpen(true)} disabled={!currentAdaptationResult}>View CV update</button>
+              {job.officialUrl&&<a className="secondary openLink" href={job.officialUrl} target="_blank" rel="noreferrer">Employer link</a>}
+            </div>}
+          />
+
 
 
           <div className="section"><h3>Application pack</h3><div className="docs"><div>{pack.cvReady?'✓':'○'} Tailored CV <span className={pack.cvReady?'ready':'pending'}>{pack.tailoredCvLabel}</span></div><div>○ Cover letter <span className="pending">{pack.coverLetterLabel}</span></div></div></div>
