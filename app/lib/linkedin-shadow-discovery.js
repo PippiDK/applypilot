@@ -84,8 +84,9 @@ export async function searchLinkedInShadow({freshnessDays=7,unionSearchPlan={},f
 
   const searchGroups=groupDirections(directions)
   const byId=new Map()
-  // Cover the current-day window first so wider retrieval cannot displace it.
-  const windows=days===1?[1]:[1,days]
+  // Combined 1 Day mode: LinkedIn last 24h plus the 1-day-ago band (up to 48h).
+  // Keep the existing broad-window discovery strategy unchanged.
+  const windows=days===1?[1,2]:[1,days]
   for(const windowDays of windows){
     let eligible=[...searchGroups]
     for(let page=0;page<MAX_SEARCH_PAGES&&eligible.length;page++){
