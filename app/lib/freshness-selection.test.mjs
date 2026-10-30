@@ -35,17 +35,19 @@ test('maps the 1 3 5 10 controls to rolling freshness semantics',()=>{
   assert.equal(freshnessSelectionFromDays(14),'10d')
 })
 
-test('1 Day matches the LinkedIn rolling 24-hour window across midnight',()=>{
+test('1 Day combines last 24 hours with the 1-day-ago band up to 48 hours',()=>{
   const jobs=[
     item('today-early','2026-09-02T22:05:00.000Z'), // 00:05 Sep 3 CPH
     item('yesterday-late','2026-09-02T21:55:00.000Z'), // 23:55 Sep 2 CPH
     item('within-24h','2026-09-02T10:01:00.000Z'),
     item('exact-24h','2026-09-02T10:00:00.000Z'),
     item('outside-24h','2026-09-02T09:59:59.999Z'),
+    item('exact-48h','2026-09-01T10:00:00.000Z'),
+    item('outside-48h','2026-09-01T09:59:59.999Z'),
     item('future','2026-09-03T10:00:00.001Z'),
     item('undated',null),
   ]
-  assert.deepEqual(ids(filterItemsByFreshnessSelection(jobs,'today',NOW)),['today-early','yesterday-late','within-24h','exact-24h'])
+  assert.deepEqual(ids(filterItemsByFreshnessSelection(jobs,'today',NOW)),['today-early','yesterday-late','within-24h','exact-24h','outside-24h','exact-48h'])
 })
 
 test('3 day mode keeps jobs within a rolling three-day horizon',()=>{
