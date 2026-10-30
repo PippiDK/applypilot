@@ -58,7 +58,8 @@ export function filterItemsByFreshnessSelection(items=[],selection='5d',now=new 
   if(!Number.isFinite(current.getTime())) return []
 
   // LinkedIn f_TPR uses rolling seconds (r86400 for 1 Day), not calendar days.
-  const horizonDays=selection==='today'?1:selection==='yesterday'?3:selection==='10d'?10:5
+  // Combined 1 Day: last 24 hours plus LinkedIn's 1-day-ago age band.
+  const horizonDays=selection==='today'?2:selection==='yesterday'?3:selection==='10d'?10:5
   const maxAge=horizonDays*DAY_MS
   return (Array.isArray(items)?items:[]).filter(item=>{
     const published=publishedDate(item)
