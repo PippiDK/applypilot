@@ -88,6 +88,8 @@ export default function Home({isNightFlightJob=()=>false}={}){
   const someFiltersSelected=selectedAreas.length>0||selectedWorkModels.length>0
   const [selected,setSelected]=useState(null)
   const [jobDetailsTab,setJobDetailsTab]=useState({jobId:'',tab:'overview'})
+  const [copiedDescriptionJobId,setCopiedDescriptionJobId]=useState('')
+  const [descriptionCopyError,setDescriptionCopyError]=useState('')
   const [jobStatuses,setJobStatuses]=useState({})
   const [appliedJobs,setAppliedJobs]=useState([])
   const [appliedSaveError,setAppliedSaveError]=useState('')
@@ -1102,7 +1104,7 @@ export default function Home({isNightFlightJob=()=>false}={}){
           </div>
           <section className="jobDetailsDescription" role="region" aria-label="Job Description" style={currentJobDetailsTab==='description'?undefined:{display:'none'}}>
             <div className="jobDescriptionSheet">
-              <div className="jobDescriptionHeading"><h3>Job Description</h3>{job.needsJdReview&&<span className="jobDescriptionStatus">Incomplete JD</span>}</div>
+              <div className="jobDescriptionHeading"><h3>Job Description</h3>{job.needsJdReview&&<span className="jobDescriptionStatus">Incomplete JD</span>}<button type="button" className="secondary" disabled={!descriptionText} style={{marginLeft:'auto',padding:'5px 10px',fontSize:12}} onClick={async()=>{try{await navigator.clipboard.writeText(descriptionText);setCopiedDescriptionJobId(job.sourceJobId);setDescriptionCopyError('')}catch{setCopiedDescriptionJobId('');setDescriptionCopyError('Copy failed — please select the text manually.')}}}>{copiedDescriptionJobId===job.sourceJobId?'✓ Copied!':'⧉ Copy'}</button></div>{descriptionCopyError&&<p role="alert" className="jobDescriptionUnavailable">{descriptionCopyError}</p>
               {descriptionText?<div className="jobDescriptionText">{descriptionText}</div>:<p className="jobDescriptionUnavailable">Full description unavailable for this vacancy.</p>}
             </div>
           </section>
