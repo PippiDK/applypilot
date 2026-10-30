@@ -197,7 +197,10 @@ function withinFreshness(publishedAt,days,now){
   if(!publishedAt) return false
   const published=new Date(publishedAt)
   if(!Number.isFinite(published.getTime())) return false
-  if(Number(days)===1) return denmarkDateKey(published)===denmarkDateKey(now)
+  if(Number(days)===1){
+    const ageMs=now.getTime()-published.getTime()
+    return ageMs>=0&&ageMs<=2*86400000
+  }
   const today=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate())
   const posted=Date.UTC(published.getUTCFullYear(),published.getUTCMonth(),published.getUTCDate())
   const ageDays=Math.floor((today-posted)/86400000)
