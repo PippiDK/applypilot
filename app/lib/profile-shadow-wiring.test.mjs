@@ -16,5 +16,8 @@ test('page promotes the saved Union Search Plan to LIVE while preserving legacy 
   assert.match(searchBlock,/JSON\.stringify\(\{freshnessDays,cvText:cvData\.cvText\}\)/)
   assert.doesNotMatch(searchBlock,/\/api\/linkedin-shadow-search/)
   assert.match(searchBlock,/const mergedJobs=mergeSourceItems/)
-  assert.match(searchBlock,/setJobs\(mergedJobs\)/)
+  // LIVE retains the original mergeSourceItems result before storing it in the dedicated results pool.
+  assert.match(searchBlock,/publishLiveMatches\(mergedJobs\)/)
+  assert.match(source,/function publishLiveMatches\(items\)/)
+  assert.match(source,/setJobs\(livePoolItems\(next\)\)/)
 })
