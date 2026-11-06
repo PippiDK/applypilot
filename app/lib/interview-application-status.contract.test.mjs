@@ -23,5 +23,5 @@ test('Interview uses blue in Applied History while normal Search styling stays u
   const globals=readFileSync(new URL('../globals.css',import.meta.url),'utf8')
   const polish=readFileSync(new URL('../ux-polish.css',import.meta.url),'utf8')
   assert.match(globals,/\.jobStatusSelect\.status-interview\{[^}]*border-color:#be185d;[^}]*color:#f9a8d4;[^}]*background:#2a1220/i)
-  assert.match(polish,/\\.applicationStatus-interview\\{[^}]*border:1px solid #4F8CCF;[^}]*color:#7AB8FF;[^}]*background:#15253B/i)
+  assert.ok(polish.includes('.applicationStatus-interview{border:1px solid #4F8CCF;color:#7AB8FF;background:#15253B}'))
 })
