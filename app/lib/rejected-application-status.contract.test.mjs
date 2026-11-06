@@ -18,9 +18,9 @@ test('Rejected remains in Applied History through the shared application lifecyc
   assert.match(archive,/REJECTED/)
 })
 
-test('Rejected uses red text on a grey background in selector and Applied History badge',()=>{
+test('Rejected uses muted coral in Applied History while normal Search styling stays unchanged',()=>{
   const globals=readFileSync(new URL('../globals.css',import.meta.url),'utf8')
   const polish=readFileSync(new URL('../ux-polish.css',import.meta.url),'utf8')
   assert.match(globals,/\.jobStatusSelect\.status-rejected\{[^}]*border-color:#6b7280;[^}]*color:#fca5a5;[^}]*background:#25282d/i)
-  assert.match(polish,/\.applicationStatus-rejected\{[^}]*border:1px solid #6b7280;[^}]*color:#fca5a5;[^}]*background:#25282d/i)
+  assert.ok(polish.includes('.applicationStatus-rejected{border:1px solid #A9575C;color:#F18C91;background:#302022}'))
 })
